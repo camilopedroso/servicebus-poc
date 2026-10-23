@@ -1,9 +1,14 @@
 # Cria (ou atualiza) a infraestrutura da POC e grava o endpoint para os apps usarem.
-# Uso: .\infra\up.ps1
+# Uso: .\infra\up.ps1               lock de 30 s (comportamento normal)
+#      .\infra\up.ps1 -ModoDebug    lock de 5 min (máximo), para depurar parado em breakpoints
+# (Não é -Debug: esse nome é um parâmetro comum reservado do PowerShell.)
 param(
     [string]$ResourceGroup = 'rg-servicebus-poc',
-    [string]$Location = 'brazilsouth'
+    [string]$Location = 'brazilsouth',
+    [switch]$ModoDebug
 )
+
+$lockDuration = if ($ModoDebug) { 'PT5M' } else { 'PT30S' }
 
 $ErrorActionPreference = 'Stop'
 
@@ -13,11 +18,11 @@ if (-not $principalId) { throw 'Faça login antes: az login' }
 Write-Host "Criando resource group $ResourceGroup em $Location..."
 az group create -n $ResourceGroup -l $Location --tags projeto=servicebus-poc -o none
 
-Write-Host 'Aplicando main.bicep (leva ~1 min)...'
+Write-Host "Aplicando main.bicep com lockDuration=$lockDuration (leva ~1 min)..."
 $outputs = az deployment group create `
     -g $ResourceGroup `
     -f "$PSScriptRoot\main.bicep" `
-    -p developerPrincipalId=$principalId `
+    -p developerPrincipalId=$principalId lockDuration=$lockDuration `
     --query properties.outputs -o json | ConvertFrom-Json
 if ($LASTEXITCODE -ne 0) { throw 'Deploy falhou.' }
 

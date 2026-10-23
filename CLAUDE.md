@@ -12,6 +12,7 @@ The work is split into phases (roadmap and status in `README.md`). Each phase ge
 
 ```powershell
 .\infra\up.ps1                 # create/update Azure infra (RG rg-servicebus-poc, brazilsouth) and write src/servicebus.local.json
+.\infra\up.ps1 -ModoDebug      # same, with lockDuration PT5M (max) on queue and subscriptions, for breakpoint debugging
 .\infra\down.ps1               # delete the resource group. Standard tier bills ~US$0.013/h while it exists, even idle
 az bicep lint -f infra\main.bicep
 dotnet build                   # solution: ServiceBusPoc.slnx

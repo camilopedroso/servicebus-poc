@@ -2,14 +2,14 @@
 
 POC para estudar Azure Service Bus em C#/.NET 10, comparando com Kafka e RabbitMQ.
 
-| Fase | Tema | Status |
-|---|---|---|
-| 1 | Fila: peek-lock, Complete/Abandon/DeadLetter, retry, DLQ, competing consumers | ✅ |
-| 2 | Tópico + assinaturas com filtros, transação entre entidades | ✅ |
-| 3 | Sessions, detecção de duplicatas, mensagens agendadas, deferral | ⏳ |
-| 4 | API REST + Outbox no SQL Server | ⏳ |
-| 5 | Observabilidade (OpenTelemetry → App Insights) + testes | ⏳ |
-| 6 | (Opcional) Azure DevOps + Azure Functions | ⏳ |
+| Fase | Tema                                                                          | Status |
+| ---- | ----------------------------------------------------------------------------- | ------ |
+| 1    | Fila: peek-lock, Complete/Abandon/DeadLetter, retry, DLQ, competing consumers | ✅      |
+| 2    | Tópico + assinaturas com filtros, transação entre entidades                   | ✅      |
+| 3    | Sessions, detecção de duplicatas, mensagens agendadas, deferral               | ⏳      |
+| 4    | API REST + Outbox no SQL Server                                               | ⏳      |
+| 5    | Observabilidade (OpenTelemetry → App Insights) + testes                       | ⏳      |
+| 6    | (Opcional) Azure DevOps + Azure Functions                                     | ⏳      |
 
 Notas de estudo: [fase 1 — filas](docs/fase-1-filas.md) · [fase 2 — tópicos](docs/fase-2-topicos.md)
 
@@ -40,8 +40,27 @@ As primeiras 13 milhões de operações/mês estão inclusas. Por isso:
 
 ```powershell
 .\infra\up.ps1     # ao começar a estudar (~1 min)
+# ou no prompt do Claude -> ! pwsh -File infra/up.ps1
+
 .\infra\down.ps1   # ao terminar
+# ou no prompt do Claude -> ! pwsh -File infra/down.ps1
 ```
+
+### Modo debug
+
+Parado num breakpoint, o SDK não renova o lock. Com o lock normal de 30 s, a mensagem volta para a fila e o
+`Complete` falha com `MessageLockLost` ("The lock supplied is invalid"). Para depurar com calma:
+
+```powershell
+.\infra\up.ps1 -ModoDebug   # lock de 5 min (máximo do Service Bus) na fila e nas assinaturas
+# ou no prompt do Claude -> ! pwsh -File infra/up.ps1 -ModoDebug
+
+.\infra\up.ps1              # volta para 30 s
+# ou no prompt do Claude -> ! pwsh -File infra/up.ps1
+```
+
+Mesmo com 5 min, se ficar mais tempo que isso parado, o erro volta. Em produção o lock fica curto de propósito:
+se um consumer travar, a mensagem volta logo para outro processar.
 
 ## Rodando a fase 1
 

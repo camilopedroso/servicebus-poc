@@ -7,6 +7,12 @@ param location string = resourceGroup().location
 @description('Object ID do usuário (Entra ID) que vai rodar producer/consumer localmente.')
 param developerPrincipalId string
 
+// Tempo que o consumer tem para concluir antes do lock expirar e a mensagem voltar à fila/assinatura.
+// É configuração da ENTIDADE no broker (o cliente não escolhe). Máximo: 5 min.
+// up.ps1 -ModoDebug usa PT5M para dar tempo de parar em breakpoints.
+@description('lockDuration da fila e das assinaturas (ISO 8601, máx. PT5M).')
+param lockDuration string = 'PT30S'
+
 // Nome do namespace precisa ser globalmente único (vira <nome>.servicebus.windows.net).
 var namespaceName = 'sb-vida-poc-${uniqueString(resourceGroup().id)}'
 
@@ -32,8 +38,7 @@ resource propostas 'Microsoft.ServiceBus/namespaces/queues@2024-01-01' = {
   parent: namespace
   name: 'propostas'
   properties: {
-    // Tempo que o consumer tem para concluir antes do lock expirar e a mensagem voltar à fila.
-    lockDuration: 'PT30S'
+    lockDuration: lockDuration
     // Após 5 entregas sem Complete, a mensagem vai para a DLQ ($DeadLetterQueue).
     maxDeliveryCount: 5
     defaultMessageTimeToLive: 'P14D'
@@ -54,7 +59,7 @@ resource apoliceEmitida 'Microsoft.ServiceBus/namespaces/topics@2024-01-01' = {
 // Cada assinatura é uma "fila virtual" com cópia própria das mensagens que passam no filtro,
 // com lock, maxDeliveryCount e DLQ independentes (≈ consumer group do Kafka / fila ligada a um exchange).
 var propriedadesAssinatura = {
-  lockDuration: 'PT30S'
+  lockDuration: lockDuration
   maxDeliveryCount: 5
   deadLetteringOnMessageExpiration: true
   // Mensagem que dá erro ao avaliar o filtro (ex.: tipo errado) vai para a DLQ em vez de sumir.
