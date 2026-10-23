@@ -1,0 +1,70 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Consumer",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/src/Vida.Consumer/bin/Debug/net10.0/Vida.Consumer.dll",
+      "cwd": "${workspaceFolder}/src/Vida.Consumer",
+      "console": "integratedTerminal",
+      "env": {
+        "DOTNET_ENVIRONMENT": "Development",
+        // Uma mensagem por vez: com 4 em paralelo, o passo a passo pula entre threads.
+        "Consumer__MaxConcurrentCalls": "1"
+      }
+    },
+    {
+      "name": "Producer",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/src/Vida.Producer/bin/Debug/net10.0/Vida.Producer.dll",
+      "args": ["${input:comandoProducer}"],
+      "cwd": "${workspaceFolder}/src/Vida.Producer",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Consumer (sem build)",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/Vida.Consumer/bin/Debug/net10.0/Vida.Consumer.dll",
+      "cwd": "${workspaceFolder}/src/Vida.Consumer",
+      "console": "integratedTerminal",
+      "env": {
+        "DOTNET_ENVIRONMENT": "Development",
+        "Consumer__MaxConcurrentCalls": "1"
+      },
+      "presentation": { "hidden": true }
+    },
+    {
+      "name": "Producer (sem build)",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/Vida.Producer/bin/Debug/net10.0/Vida.Producer.dll",
+      "args": ["${input:comandoProducer}"],
+      "cwd": "${workspaceFolder}/src/Vida.Producer",
+      "console": "integratedTerminal",
+      "presentation": { "hidden": true }
+    }
+  ],
+  "compounds": [
+    {
+      // Compila uma vez só (dois builds em paralelo brigam pelos mesmos arquivos) e sobe os dois.
+      "name": "Consumer + Producer",
+      "preLaunchTask": "build",
+      "configurations": ["Consumer (sem build)", "Producer (sem build)"],
+      "stopAll": true
+    }
+  ],
+  "inputs": [
+    {
+      "id": "comandoProducer",
+      "type": "pickString",
+      "description": "Comando do producer",
+      "options": ["enviar", "enviar-invalida", "enviar-com-falha", "espiar", "dlq", "reprocessar-dlq"],
+      "default": "enviar"
+    }
+  ]
+}
