@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-Vida.Consumer-98dc07a3-99c1-4a49-9176-c83a3352f306</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Vida.Mensageria\Vida.Mensageria.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Gerado por infra/up.ps1 -->
+    <None Include="..\servicebus.local.json" Link="servicebus.local.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\servicebus.local.json')" />
+  </ItemGroup>
+</Project>

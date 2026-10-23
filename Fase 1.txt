@@ -1,0 +1,3 @@
+Dois pontos importantes:
+- Abandon não espera antes de reentregar. Se a falha for de um serviço fora do ar, as 5 tentativas se esgotam em segundos. As notas explicam três formas de fazer retry com espera.
+- Startup lento. O consumer leva cerca de 20 s na primeira conexão, porque o DefaultAzureCredential testa várias formas de login antes de chegar ao az login. Em produção, com Managed Identity, isso não acontece.
