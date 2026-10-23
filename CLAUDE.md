@@ -45,6 +45,14 @@ There are no tests yet (planned for phase 5).
 - **Subscription filters only see properties, never the body.** `MensagensApolice.Criar` copies routing fields (`plano`, `capitalSegurado` as `long`) into application properties. Change those together with the Bicep rules. In Bicep, don't redefine the `$Default` rule: the deploy succeeds but leaves the subscription with no rules. Give each rule its own name.
 - **`Vida.Producer`:** a console app with `switch`-dispatched commands. It sets `MessageId` to the business id (groundwork for duplicate detection in phase 3), `Subject` to the event type (for subscription filters in phase 2), and `CorrelationId` to the client id. It also hosts the operations tools: peek, DLQ peek, and DLQ resubmit. Resubmit sends the copy before completing the DLQ message, so a failure duplicates rather than loses (at-least-once).
 
+## Working with the user
+
+- Talk to the user in Portuguese. They read the code closely, ask concept questions as they go, and add XML doc comments themselves. Keep their edits.
+- Commit only when asked, directly on `master`, with no branches. Before committing, check for and mention the user's own uncommitted edits.
+- Infra costs money while it exists. At the end of a session, or after a deploy the user didn't ask to keep, remind them to run `down.ps1`. Check with `az group exists -n rg-servicebus-poc`.
+- The `!` prompt prefix runs **bash**, which eats backslashes. Suggest `! pwsh -File infra/up.ps1` (or `down.ps1`, `-ModoDebug`), not `.\infra\up.ps1`.
+- Before writing Service Bus facts into docs (limits, semantics), verify them with the Azure MCP `documentation` tool. One claim about multiple matching rules was wrong until checked.
+
 ## Conventions for new phases
 
 - Follow the Azure best-practice choices already made: managed identity/RBAC instead of keys, one `ServiceBusClient` singleton per app, infrastructure in Bicep rather than portal clicks, latest stable SDKs (`Azure.Messaging.ServiceBus`, `Azure.Identity`).
