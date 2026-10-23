@@ -1,10 +1,12 @@
+using System.Transactions;
 using Azure.Messaging.ServiceBus;
 using Vida.Mensageria;
 
 namespace Vida.Consumer;
 
 /// <summary>
-/// Consumer de subscrição: lê propostas da fila e decide o destino de cada mensagem.
+/// Consumer de subscrição: lê propostas da fila, decide o destino de cada mensagem e,
+/// quando aprova, publica ApoliceEmitida no tópico.
 /// Rode duas instâncias para ver "competing consumers": cada mensagem vai para só uma delas.
 /// </summary>
 public sealed class Worker(ServiceBusClient client, IConfiguration configuration, ILogger<Worker> logger)
@@ -15,6 +17,9 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
 
     // Identifica a instância nos logs para comparar quando houver mais de um consumer.
     private readonly string _instancia = $"{Environment.MachineName}-{Environment.ProcessId}";
+
+    // Sender criado a partir do mesmo client do processor: exigência da transação entre entidades.
+    private readonly ServiceBusSender _senderApolices = client.CreateSender(Topicos.ApoliceEmitida);
 
     private ServiceBusProcessor? _processor;
 
@@ -95,14 +100,33 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
             return;
         }
 
-        // 4) Caminho feliz: simula a análise de risco e confirma.
+        // 4) Caminho feliz: simula a análise de risco, emite a apólice e publica o evento.
         await Task.Delay(TimeSpan.FromMilliseconds(500), args.CancellationToken);
-        await args.CompleteMessageAsync(mensagem, args.CancellationToken);
+
+        var apolice = new ApoliceEmitida(
+            ApoliceId: Guid.NewGuid(),
+            PropostaId: proposta.PropostaId,
+            ClienteId: proposta.ClienteId,
+            Plano: proposta.Plano,
+            CapitalSegurado: proposta.CapitalSegurado,
+            PremioMensal: MensagensApolice.CalcularPremioMensal(proposta.CapitalSegurado, proposta.Idade),
+            EmitidaEm: DateTimeOffset.UtcNow);
+
+        // Complete na fila + Send no tópico na MESMA transação do broker: ou os dois acontecem, ou nenhum.
+        // Sem isso: publicar e cair antes do Complete → evento duplicado; completar e cair antes do Send → evento perdido.
+        // Só vale para operações no Service Bus: um INSERT no SQL Server aqui dentro NÃO entraria na transação (fase 4: outbox).
+        using (var transacao = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+        {
+            // A primeira operação define a entidade "via" (a fila): o envio para o tópico é roteado por ela.
+            await args.CompleteMessageAsync(mensagem, args.CancellationToken);
+            await _senderApolices.SendMessageAsync(MensagensApolice.Criar(apolice), args.CancellationToken);
+            transacao.Complete();
+        }
 
         logger.LogInformation(
-            "[{Instancia}] Proposta {PropostaId} aprovada para análise: {Plano}, capital {Capital}, idade {Idade} (#{Seq}).",
+            "[{Instancia}] Proposta {PropostaId} aprovada: {Plano}, capital {Capital}, idade {Idade} (#{Seq}) → apólice {ApoliceId} publicada.",
             _instancia, proposta.PropostaId, proposta.Plano, proposta.CapitalSegurado.ToString("C0", PtBr), proposta.Idade,
-            mensagem.SequenceNumber);
+            mensagem.SequenceNumber, apolice.ApoliceId);
     }
 
     private Task TratarErro(ProcessErrorEventArgs args)
@@ -123,6 +147,7 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
             await _processor.StopProcessingAsync(cancellationToken);
             await _processor.DisposeAsync();
         }
+        await _senderApolices.DisposeAsync();
         await base.StopAsync(cancellationToken);
     }
 }

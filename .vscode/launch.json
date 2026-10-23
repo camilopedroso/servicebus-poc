@@ -26,6 +26,26 @@
       "console": "integratedTerminal"
     },
     {
+      "name": "Assinantes",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/src/Vida.Assinantes/bin/Debug/net10.0/Vida.Assinantes.dll",
+      "cwd": "${workspaceFolder}/src/Vida.Assinantes",
+      "console": "integratedTerminal",
+      "env": { "DOTNET_ENVIRONMENT": "Development" }
+    },
+    {
+      "name": "Assinantes (sem build)",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/Vida.Assinantes/bin/Debug/net10.0/Vida.Assinantes.dll",
+      "cwd": "${workspaceFolder}/src/Vida.Assinantes",
+      "console": "integratedTerminal",
+      "env": { "DOTNET_ENVIRONMENT": "Development" },
+      "presentation": { "hidden": true }
+    },
+    {
       "name": "Consumer (sem build)",
       "type": "coreclr",
       "request": "launch",
@@ -56,6 +76,12 @@
       "preLaunchTask": "build",
       "configurations": ["Consumer (sem build)", "Producer (sem build)"],
       "stopAll": true
+    },
+    {
+      "name": "Fluxo completo (Consumer + Assinantes + Producer)",
+      "preLaunchTask": "build",
+      "configurations": ["Consumer (sem build)", "Assinantes (sem build)", "Producer (sem build)"],
+      "stopAll": true
     }
   ],
   "inputs": [
@@ -63,7 +89,7 @@
       "id": "comandoProducer",
       "type": "pickString",
       "description": "Comando do producer",
-      "options": ["enviar", "enviar-invalida", "enviar-com-falha", "espiar", "dlq", "reprocessar-dlq"],
+      "options": ["enviar", "enviar-invalida", "enviar-com-falha", "espiar", "dlq", "reprocessar-dlq", "publicar-apolice", "regras"],
       "default": "enviar"
     }
   ]

@@ -42,6 +42,75 @@ resource propostas 'Microsoft.ServiceBus/namespaces/queues@2024-01-01' = {
   }
 }
 
+// Fase 2: evento publicado pelo consumer de subscrição quando aprova uma proposta.
+resource apoliceEmitida 'Microsoft.ServiceBus/namespaces/topics@2024-01-01' = {
+  parent: namespace
+  name: 'apolice-emitida'
+  properties: {
+    defaultMessageTimeToLive: 'P14D'
+  }
+}
+
+// Cada assinatura é uma "fila virtual" com cópia própria das mensagens que passam no filtro,
+// com lock, maxDeliveryCount e DLQ independentes (≈ consumer group do Kafka / fila ligada a um exchange).
+var propriedadesAssinatura = {
+  lockDuration: 'PT30S'
+  maxDeliveryCount: 5
+  deadLetteringOnMessageExpiration: true
+  // Mensagem que dá erro ao avaliar o filtro (ex.: tipo errado) vai para a DLQ em vez de sumir.
+  deadLetteringOnFilterEvaluationExceptions: true
+}
+
+resource cobranca 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
+  parent: apoliceEmitida
+  name: 'cobranca'
+  properties: propriedadesAssinatura
+}
+
+// Uma assinatura criada sem regras ganha a regra $Default (TrueFilter = recebe tudo). Se houver várias regras,
+// vale o OR entre elas. Obs.: redefinir '$Default' via ARM não funciona (o deploy passa, mas a regra some);
+// por isso cada filtro tem nome próprio.
+resource cobrancaRegra 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
+  parent: cobranca
+  name: 'apenas-apolice-emitida'
+  properties: {
+    // Correlation filter: igualdade em propriedades, avaliado por hash. Mais barato que SQL.
+    filterType: 'CorrelationFilter'
+    correlationFilter: {
+      label: 'ApoliceEmitida' // "label" é o nome antigo de Subject
+    }
+  }
+}
+
+// Sem regra customizada: fica com $Default (TrueFilter) e recebe todos os eventos do tópico.
+resource notificacao 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
+  parent: apoliceEmitida
+  name: 'notificacao'
+  properties: propriedadesAssinatura
+}
+
+resource altoValor 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
+  parent: apoliceEmitida
+  name: 'alto-valor'
+  properties: propriedadesAssinatura
+}
+
+resource altoValorRegra 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
+  parent: altoValor
+  name: 'capital-acima-de-1-milhao'
+  properties: {
+    // SQL filter: expressões sobre propriedades (nunca sobre o corpo). Mais flexível, mais caro de avaliar.
+    filterType: 'SqlFilter'
+    sqlFilter: {
+      sqlExpression: 'capitalSegurado > 1000000'
+    }
+    // Action: altera as propriedades da cópia que entra nesta assinatura (as outras não veem).
+    action: {
+      sqlExpression: 'SET prioridade = \'alta\''
+    }
+  }
+}
+
 resource developerDataOwner 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(namespace.id, developerPrincipalId, serviceBusDataOwnerRoleId)
   scope: namespace
