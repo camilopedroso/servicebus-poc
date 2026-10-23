@@ -1,13 +1,18 @@
 using Azure.Messaging.ServiceBus;
-using Vida.Mensageria;
+using Vida.Mensageria.Contratos;
+using Vida.Mensageria.Mensagens;
+using Vida.Mensageria.Topologia;
 
 namespace Vida.Assinantes;
 
 /// <summary>
 /// Processa uma assinatura do tópico "apolice-emitida". Uma instância por assinatura:
-/// cada uma recebe sua própria cópia das mensagens que passaram no filtro (pub/sub),
+/// cada uma recebe sua própria cópia das mensagens que passaram no filtro (publish/subscribe),
 /// enquanto várias instâncias da MESMA assinatura dividem as mensagens (competing consumers).
 /// </summary>
+/// <param name="assinatura">Nome da assinatura do tópico "apolice-emitida".</param>
+/// <param name="client">Instância do ServiceBusClient para criar o processor.</param>
+/// <param name="logger">Logger para registrar informações e erros.</param>
 public sealed class AssinaturaWorker(string assinatura, ServiceBusClient client, ILogger<AssinaturaWorker> logger)
     : BackgroundService
 {
@@ -15,6 +20,11 @@ public sealed class AssinaturaWorker(string assinatura, ServiceBusClient client,
 
     private ServiceBusProcessor? _processor;
 
+    /// <summary>
+    /// Executa o processamento das mensagens da assinatura até que o token de cancelamento seja acionado.
+    /// </summary>
+    /// <param name="stoppingToken"></param>
+    /// <returns></returns>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         // Mesma API da fila, só muda o endereço: (tópico, assinatura).
@@ -44,6 +54,11 @@ public sealed class AssinaturaWorker(string assinatura, ServiceBusClient client,
         }
     }
 
+    /// <summary>
+    /// Processa uma mensagem recebida da assinatura, completando-a ou enviando para dead-letter se inválida.
+    /// </summary>
+    /// <param name="args"></param>
+    /// <returns></returns>
     private async Task ProcessarMensagem(ProcessMessageEventArgs args)
     {
         var mensagem = args.Message;
@@ -74,6 +89,11 @@ public sealed class AssinaturaWorker(string assinatura, ServiceBusClient client,
             assinatura, apolice.ApoliceId, apolice.Plano, apolice.CapitalSegurado.ToString("C0", PtBr), prioridade, acao);
     }
 
+    /// <summary>
+    /// Para encerrar o processamento da assinatura, parando o processor e liberando recursos.
+    /// </summary>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
         if (_processor is not null)

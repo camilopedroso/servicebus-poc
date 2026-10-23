@@ -2,62 +2,22 @@ using Azure.Identity;
 using Azure.Messaging.ServiceBus;
 using Microsoft.Extensions.Configuration;
 
-namespace Vida.Mensageria;
-
-/// <summary>Nomes das entidades criadas em infra/main.bicep.</summary>
-public static class Filas
-{
-    public const string Propostas = "propostas";
-}
-
-public static class Topicos
-{
-    public const string ApoliceEmitida = "apolice-emitida";
-}
-
-public static class Assinaturas
-{
-    /// <summary>Correlation filter: Subject = 'ApoliceEmitida'.</summary>
-    public const string Cobranca = "cobranca";
-
-    /// <summary>Sem filtro (TrueFilter): recebe tudo.</summary>
-    public const string Notificacao = "notificacao";
-
-    /// <summary>SQL filter: capitalSegurado &gt; 1000000, com action que define prioridade = 'alta'.</summary>
-    public const string AltoValor = "alto-valor";
-
-    public static readonly string[] Todas = [Cobranca, Notificacao, AltoValor];
-}
+namespace Vida.Mensageria.Conexao;
 
 /// <summary>
-/// Nomes de application properties (metadados fora do corpo, ≈ headers no Kafka/RabbitMQ).
-/// Filtros de assinatura só enxergam propriedades, nunca o corpo: o que for filtrável tem que estar aqui.
+/// Fábrica para criar instâncias do ServiceBusClient, configuradas com retry e suporte a transações entre entidades.
 /// </summary>
-public static class Propriedades
-{
-    /// <summary>Quando true, o consumer simula uma falha transitória (para exercitar retry → DLQ).</summary>
-    public const string SimularFalha = "simularFalha";
-
-    public const string Plano = "plano";
-
-    /// <summary>Capital em reais inteiros (long): o filtro SQL compara números, e decimal não é bem suportado.</summary>
-    public const string CapitalSegurado = "capitalSegurado";
-
-    /// <summary>Definida pela action da regra da assinatura alto-valor (não é enviada pelo publisher).</summary>
-    public const string Prioridade = "prioridade";
-}
-
-public static class TiposDeMensagem
-{
-    public const string PropostaRecebida = "PropostaRecebida";
-    public const string ApoliceEmitida = "ApoliceEmitida";
-}
-
 public static class ServiceBusClientFactory
 {
     /// <summary>Arquivo gerado por infra/up.ps1 com o endpoint do namespace.</summary>
     public const string ArquivoConfiguracaoLocal = "servicebus.local.json";
 
+    /// <summary>
+    /// Obtém o namespace totalmente qualificado do Service Bus a partir da configuração.
+    /// </summary>
+    /// <param name="configuration"></param>
+    /// <returns></returns>
+    /// <exception cref="InvalidOperationException"></exception>
     public static string ObterNamespace(IConfiguration configuration) =>
         configuration["ServiceBus:FullyQualifiedNamespace"]
         ?? throw new InvalidOperationException(

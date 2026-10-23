@@ -1,4 +1,4 @@
-namespace Vida.Mensageria;
+namespace Vida.Mensageria.Contratos;
 
 /// <summary>
 /// Proposta de seguro de vida enviada para subscrição (análise de risco).

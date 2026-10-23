@@ -1,6 +1,6 @@
 using Azure.Messaging.ServiceBus;
 using Vida.Consumer;
-using Vida.Mensageria;
+using Vida.Mensageria.Conexao;
 
 var builder = Host.CreateApplicationBuilder(args);
 

@@ -2,7 +2,11 @@
 using Azure.Messaging.ServiceBus;
 using Azure.Messaging.ServiceBus.Administration;
 using Microsoft.Extensions.Configuration;
-using Vida.Mensageria;
+using Vida.Mensageria.Conexao;
+using Vida.Mensageria.Contratos;
+using Vida.Mensageria.Dominio;
+using Vida.Mensageria.Mensagens;
+using Vida.Mensageria.Topologia;
 
 // Producer + ferramentas de operação.
 // Fase 1 (fila "propostas"):
@@ -25,6 +29,7 @@ var configuration = new ConfigurationBuilder()
 
 var comando = args.FirstOrDefault() ?? "enviar";
 var fqdn = ServiceBusClientFactory.ObterNamespace(configuration);
+Console.WriteLine($"Namespace do Service Bus: {fqdn}");
 
 await using var client = ServiceBusClientFactory.Criar(fqdn);
 
@@ -91,11 +96,19 @@ catch (UnauthorizedAccessException ex)
 
 return 0;
 
+/// <summary>
+/// Obtém o argumento da assinatura a partir da linha de comando.
+/// </summary>
+/// <param name="args">Argumentos da linha de comando.</param>
+/// <returns>Assinatura obtida a partir dos argumentos.</returns>
 static string ArgumentoAssinatura(string[] args) =>
     args.Length > 1 && Assinaturas.Todas.Contains(args[1])
         ? args[1]
         : throw new ArgumentException($"Informe a assinatura: {string.Join(" | ", Assinaturas.Todas)}");
 
+/// Publica uma apólice no tópico ApoliceEmitida.
+/// <param name="client">Client do Service Bus.</param>
+/// <param name="capital">Capital segurado (opcional; se não informado, será gerado aleatoriamente).</param>
 static async Task PublicarApolice(ServiceBusClient client, decimal? capital)
 {
     var capitalSegurado = capital ?? Random.Shared.Next(50, 2000) * 1_000m;
@@ -105,7 +118,7 @@ static async Task PublicarApolice(ServiceBusClient client, decimal? capital)
         ClienteId: $"CLI-{Random.Shared.Next(1000, 9999)}",
         Plano: Random.Shared.GetItems(["Individual", "Familiar", "Empresarial"], 1)[0],
         CapitalSegurado: capitalSegurado,
-        PremioMensal: MensagensApolice.CalcularPremioMensal(capitalSegurado, idade: 40),
+        PremioMensal: CalculadoraDePremio.CalcularMensal(capitalSegurado, idade: 40),
         EmitidaEm: DateTimeOffset.UtcNow);
 
     await using var sender = client.CreateSender(Topicos.ApoliceEmitida);
@@ -113,6 +126,10 @@ static async Task PublicarApolice(ServiceBusClient client, decimal? capital)
     Console.WriteLine($"Publicada apólice {apolice.ApoliceId} com capital {capitalSegurado:N0} em '{Topicos.ApoliceEmitida}'.");
 }
 
+/// Espia as mensagens de uma assinatura do tópico ApoliceEmitida.
+/// <param name="client">Client do Service Bus.</param>
+/// <param name="assinatura">Nome da assinatura.</param>
+/// <param name="deadLetter">Se true, espiar a DLQ; caso contrário, a fila normal.</param>
 static async Task EspiarAssinatura(ServiceBusClient client, string assinatura, bool deadLetter)
 {
     await using var receiver = client.CreateReceiver(Topicos.ApoliceEmitida, assinatura, new ServiceBusReceiverOptions
@@ -136,6 +153,8 @@ static async Task EspiarAssinatura(ServiceBusClient client, string assinatura, b
     }
 }
 
+/// Lista as regras de todas as assinaturas do tópico ApoliceEmitida.
+/// <param name="fqdn">FQDN do namespace do Service Bus.</param>
 static async Task ListarRegras(string fqdn)
 {
     // Administration client = operações de gerenciamento (criar/listar entidades e regras) pelo data plane.
@@ -160,6 +179,9 @@ static async Task ListarRegras(string fqdn)
     }
 }
 
+/// Descreve um filtro de correlação.
+/// <param name="c">Filtro de correlação.</param>
+/// <returns>Descrição legível do filtro.</returns>
 static string DescreverCorrelacao(CorrelationRuleFilter c)
 {
     var partes = new List<string>();
@@ -169,6 +191,9 @@ static string DescreverCorrelacao(CorrelationRuleFilter c)
     return string.Join(" AND ", partes);
 }
 
+/// Cria uma nova proposta de seguro de vida.
+/// <param name="idade">Idade do cliente (opcional; se não informado, será gerada aleatoriamente).</param>
+/// <returns>Nova instância de PropostaSeguroVida.</returns>
 static PropostaSeguroVida NovaProposta(int? idade = null) => new(
     PropostaId: Guid.NewGuid(),
     ClienteId: $"CLI-{Random.Shared.Next(1000, 9999)}",
@@ -177,6 +202,10 @@ static PropostaSeguroVida NovaProposta(int? idade = null) => new(
     Plano: Random.Shared.GetItems(["Individual", "Familiar", "Empresarial"], 1)[0],
     CriadaEm: DateTimeOffset.UtcNow);
 
+/// Cria uma mensagem do Service Bus a partir de uma proposta.
+/// <param name="proposta">Proposta de seguro de vida.</param>
+/// <param name="simularFalha">Se true, adiciona a propriedade SimularFalha na mensagem.</param>
+/// <returns>Nova instância de ServiceBusMessage.</returns>
 static ServiceBusMessage CriarMensagem(PropostaSeguroVida proposta, bool simularFalha)
 {
     var mensagem = new ServiceBusMessage(BinaryData.FromObjectAsJson(proposta))
@@ -196,6 +225,10 @@ static ServiceBusMessage CriarMensagem(PropostaSeguroVida proposta, bool simular
     return mensagem;
 }
 
+/// Envia um lote de propostas para a fila.
+/// <param name="client">Client do Service Bus.</param>
+/// <param name="quantidade">Número de propostas a enviar.</param>
+/// <returns>Tarefa representando a operação assíncrona.</returns>
 static async Task EnviarLote(ServiceBusClient client, int quantidade)
 {
     await using var sender = client.CreateSender(Filas.Propostas);
@@ -216,6 +249,11 @@ static async Task EnviarLote(ServiceBusClient client, int quantidade)
     Console.WriteLine($"Total: {enviadas} proposta(s) em '{Filas.Propostas}'.");
 }
 
+/// Envia uma única proposta para a fila.
+/// <param name="client">Client do Service Bus.</param>
+/// <param name="proposta">Proposta de seguro de vida.</param>
+/// <param name="simularFalha">Se true, adiciona a propriedade SimularFalha na mensagem.</param>
+/// <returns>Tarefa representando a operação assíncrona.</returns>
 static async Task EnviarUma(ServiceBusClient client, PropostaSeguroVida proposta, bool simularFalha)
 {
     await using var sender = client.CreateSender(Filas.Propostas);
@@ -223,6 +261,11 @@ static async Task EnviarUma(ServiceBusClient client, PropostaSeguroVida proposta
     Console.WriteLine($"Enviada proposta {proposta.PropostaId} (idade {proposta.Idade}, simularFalha={simularFalha}).");
 }
 
+/// Espia mensagens de uma fila ou da DLQ.
+/// <param name="client">Client do Service Bus.</param>
+/// <param name="fila">Nome da fila.</param>
+/// <param name="deadLetter">Se true, espiar a DLQ; caso contrário, a fila normal.</param>
+/// <returns>Tarefa representando a operação assíncrona.</returns>
 static async Task Espiar(ServiceBusClient client, string fila, bool deadLetter)
 {
     // Peek não trava nem consome: útil para inspeção/suporte, sem afetar consumers.
@@ -246,6 +289,9 @@ static async Task Espiar(ServiceBusClient client, string fila, bool deadLetter)
     }
 }
 
+/// Reprocessa mensagens da DLQ de volta para a fila principal.
+/// <param name="client">Client do Service Bus.</param>
+/// <returns>Tarefa representando a operação assíncrona.</returns>
 static async Task ReprocessarDlq(ServiceBusClient client)
 {
     await using var dlqReceiver = client.CreateReceiver(Filas.Propostas, new ServiceBusReceiverOptions

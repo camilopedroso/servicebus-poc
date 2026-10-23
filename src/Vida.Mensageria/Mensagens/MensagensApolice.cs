@@ -1,10 +1,18 @@
 using Azure.Messaging.ServiceBus;
+using Vida.Mensageria.Contratos;
 
-namespace Vida.Mensageria;
+namespace Vida.Mensageria.Mensagens;
 
+/// <summary>
+/// Contém métodos auxiliares para criar mensagens do tipo ApoliceEmitida.
+/// </summary>
 public static class MensagensApolice
 {
-    /// <summary>Monta a mensagem do evento, com as propriedades que os filtros das assinaturas usam.</summary>
+    /// <summary>
+    /// Fábrica que monta a mensagem do evento, com as propriedades que os filtros das assinaturas usam.
+    /// </summary>
+    /// <param name="apolice">Evento ApoliceEmitida a ser enviado.</param>
+    /// <returns>Mensagem do Service Bus pronta para envio.</returns>
     public static ServiceBusMessage Criar(ApoliceEmitida apolice)
     {
         var mensagem = new ServiceBusMessage(BinaryData.FromObjectAsJson(apolice))
@@ -18,8 +26,4 @@ public static class MensagensApolice
         mensagem.ApplicationProperties[Propriedades.CapitalSegurado] = (long)apolice.CapitalSegurado;
         return mensagem;
     }
-
-    /// <summary>Regra de prêmio fictícia, só para o evento ter um valor calculado.</summary>
-    public static decimal CalcularPremioMensal(decimal capitalSegurado, int idade) =>
-        Math.Round(capitalSegurado * (0.0002m + idade * 0.00001m), 2);
 }

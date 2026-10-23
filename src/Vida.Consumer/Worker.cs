@@ -1,6 +1,9 @@
 using System.Transactions;
 using Azure.Messaging.ServiceBus;
-using Vida.Mensageria;
+using Vida.Mensageria.Contratos;
+using Vida.Mensageria.Dominio;
+using Vida.Mensageria.Mensagens;
+using Vida.Mensageria.Topologia;
 
 namespace Vida.Consumer;
 
@@ -109,7 +112,7 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
             ClienteId: proposta.ClienteId,
             Plano: proposta.Plano,
             CapitalSegurado: proposta.CapitalSegurado,
-            PremioMensal: MensagensApolice.CalcularPremioMensal(proposta.CapitalSegurado, proposta.Idade),
+            PremioMensal: CalculadoraDePremio.CalcularMensal(proposta.CapitalSegurado, proposta.Idade),
             EmitidaEm: DateTimeOffset.UtcNow);
 
         // Complete na fila + Send no tópico na MESMA transação do broker: ou os dois acontecem, ou nenhum.

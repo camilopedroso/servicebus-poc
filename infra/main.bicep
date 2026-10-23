@@ -20,6 +20,7 @@ var namespaceName = 'sb-vida-poc-${uniqueString(resourceGroup().id)}'
 // Em produção, prefira Data Sender / Data Receiver separados por aplicação (least privilege).
 var serviceBusDataOwnerRoleId = '090c5cfd-751d-490a-894a-3ce6f1109419'
 
+// Criação do namespace Service Bus e configuração de RBAC para o desenvolvedor.
 resource namespace 'Microsoft.ServiceBus/namespaces@2024-01-01' = {
   name: namespaceName
   location: location
@@ -34,6 +35,7 @@ resource namespace 'Microsoft.ServiceBus/namespaces@2024-01-01' = {
   }
 }
 
+// Criação da fila de propostas no namespace Service Bus.
 resource propostas 'Microsoft.ServiceBus/namespaces/queues@2024-01-01' = {
   parent: namespace
   name: 'propostas'
@@ -47,7 +49,7 @@ resource propostas 'Microsoft.ServiceBus/namespaces/queues@2024-01-01' = {
   }
 }
 
-// Fase 2: evento publicado pelo consumer de subscrição quando aprova uma proposta.
+// Criação do tópico "apolice-emitida" no namespace Service Bus.
 resource apoliceEmitida 'Microsoft.ServiceBus/namespaces/topics@2024-01-01' = {
   parent: namespace
   name: 'apolice-emitida'
@@ -66,12 +68,13 @@ var propriedadesAssinatura = {
   deadLetteringOnFilterEvaluationExceptions: true
 }
 
+
+// Criação das assinaturas do tópico "apolice-emitida" com suas respectivas regras e filtros.
 resource cobranca 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
   parent: apoliceEmitida
   name: 'cobranca'
   properties: propriedadesAssinatura
 }
-
 // Uma assinatura criada sem regras ganha a regra $Default (TrueFilter = recebe tudo). Se houver várias regras,
 // vale o OR entre elas. Obs.: redefinir '$Default' via ARM não funciona (o deploy passa, mas a regra some);
 // por isso cada filtro tem nome próprio.
@@ -87,6 +90,7 @@ resource cobrancaRegra 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rul
   }
 }
 
+
 // Sem regra customizada: fica com $Default (TrueFilter) e recebe todos os eventos do tópico.
 resource notificacao 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
   parent: apoliceEmitida
@@ -94,12 +98,14 @@ resource notificacao 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-
   properties: propriedadesAssinatura
 }
 
+
+// Criação da assinatura "alto-valor" com filtro para capital segurado acima de 1 milhão.
 resource altoValor 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
   parent: apoliceEmitida
   name: 'alto-valor'
   properties: propriedadesAssinatura
 }
-
+// Criação da regra para a assinatura "alto-valor" que aplica o filtro SQL e a action de prioridade alta.
 resource altoValorRegra 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
   parent: altoValor
   name: 'capital-acima-de-1-milhao'
@@ -116,6 +122,7 @@ resource altoValorRegra 'Microsoft.ServiceBus/namespaces/topics/subscriptions/ru
   }
 }
 
+// Atribuição de função para o desenvolvedor como Data Owner no namespace Service Bus.
 resource developerDataOwner 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(namespace.id, developerPrincipalId, serviceBusDataOwnerRoleId)
   scope: namespace
@@ -126,5 +133,6 @@ resource developerDataOwner 'Microsoft.Authorization/roleAssignments@2022-04-01'
   }
 }
 
+// Outputs com informações do namespace Service Bus criado.
 output fullyQualifiedNamespace string = '${namespace.name}.servicebus.windows.net'
 output namespaceName string = namespace.name

@@ -1,6 +1,7 @@
 using Azure.Messaging.ServiceBus;
 using Vida.Assinantes;
-using Vida.Mensageria;
+using Vida.Mensageria.Conexao;
+using Vida.Mensageria.Topologia;
 
 // Uso: dotnet run                        → todas as assinaturas
 //      dotnet run -- cobranca alto-valor  → só as informadas
