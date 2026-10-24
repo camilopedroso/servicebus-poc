@@ -1,10 +1,15 @@
+using Azure.Identity;
 using Azure.Messaging.ServiceBus;
-using Vida.Assinantes;
+using Azure.Messaging.ServiceBus.Administration;
+using Vida.Assinantes.Endpoints;
+using Vida.Assinantes.Processamento;
+using Vida.LogsAoVivo.Logs;
 using Vida.Mensageria.Conexao;
 using Vida.Mensageria.Topologia;
 
-// Uso: dotnet run                        → todas as assinaturas
-//      dotnet run -- cobranca alto-valor  → só as informadas
+// Uso: dotnet run                        → todas as assinaturas ligadas na partida
+//      dotnet run -- cobranca alto-valor  → só as informadas começam ligadas
+// Depois da partida, o painel (web/painel) liga e desliga cada uma por HTTP.
 var assinaturas = args.Where(a => !a.StartsWith('-')).ToArray() is { Length: > 0 } escolhidas ? escolhidas : Assinaturas.Todas;
 var desconhecidas = assinaturas.Except(Assinaturas.Todas).ToArray();
 if (desconhecidas.Length > 0)
@@ -14,23 +19,27 @@ if (desconhecidas.Length > 0)
 }
 
 // Nomes de assinatura não são configuração: só repassa ao host os argumentos no formato --chave=valor.
-var builder = Host.CreateApplicationBuilder(args.Where(a => a.StartsWith('-')).ToArray());
+var builder = WebApplication.CreateBuilder(args.Where(a => a.StartsWith('-')).ToArray());
 
 builder.Configuration.AddJsonFile(
     Path.Combine(AppContext.BaseDirectory, ServiceBusClientFactory.ArquivoConfiguracaoLocal), optional: true);
+builder.AddLogsAoVivo();
 
 builder.Services.AddSingleton(sp =>
     ServiceBusClientFactory.Criar(ServiceBusClientFactory.ObterNamespace(sp.GetRequiredService<IConfiguration>())));
+// Só para ler contagens e regras (pendentes por assinatura no painel).
+builder.Services.AddSingleton(sp => new ServiceBusAdministrationClient(
+    ServiceBusClientFactory.ObterNamespace(sp.GetRequiredService<IConfiguration>()), new DefaultAzureCredential()));
 
-// Um hosted service por assinatura, todos compartilhando o mesmo ServiceBusClient (uma conexão AMQP).
-foreach (var assinatura in assinaturas)
-{
-    builder.Services.AddSingleton<IHostedService>(sp => new AssinaturaWorker(
-        assinatura,
-        sp.GetRequiredService<ServiceBusClient>(),
-        sp.GetRequiredService<ILogger<AssinaturaWorker>>()));
-}
+// Um processor por assinatura, todos compartilhando o mesmo ServiceBusClient (uma conexão AMQP).
+builder.Services.AddSingleton(sp => new GerenciadorDeAssinaturas(
+    assinaturas,
+    sp.GetRequiredService<ServiceBusClient>(),
+    sp.GetRequiredService<ILogger<ProcessadorDeAssinatura>>()));
+builder.Services.AddHostedService(sp => sp.GetRequiredService<GerenciadorDeAssinaturas>());
 
-var host = builder.Build();
-host.Run();
+var app = builder.Build();
+app.MapLogsAoVivo();
+app.MapAssinaturas();
+app.Run();
 return 0;

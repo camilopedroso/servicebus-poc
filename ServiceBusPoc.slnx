@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Vida.Assinantes/Vida.Assinantes.csproj" />
     <Project Path="src/Vida.Consumer/Vida.Consumer.csproj" />
+    <Project Path="src/Vida.LogsAoVivo/Vida.LogsAoVivo.csproj" />
     <Project Path="src/Vida.Mensageria/Vida.Mensageria.csproj" />
     <Project Path="src/Vida.Producer/Vida.Producer.csproj" />
   </Folder>

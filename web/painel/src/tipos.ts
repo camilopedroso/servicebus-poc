@@ -1,0 +1,30 @@
+/** Os três processos .NET que o painel acompanha. */
+export type App = 'producer' | 'consumer' | 'assinantes';
+
+/** Uma linha de log como chega do GET /logs (Vida.LogsAoVivo.Logs.RegistroDeLog). */
+export interface RegistroDeLog {
+  processo: string;
+  sequencia: number;
+  momento: string;
+  nivel: 'Trace' | 'Debug' | 'Information' | 'Warning' | 'Error' | 'Critical';
+  categoria: string;
+  mensagem: string;
+  excecao: string | null;
+  ids: Record<string, string>;
+}
+
+/** Linha exibida: um registro ou o aviso de que o processo foi reiniciado. */
+export type LinhaDeLog =
+  | { tipo: 'registro'; chave: string; registro: RegistroDeLog }
+  | { tipo: 'reinicio'; chave: string; momento: string };
+
+export type EstadoDaConexao = 'conectando' | 'ao-vivo' | 'reconectando';
+
+/** GET /assinaturas do Vida.Assinantes. */
+export interface EstadoDaAssinatura {
+  nome: string;
+  filtros: string[];
+  ativa: boolean;
+  pendentes: number;
+  naDlq: number;
+}

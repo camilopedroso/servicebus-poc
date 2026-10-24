@@ -23,15 +23,55 @@ infra/
   down.ps1           apaga tudo (para a cobrança)
 src/
   Vida.Mensageria/   contratos (PropostaSeguroVida, ApoliceEmitida) + criação do ServiceBusClient
-  Vida.Producer/     envia propostas/apólices e tem comandos de operação (peek, DLQ, reprocessar, regras)
-  Vida.Consumer/     lê a fila; ao aprovar, completa e publica no tópico numa transação
-  Vida.Assinantes/   um processor por assinatura (cobranca, notificacao, alto-valor)
+  Vida.LogsAoVivo/   logger que guarda os últimos logs e os transmite em GET /logs (SSE) para o painel
+  Vida.Producer/     API (:5180): envia propostas/apólices e tem as operações (peek, DLQ, reprocessar, regras)
+  Vida.Consumer/     (:5181) lê a fila; ao aprovar, completa e publica no tópico numa transação
+  Vida.Assinantes/   (:5182) um processor por assinatura (cobranca, notificacao, alto-valor), liga/desliga por HTTP
+web/
+  painel/            React + Vite: escolhe e executa cenários, mostra os logs dos três apps lado a lado
 ```
 
 ## Pré-requisitos
 
 - .NET 10 SDK
+- Node.js 20+ (para o painel)
 - Azure CLI logado (`az login`) — o código autentica com `DefaultAzureCredential`, sem connection string
+
+## Painel
+
+Um comando sobe tudo e abre o navegador (Ctrl+C encerra; a saída de cada app fica em `logs\`):
+
+```powershell
+.\iniciar.ps1               # compila, sobe Producer, Consumer, Assinantes e o painel
+.\iniciar.ps1 -ComInfra     # antes, cria/atualiza a infra (infra\up.ps1)
+.\iniciar.ps1 -Parar        # encerra processos que ficaram para trás (ex.: janela fechada no X)
+# ou no prompt do Claude -> ! pwsh -File iniciar.ps1
+```
+
+Para depurar um app, suba-o pelo VS Code (configuração **Fluxo completo (Consumer + Assinantes + Producer)**) ou
+cada um no seu terminal:
+
+```powershell
+dotnet run --project src\Vida.Producer
+dotnet run --project src\Vida.Consumer
+dotnet run --project src\Vida.Assinantes
+cd web\painel; npm install; npm run dev     # http://localhost:5173
+```
+
+- **Cenário**: o dropdown lista os cenários das fases 1 e 2, cada um com seus parâmetros (idade, capital, plano,
+  falha simulada, assinatura). Campo vazio = o Producer sorteia. Não é preciso reiniciar nada para trocar de cenário.
+- **Colunas**: logs ao vivo do Producer, do Consumer e do Assinantes. Se um app cair, a coluna mostra o comando para
+  subir de novo e reconecta sozinha.
+- **Trilha**: clique em um id (proposta ou apólice) para destacar a mesma mensagem nas três colunas.
+- **Assinaturas ligadas**: no cabeçalho da coluna do Assinantes, liga e desliga cada assinatura e mostra quantas
+  mensagens estão pendentes.
+
+Os endpoints também podem ser chamados direto (lista no início de `src/Vida.Producer/Program.cs`):
+
+```powershell
+curl -X POST localhost:5180/propostas -H "Content-Type: application/json" -d '{\"idade\":85}'
+curl localhost:5180/assinaturas/regras
+```
 
 ## Custo
 
@@ -64,53 +104,39 @@ se um consumer travar, a mensagem volta logo para outro processar.
 
 ## Rodando a fase 1
 
-Terminal 1 — consumer (a primeira conexão pode levar ~20 s enquanto o `DefaultAzureCredential` acha o login do Azure CLI):
+Com os apps e o painel no ar (seção **Painel**), use os cenários do grupo "Fase 1: fila propostas". A primeira chamada
+pode levar ~20 s enquanto o `DefaultAzureCredential` acha o login do Azure CLI.
 
-```powershell
-dotnet run --project src\Vida.Consumer
-```
-
-Terminal 2 — producer:
-
-```powershell
-dotnet run --project src\Vida.Producer -- enviar 10          # 10 propostas válidas, em lote
-dotnet run --project src\Vida.Producer -- enviar-invalida    # idade 85 → DLQ (RegraDeNegocio)
-dotnet run --project src\Vida.Producer -- enviar-com-falha   # 5 tentativas → DLQ (MaxDeliveryCountExceeded)
-dotnet run --project src\Vida.Producer -- espiar             # peek na fila
-dotnet run --project src\Vida.Producer -- dlq                # peek na DLQ com o motivo
-dotnet run --project src\Vida.Producer -- reprocessar-dlq    # devolve a DLQ para a fila
-```
+| Cenário no painel                  | O que acontece                                                     |
+| ---------------------------------- | ------------------------------------------------------------------ |
+| Enviar lote de propostas válidas   | N propostas em batch; o Consumer aprova cada uma                   |
+| Enviar uma proposta sob medida     | idade, capital, plano e falha simulada escolhidos por você         |
+| Proposta recusada por idade        | idade 85 → DLQ (`RegraDeNegocio`)                                  |
+| Falha transitória até a DLQ        | 5 entregas seguidas → DLQ (`MaxDeliveryCountExceeded`)             |
+| Espiar a fila / Espiar a DLQ       | peek, sem consumir; na DLQ mostra o motivo                         |
+| Reprocessar a DLQ                  | devolve a DLQ para a fila                                          |
 
 Experimentos sugeridos:
 
-1. **Competing consumers**: abra 2 consumers e envie `enviar 20`. Cada mensagem aparece em só um deles (o log mostra a instância).
+1. **Competing consumers**: suba um segundo consumer em outra porta (`dotnet run --project src\Vida.Consumer -- --urls http://localhost:5191`) e envie um lote de 20. Cada mensagem é processada por só um deles (o log mostra a instância). O painel mostra a instância da porta 5181.
 2. **Lock expirando**: pare o consumer com a mensagem em processamento (ou aumente o `Task.Delay` para além do `MaxAutoLockRenewalDuration`) e veja a mensagem voltar com `DeliveryCount` maior.
 3. **Portal**: em portal.azure.com → namespace `sb-vida-poc-*` → fila `propostas`, veja contagem de mensagens ativas/DLQ e use o **Service Bus Explorer**.
 
 ## Rodando a fase 2
 
 Fluxo completo: proposta na fila → consumer aprova e publica `ApoliceEmitida` → cada assinatura recebe sua cópia.
-No VS Code, use a configuração **Fluxo completo (Consumer + Assinantes + Producer)**. Pelo terminal:
+No painel, o lote da fase 1 já percorre o fluxo inteiro. Para testar só os filtros, sem a fila, use o grupo
+"Fase 2: tópico apolice-emitida":
 
-```powershell
-dotnet run --project src\Vida.Consumer                       # terminal 1
-dotnet run --project src\Vida.Assinantes                     # terminal 2 (todas as assinaturas)
-dotnet run --project src\Vida.Assinantes -- alto-valor       # ...ou só algumas
-dotnet run --project src\Vida.Producer -- enviar 5           # terminal 3
-```
-
-Para testar só os filtros, sem a fila:
-
-```powershell
-dotnet run --project src\Vida.Producer -- publicar-apolice 500000     # cobranca + notificacao
-dotnet run --project src\Vida.Producer -- publicar-apolice 1500000    # cobranca + notificacao + alto-valor
-dotnet run --project src\Vida.Producer -- espiar-assinatura alto-valor
-dotnet run --project src\Vida.Producer -- dlq-assinatura cobranca
-dotnet run --project src\Vida.Producer -- regras                      # filtros e actions aplicados pelo broker
-```
+| Cenário no painel                  | O que acontece                                                     |
+| ---------------------------------- | ------------------------------------------------------------------ |
+| Publicar apólice direto no tópico  | capital até 1 milhão → cobranca + notificacao                      |
+| Publicar apólice de alto valor     | 1,5 milhão → cobranca + notificacao + alto-valor (prioridade alta) |
+| Espiar uma assinatura / sua DLQ    | peek na assinatura escolhida                                       |
+| Ler as regras das assinaturas      | filtros e actions aplicados pelo broker                            |
 
 Experimentos sugeridos:
 
-1. **Assinante parado não perde nada**: rode `Vida.Assinantes -- cobranca`, envie propostas e depois suba `notificacao`. As mensagens estavam guardadas na assinatura dela.
-2. **Competing consumers numa assinatura**: rode duas instâncias de `Vida.Assinantes -- cobranca` e veja as apólices divididas entre elas, enquanto `notificacao` continua recebendo todas.
+1. **Assinante parado não perde nada**: no seletor "Assinaturas ligadas" da coluna do Assinantes, desligue `notificacao`, publique apólices e veja as pendentes subirem. Religue e ela processa o acúmulo.
+2. **Competing consumers numa assinatura**: suba uma segunda instância só com cobrança (`dotnet run --project src\Vida.Assinantes -- cobranca --urls=http://localhost:5192`) e veja as apólices divididas entre as duas, enquanto `notificacao` continua recebendo todas.
 3. **Nova assinatura**: crie uma no portal com filtro SQL `plano = 'Empresarial'`. Ela só recebe o que for publicado depois de criada.

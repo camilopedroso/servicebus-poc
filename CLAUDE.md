@@ -15,11 +15,13 @@ The work is split into phases (roadmap and status in `README.md`). Each phase ge
 .\infra\up.ps1 -ModoDebug      # same, with lockDuration PT5M (max) on queue and subscriptions, for breakpoint debugging
 .\infra\down.ps1               # delete the resource group. Standard tier bills ~US$0.013/h while it exists, even idle
 az bicep lint -f infra\main.bicep
+.\iniciar.ps1                  # build + start all 3 apps (from bin, output in logs\) + panel, opens browser. -ComInfra runs up.ps1 first; -Parar kills leftovers
 dotnet build                   # solution: ServiceBusPoc.slnx
-dotnet run --project src\Vida.Consumer
-dotnet run --project src\Vida.Assinantes [-- cobranca notificacao alto-valor]   # default: all subscriptions
-dotnet run --project src\Vida.Producer -- <command>   # full command list in the header comment of src/Vida.Producer/Program.cs
-dotnet run --project src\Vida.Producer -- regras      # verify subscription rules after any Bicep change
+dotnet run --project src\Vida.Producer      # HTTP API on :5180; endpoint list in the header comment of src/Vida.Producer/Program.cs
+dotnet run --project src\Vida.Consumer      # :5181 (logs only). Second instance: -- --urls http://localhost:5191
+dotnet run --project src\Vida.Assinantes [-- cobranca notificacao alto-valor]   # :5182; args = subscriptions on at startup (default all)
+cd web\painel; npm install; npm run dev     # React panel on http://localhost:5173; Vite proxies /api/<app> to the ports above
+curl localhost:5180/assinaturas/regras      # verify subscription rules after any Bicep change
 ```
 
 There are no tests yet (planned for phase 5).
@@ -30,10 +32,10 @@ There are no tests yet (planned for phase 5).
 - **Auth is Entra ID only:** the namespace has `disableLocalAuth: true`, so SAS keys and connection strings will not work. `ServiceBusClientFactory` (in `Vida.Mensageria/Conexao/`) builds the single `ServiceBusClient` with `DefaultAzureCredential` (locally that's `az login`) and exponential retry. Bicep grants the deploying user `Azure Service Bus Data Owner`. RBAC can take minutes to propagate, so 401s right after `up.ps1` are expected. The first consumer connection takes ~20 s while `DefaultAzureCredential` walks its credential chain.
 - **`Vida.Mensageria`:** organized by role, one class per file, namespace = `Vida.Mensageria.<Pasta>`:
   - `Contratos/`: message payloads (`PropostaSeguroVida`, `ApoliceEmitida`)
-  - `Topologia/`: broker entity names (`Filas`, `Topicos`, `Assinaturas`). New queues, topics and subscriptions must be added both here and in `infra/main.bicep`.
+  - `Topologia/`: broker entity names (`Filas`, `Topicos`, `Assinaturas`) and `DescricaoDeRegras` (rule → text). New queues, topics and subscriptions must be added both here and in `infra/main.bicep`.
   - `Mensagens/`: how messages are built (`MensagensApolice`, application-property names in `Propriedades`, `TiposDeMensagem`)
   - `Conexao/`: `ServiceBusClientFactory`
-  - `Dominio/`: business rules that aren't messaging (`CalculadoraDePremio`)
+  - `Dominio/`: business rules that aren't messaging (`CalculadoraDePremio`, `Planos`)
 - The user prefers one class per file and folders named after what the code does. Follow that for new code.
 - **`Vida.Consumer` (`Worker.cs`):** a `BackgroundService` around `ServiceBusProcessor` in PeekLock mode with `AutoCompleteMessages = false`. Settlement is explicit and demonstrates the distinct DLQ paths:
   - unreadable body → `DeadLetter("PayloadInvalido")`
@@ -41,9 +43,11 @@ There are no tests yet (planned for phase 5).
   - age > 80 → `DeadLetter("RegraDeNegocio")`
   - otherwise → `Complete`
   - Note that `Abandon` redelivers immediately with no backoff. This is an intended teaching point.
-- **Phase 2 flow:** on the happy path, `Vida.Consumer` completes the queue message and sends `ApoliceEmitida` to topic `apolice-emitida` inside one `TransactionScope`. This needs `EnableCrossEntityTransactions` on its client (`ServiceBusClientFactory.Criar(..., transacoesEntreEntidades: true)`), the sender created from that same client, and Complete as the first operation so the queue is the "via" entity. `Vida.Assinantes` registers one `AssinaturaWorker` hosted service per subscription, all sharing one client.
+- **Phase 2 flow:** on the happy path, `Vida.Consumer` completes the queue message and sends `ApoliceEmitida` to topic `apolice-emitida` inside one `TransactionScope`. This needs `EnableCrossEntityTransactions` on its client (`ServiceBusClientFactory.Criar(..., transacoesEntreEntidades: true)`), the sender created from that same client, and Complete as the first operation so the queue is the "via" entity. In `Vida.Assinantes`, `GerenciadorDeAssinaturas` (hosted service) owns one `ProcessadorDeAssinatura` per subscription, all sharing one client. Each processor can be started/stopped at runtime (`POST /assinaturas/{nome}/iniciar|parar`). `GET /assinaturas` returns pending/DLQ counts via `ServiceBusAdministrationClient`.
 - **Subscription filters only see properties, never the body.** `MensagensApolice.Criar` copies routing fields (`plano`, `capitalSegurado` as `long`) into application properties. Change those together with the Bicep rules. In Bicep, don't redefine the `$Default` rule: the deploy succeeds but leaves the subscription with no rules. Give each rule its own name.
-- **`Vida.Producer`:** a console app with `switch`-dispatched commands. It sets `MessageId` to the business id (groundwork for duplicate detection in phase 3), `Subject` to the event type (for subscription filters in phase 2), and `CorrelationId` to the client id. It also hosts the operations tools: peek, DLQ peek, and DLQ resubmit. Resubmit sends the copy before completing the DLQ message, so a failure duplicates rather than loses (at-least-once).
+- **All three apps are ASP.NET Core hosts with fixed ports** (`Urls` in each `appsettings.json`). `Vida.LogsAoVivo` adds a logger provider (`builder.AddLogsAoVivo()`) that keeps the last 500 entries and streams them on `GET /logs` as Server-Sent Events (`app.MapLogsAoVivo()`). Entries carry `PropostaId`/`ApoliceId`/`MessageId` taken from structured-log placeholders, which the panel uses to correlate lines across columns. Use those placeholder names when logging business ids.
+- **`web/painel`** (Vite + React + TS): a scenario dropdown (catalog in `src/cenarios.ts`) that calls the Producer, three live log columns, a subscription on/off control in the Assinantes column, and an id "trail" that highlights one message across all three processes. A new Producer endpoint needs a matching entry in `cenarios.ts`.
+- **`Vida.Producer`:** a minimal API (no CLI args). Scenario logic lives in `Cenarios/` (`EnvioDePropostas`, `PublicacaoDeApolices`, `InspecaoDeEntidades`, `ReprocessamentoDaDlq`), request bodies in `Contratos/` with a `Validar()` method, and `Erros/TratadorDeErros` turns `ServiceBusException`/auth errors into ProblemDetails. It sets `MessageId` to the business id (groundwork for duplicate detection in phase 3), `Subject` to the event type (for subscription filters in phase 2), and `CorrelationId` to the client id. It also hosts the operations tools: peek, DLQ peek, and DLQ resubmit. Resubmit sends the copy before completing the DLQ message, so a failure duplicates rather than loses (at-least-once).
 
 ## Working with the user
 

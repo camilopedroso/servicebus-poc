@@ -21,7 +21,6 @@
       "request": "launch",
       "preLaunchTask": "build",
       "program": "${workspaceFolder}/src/Vida.Producer/bin/Debug/net10.0/Vida.Producer.dll",
-      "args": ["${input:comandoProducer}"],
       "cwd": "${workspaceFolder}/src/Vida.Producer",
       "console": "integratedTerminal"
     },
@@ -63,7 +62,6 @@
       "type": "coreclr",
       "request": "launch",
       "program": "${workspaceFolder}/src/Vida.Producer/bin/Debug/net10.0/Vida.Producer.dll",
-      "args": ["${input:comandoProducer}"],
       "cwd": "${workspaceFolder}/src/Vida.Producer",
       "console": "integratedTerminal",
       "presentation": { "hidden": true }
@@ -82,15 +80,6 @@
       "preLaunchTask": "build",
       "configurations": ["Consumer (sem build)", "Assinantes (sem build)", "Producer (sem build)"],
       "stopAll": true
-    }
-  ],
-  "inputs": [
-    {
-      "id": "comandoProducer",
-      "type": "pickString",
-      "description": "Comando do producer",
-      "options": ["enviar", "enviar-invalida", "enviar-com-falha", "espiar", "dlq", "reprocessar-dlq", "publicar-apolice", "regras"],
-      "default": "enviar"
     }
   ]
 }

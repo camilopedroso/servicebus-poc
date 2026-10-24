@@ -483,3 +483,4 @@ $RECYCLE.BIN/
 
 # Endpoint gerado por infra/up.ps1
 src/servicebus.local.json
+web/painel/dist/
