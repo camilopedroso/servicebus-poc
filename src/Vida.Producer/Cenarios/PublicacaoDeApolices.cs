@@ -34,7 +34,8 @@ public sealed class PublicacaoDeApolices(ServiceBusClient client, ILogger<Public
             Plano: parametros.Plano ?? Planos.Sortear(),
             CapitalSegurado: capitalSegurado,
             PremioMensal: CalculadoraDePremio.CalcularMensal(capitalSegurado, idade: 40),
-            EmitidaEm: DateTimeOffset.UtcNow);
+            EmitidaEm: DateTimeOffset.UtcNow,
+            RequerRevisao: PoliticaDeRevisao.RequerRevisao(capitalSegurado));
 
         await _sender.SendMessageAsync(MensagensApolice.Criar(apolice), cancellationToken);
         logger.LogInformation(

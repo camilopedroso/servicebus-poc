@@ -128,7 +128,8 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
             Plano: proposta.Plano,
             CapitalSegurado: proposta.CapitalSegurado,
             PremioMensal: CalculadoraDePremio.CalcularMensal(proposta.CapitalSegurado, proposta.Idade),
-            EmitidaEm: DateTimeOffset.UtcNow);
+            EmitidaEm: DateTimeOffset.UtcNow,
+            RequerRevisao: PoliticaDeRevisao.RequerRevisao(proposta.CapitalSegurado));
 
         // Complete na fila + Send no tópico na MESMA transação do broker: ou os dois acontecem, ou nenhum.
         // Sem isso: publicar e cair antes do Complete → evento duplicado; completar e cair antes do Send → evento perdido.

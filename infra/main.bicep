@@ -78,14 +78,19 @@ resource cobranca 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-
 // Uma assinatura criada sem regras ganha a regra $Default (TrueFilter = recebe tudo). Se houver várias regras,
 // vale o OR entre elas. Obs.: redefinir '$Default' via ARM não funciona (o deploy passa, mas a regra some);
 // por isso cada filtro tem nome próprio.
+// Renomear uma regra aqui NÃO apaga a antiga no broker (deploy incremental): ela continua valendo em OR.
+// Ao renomear, apague a antiga: az servicebus topic subscription rule delete ... -n <nome-antigo>.
 resource cobrancaRegra 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
   parent: cobranca
-  name: 'apenas-apolice-emitida'
+  name: 'apolice-sem-revisao'
   properties: {
-    // Correlation filter: igualdade em propriedades, avaliado por hash. Mais barato que SQL.
-    filterType: 'CorrelationFilter'
-    correlationFilter: {
-      label: 'ApoliceEmitida' // "label" é o nome antigo de Subject
+    // Apólice em revisão manual não é cobrada agora. O limite de capital fica no código (PoliticaDeRevisao);
+    // aqui só se roteia pela decisão já tomada.
+    // Seria um correlation filter (mais barato), mas via ARM as propriedades dele são sempre string:
+    // 'false' (string) não casa com o bool que o publisher envia. Em SQL, FALSE é booleano de verdade.
+    filterType: 'SqlFilter'
+    sqlFilter: {
+      sqlExpression: 'sys.Label = \'ApoliceEmitida\' AND requerRevisao = FALSE' // sys.Label = Subject
     }
   }
 }
@@ -99,7 +104,7 @@ resource notificacao 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-
 }
 
 
-// Criação da assinatura "alto-valor" com filtro para capital segurado acima de 1 milhão.
+// Criação da assinatura "alto-valor": apólices que exigem revisão manual e resseguro.
 resource altoValor 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
   parent: apoliceEmitida
   name: 'alto-valor'
@@ -108,12 +113,13 @@ resource altoValor 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01
 // Criação da regra para a assinatura "alto-valor" que aplica o filtro SQL e a action de prioridade alta.
 resource altoValorRegra 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
   parent: altoValor
-  name: 'capital-acima-de-1-milhao'
+  name: 'requer-revisao'
   properties: {
     // SQL filter: expressões sobre propriedades (nunca sobre o corpo). Mais flexível, mais caro de avaliar.
+    // Complemento exato do filtro da cobranca: cada apólice cai em uma das duas, nunca nas duas.
     filterType: 'SqlFilter'
     sqlFilter: {
-      sqlExpression: 'capitalSegurado > 1000000'
+      sqlExpression: 'requerRevisao = TRUE'
     }
     // Action: altera as propriedades da cópia que entra nesta assinatura (as outras não veem).
     action: {

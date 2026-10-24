@@ -11,6 +11,7 @@ namespace Vida.Mensageria.Contratos;
 /// <param name="CapitalSegurado">Capital segurado da apólice.</param>
 /// <param name="PremioMensal">Prêmio mensal da apólice.</param>
 /// <param name="EmitidaEm">Data e hora em que a apólice foi emitida.</param>
+/// <param name="RequerRevisao">True se a apólice vai para revisão manual e resseguro antes da cobrança (PoliticaDeRevisao).</param>
 public sealed record ApoliceEmitida(
     Guid ApoliceId,
     Guid PropostaId,
@@ -18,4 +19,5 @@ public sealed record ApoliceEmitida(
     string Plano,
     decimal CapitalSegurado,
     decimal PremioMensal,
-    DateTimeOffset EmitidaEm);
+    DateTimeOffset EmitidaEm,
+    bool RequerRevisao);

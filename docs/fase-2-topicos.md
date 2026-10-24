@@ -7,8 +7,9 @@ fila "propostas" ──► Vida.Consumer (subscrição) ──[transação: Comp
                                                                                    │
                          ┌───────────────────────────────┬──────────────────────────┴──────────────┐
                  assinatura "cobranca"          assinatura "notificacao"            assinatura "alto-valor"
-                 Correlation: Subject =         (sem filtro: $Default =             SQL: capitalSegurado > 1000000
-                 'ApoliceEmitida'               TrueFilter)                         action: SET prioridade = 'alta'
+                 SQL: sys.Label =               (sem filtro: $Default =             SQL: requerRevisao = TRUE
+                 'ApoliceEmitida' AND           TrueFilter)                         action: SET prioridade = 'alta'
+                 requerRevisao = FALSE
                          │                               │                                     │
                          └──────────────── Vida.Assinantes (1 processor por assinatura) ──────┘
 ```
@@ -98,7 +99,7 @@ instâncias, **não há garantia de ordem**, nem na fila nem nas assinaturas. Pa
 
 Redefinir a regra `$Default` via Bicep/ARM **não funciona**: o deploy termina com sucesso, mas a assinatura fica
 sem nenhuma regra e não recebe nada. A solução usada aqui é dar um nome próprio à regra
-(`apenas-apolice-emitida`, `capital-acima-de-1-milhao`). Uma assinatura criada via ARM já com regra declarada não
+(`apolice-sem-revisao`, `requer-revisao`). Uma assinatura criada via ARM já com regra declarada não
 ganha a `$Default`. Confira sempre com `dotnet run --project src\Vida.Producer -- regras`.
 
 ## Perguntas para revisar

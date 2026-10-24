@@ -14,6 +14,12 @@ public static class Propriedades
     /// <summary>Capital em reais inteiros (long): o filtro SQL compara números, e decimal não é bem suportado.</summary>
     public const string CapitalSegurado = "capitalSegurado";
 
+    /// <summary>
+    /// Bool com a decisão da PoliticaDeRevisao. Os filtros de cobranca (= FALSE) e alto-valor (= TRUE) usam esta
+    /// propriedade, e não o capital, para que o limite exista só no código de domínio.
+    /// </summary>
+    public const string RequerRevisao = "requerRevisao";
+
     /// <summary>Definida pela action da regra da assinatura alto-valor (não é enviada pelo publisher).</summary>
     public const string Prioridade = "prioridade";
 }

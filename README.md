@@ -132,7 +132,7 @@ No painel, o lote da fase 1 já percorre o fluxo inteiro. Para testar só os fil
 | Cenário no painel                  | O que acontece                                                     |
 | ---------------------------------- | ------------------------------------------------------------------ |
 | Publicar apólice direto no tópico  | capital até 1 milhão → cobranca + notificacao                      |
-| Publicar apólice de alto valor     | 1,5 milhão → cobranca + notificacao + alto-valor (prioridade alta) |
+| Publicar apólice de alto valor     | 1,5 milhão → notificacao + alto-valor (prioridade alta), sem cobrança |
 | Espiar uma assinatura / sua DLQ    | peek na assinatura escolhida                                       |
 | Ler as regras das assinaturas      | filtros e actions aplicados pelo broker                            |
 

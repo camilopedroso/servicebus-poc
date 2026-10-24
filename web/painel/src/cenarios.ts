@@ -72,7 +72,7 @@ export const cenarios: Cenario[] = [
     titulo: 'Enviar lote de propostas válidas',
     mostra: 'Envio em batch: várias mensagens numa única operação de rede.',
     esperado:
-      'O Consumer aprova cada proposta e publica a apólice. Cobrança e notificação recebem todas; alto-valor, só as de capital acima de 1 milhão.',
+      'O Consumer aprova cada proposta e publica a apólice. Notificação recebe todas. Capital até 1 milhão vai para cobrança; acima disso, para alto-valor (revisão manual), e não é cobrada agora.',
     campos: ['quantidade'],
     executar: async (v) => {
       const { propostas } = await chamar<{ propostas: string[] }>('producer', 'POST', '/propostas/lote', {
@@ -155,7 +155,7 @@ export const cenarios: Cenario[] = [
     fase: 2,
     titulo: 'Publicar apólice direto no tópico',
     mostra: 'Testa só os filtros das assinaturas, sem passar pela fila nem pelo Consumer.',
-    esperado: 'Cobrança e notificação recebem. Alto-valor só recebe se o capital passar de 1 milhão.',
+    esperado: 'Notificação sempre recebe. Até 1 milhão, cobrança também; acima disso, alto-valor no lugar da cobrança.',
     campos: ['capitalSegurado', 'plano'],
     executar: publicarApolice,
   },
@@ -163,8 +163,8 @@ export const cenarios: Cenario[] = [
     id: 'apolice-alto-valor',
     fase: 2,
     titulo: 'Publicar apólice de alto valor',
-    mostra: 'Filtro SQL sobre application properties, com action que acrescenta uma propriedade.',
-    esperado: 'As três assinaturas recebem. Em alto-valor a prioridade chega como "alta", colocada pela action da regra.',
+    mostra: 'Filtros complementares: requerRevisao = TRUE em alto-valor, = FALSE em cobrança. A action acrescenta uma propriedade.',
+    esperado: 'Notificação e alto-valor recebem; cobrança não. Em alto-valor a prioridade chega como "alta", colocada pela action da regra.',
     campos: ['capitalSegurado', 'plano'],
     padroes: { capitalSegurado: '1500000' },
     executar: publicarApolice,
@@ -193,7 +193,7 @@ export const cenarios: Cenario[] = [
     titulo: 'Ler as regras das assinaturas',
     mostra: 'Consulta no broker os filtros e actions que o Bicep aplicou.',
     esperado:
-      'Uma regra por assinatura: correlation em cobrança, TrueFilter em notificação, SQL com action em alto-valor e TrueFilter em notificacao-recusa (tópico proposta-recusada).',
+      'Uma regra por assinatura: SQL em cobrança (requerRevisao = FALSE), TrueFilter em notificação, SQL com action em alto-valor (requerRevisao = TRUE) e TrueFilter em notificacao-recusa (tópico proposta-recusada).',
     campos: [],
     executar: async () => {
       const regras = await chamar<unknown[]>('producer', 'GET', '/assinaturas/regras');
