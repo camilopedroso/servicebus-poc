@@ -13,8 +13,8 @@ type Resultado = { tipo: 'executando' } | { tipo: 'ok'; texto: string } | { tipo
 
 const colunas: { app: NomeDoApp; papel: string; comando: string }[] = [
   { app: 'producer', papel: 'Envia para a fila e para o tópico', comando: 'dotnet run --project src\\Vida.Producer' },
-  { app: 'consumer', papel: 'Fila propostas, publica no tópico', comando: 'dotnet run --project src\\Vida.Consumer' },
-  { app: 'assinantes', papel: 'Assinaturas do tópico', comando: 'dotnet run --project src\\Vida.Assinantes' },
+  { app: 'consumer', papel: 'Fila propostas, publica nos tópicos', comando: 'dotnet run --project src\\Vida.Consumer' },
+  { app: 'assinantes', papel: 'Assinaturas dos tópicos', comando: 'dotnet run --project src\\Vida.Assinantes' },
 ];
 
 export function App() {

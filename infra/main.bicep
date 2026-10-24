@@ -122,6 +122,23 @@ resource altoValorRegra 'Microsoft.ServiceBus/namespaces/topics/subscriptions/ru
   }
 }
 
+// Tópico "proposta-recusada": recusa por regra de negócio é um resultado do processamento, não uma falha.
+// O consumer conclui a proposta e publica o fato aqui; a DLQ fica só para o que não dá para processar.
+resource propostaRecusada 'Microsoft.ServiceBus/namespaces/topics@2024-01-01' = {
+  parent: namespace
+  name: 'proposta-recusada'
+  properties: {
+    defaultMessageTimeToLive: 'P14D'
+  }
+}
+
+// Sem regra customizada: fica com $Default (TrueFilter) e recebe todas as recusas para avisar o cliente.
+resource notificacaoRecusa 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
+  parent: propostaRecusada
+  name: 'notificacao-recusa'
+  properties: propriedadesAssinatura
+}
+
 // Atribuição de função para o desenvolvedor como Data Owner no namespace Service Bus.
 resource developerDataOwner 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(namespace.id, developerPrincipalId, serviceBusDataOwnerRoleId)

@@ -1,6 +1,7 @@
 using Azure.Messaging.ServiceBus;
 using Vida.Mensageria.Mensagens;
 using Vida.Mensageria.Topologia;
+using Vida.Producer.Contratos;
 
 namespace Vida.Producer.Cenarios;
 
@@ -13,10 +14,13 @@ public sealed class ReprocessamentoDaDlq(ServiceBusClient client, ILogger<Reproc
 {
     /// <summary>
     /// Reprocessa mensagens da DLQ de volta para a fila principal.
+    /// Duas proteções contra loop (reenviar → morrer de novo → reenviar...):
+    /// 1) motivo permanente (payload inválido) fica na DLQ: reenviar daria o mesmo erro;
+    /// 2) só entra o que já estava na DLQ no início: uma cópia que morrer de novo fica para a próxima execução.
     /// </summary>
     /// <param name="cancellationToken">Token de cancelamento.</param>
-    /// <returns>Quantas mensagens foram movidas.</returns>
-    public async Task<int> ReprocessarAsync(CancellationToken cancellationToken)
+    /// <returns>Quantas mensagens foram movidas e quantas ficaram na DLQ.</returns>
+    public async Task<ResultadoDoReprocessamento> ReprocessarAsync(CancellationToken cancellationToken)
     {
         await using var dlqReceiver = client.CreateReceiver(Filas.Propostas, new ServiceBusReceiverOptions
         {
@@ -24,28 +28,97 @@ public sealed class ReprocessamentoDaDlq(ServiceBusClient client, ILogger<Reproc
         });
         await using var sender = client.CreateSender(Filas.Propostas);
 
-        var total = 0;
-        while (true)
+        var ultimaSequencia = await UltimaSequenciaAsync(dlqReceiver, cancellationToken);
+        if (ultimaSequencia is null)
         {
-            var mensagens = await dlqReceiver.ReceiveMessagesAsync(
-                maxMessages: 20, maxWaitTime: TimeSpan.FromSeconds(3), cancellationToken);
-            if (mensagens.Count == 0) break;
+            logger.LogInformation("DLQ de '{Fila}' vazia: nada a reprocessar.", Filas.Propostas);
+            return new ResultadoDoReprocessamento(Movidas: 0, Mantidas: 0);
+        }
 
-            foreach (var m in mensagens)
+        // Ficam travadas (peek-lock) até o fim: se fossem liberadas na hora, o próximo receive as traria de volta.
+        var mantidas = new Dictionary<long, ServiceBusReceivedMessage>();
+        var movidas = 0;
+        try
+        {
+            while (true)
             {
-                // Copia corpo e propriedades para uma nova mensagem (DeliveryCount volta a 0).
-                // Remove o gatilho de falha simulada para a mensagem conseguir ser processada.
-                var reenvio = new ServiceBusMessage(m);
-                reenvio.ApplicationProperties.Remove(Propriedades.SimularFalha);
-                await sender.SendMessageAsync(reenvio, cancellationToken);
-                // Só completa na DLQ depois do reenvio: se cair no meio, no pior caso duplica (at-least-once), não perde.
-                await dlqReceiver.CompleteMessageAsync(m, cancellationToken);
-                logger.LogInformation(
-                    "  proposta {PropostaId} devolvida à fila (motivo era {Motivo}).", m.MessageId, m.DeadLetterReason);
-                total++;
+                var mensagens = await dlqReceiver.ReceiveMessagesAsync(
+                    maxMessages: 20, maxWaitTime: TimeSpan.FromSeconds(3), cancellationToken);
+                if (mensagens.Count == 0) break;
+
+                foreach (var m in mensagens)
+                {
+                    if (m.SequenceNumber > ultimaSequencia)
+                    {
+                        // Chegou à DLQ depois do início (pode ser uma cópia que acabamos de reenviar).
+                        mantidas[m.SequenceNumber] = m;
+                        continue;
+                    }
+                    if (MotivosDeDeadLetter.Permanentes.Contains(m.DeadLetterReason))
+                    {
+                        if (mantidas.TryAdd(m.SequenceNumber, m))
+                        {
+                            logger.LogWarning(
+                                "  proposta {PropostaId} mantida na DLQ: {Motivo} não se resolve reenviando ({Descricao}).",
+                                m.MessageId, m.DeadLetterReason, m.DeadLetterErrorDescription);
+                        }
+                        continue;
+                    }
+
+                    // Copia corpo e propriedades para uma nova mensagem (DeliveryCount volta a 0).
+                    // Remove o gatilho de falha simulada para a mensagem conseguir ser processada.
+                    var reenvio = new ServiceBusMessage(m);
+                    reenvio.ApplicationProperties.Remove(Propriedades.SimularFalha);
+                    await sender.SendMessageAsync(reenvio, cancellationToken);
+                    // Só completa na DLQ depois do reenvio: se cair no meio, no pior caso duplica (at-least-once), não perde.
+                    await dlqReceiver.CompleteMessageAsync(m, cancellationToken);
+                    logger.LogInformation(
+                        "  proposta {PropostaId} devolvida à fila (motivo era {Motivo}).", m.MessageId, m.DeadLetterReason);
+                    movidas++;
+                }
             }
         }
-        logger.LogInformation("{Total} mensagem(ns) movida(s) da DLQ de volta para '{Fila}'.", total, Filas.Propostas);
-        return total;
+        finally
+        {
+            // Libera as mantidas: continuam na DLQ, com o mesmo motivo.
+            foreach (var m in mantidas.Values)
+            {
+                await LiberarAsync(dlqReceiver, m);
+            }
+        }
+
+        logger.LogInformation(
+            "{Movidas} mensagem(ns) movida(s) da DLQ de volta para '{Fila}'; {Mantidas} mantida(s) na DLQ.",
+            movidas, Filas.Propostas, mantidas.Count);
+        return new ResultadoDoReprocessamento(movidas, mantidas.Count);
+    }
+
+    /// <summary>
+    /// Maior SequenceNumber presente na DLQ agora, lido por peek (sem travar nada). Null se a DLQ estiver vazia.
+    /// </summary>
+    private static async Task<long?> UltimaSequenciaAsync(ServiceBusReceiver receiver, CancellationToken cancellationToken)
+    {
+        long? ultima = null;
+        while (true)
+        {
+            // Peek continua de onde parou a cada chamada: lê a DLQ inteira em páginas.
+            var pagina = await receiver.PeekMessagesAsync(maxMessages: 250, cancellationToken: cancellationToken);
+            if (pagina.Count == 0) return ultima;
+            ultima = Math.Max(ultima ?? long.MinValue, pagina.Max(m => m.SequenceNumber));
+        }
+    }
+
+    private async Task LiberarAsync(ServiceBusReceiver receiver, ServiceBusReceivedMessage mensagem)
+    {
+        try
+        {
+            // Sem o token da requisição: mesmo se o painel desconectar, o lock é devolvido.
+            await receiver.AbandonMessageAsync(mensagem, cancellationToken: CancellationToken.None);
+        }
+        catch (ServiceBusException ex) when (ex.Reason == ServiceBusFailureReason.MessageLockLost)
+        {
+            // O lock já expirou: a mensagem já voltou a ficar disponível na DLQ.
+            logger.LogDebug("Lock da mensagem {MessageId} expirou antes de liberar.", mensagem.MessageId);
+        }
     }
 }

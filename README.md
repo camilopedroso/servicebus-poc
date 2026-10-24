@@ -18,7 +18,7 @@ Notas de estudo: [fase 1 — filas](docs/fase-1-filas.md) · [fase 2 — tópico
 ```
 infra/
   main.bicep         namespace Standard (só Entra ID, sem SAS), fila "propostas",
-                     tópico "apolice-emitida" com 3 assinaturas e filtros, RBAC
+                     tópico "apolice-emitida" com 3 assinaturas e filtros, tópico "proposta-recusada", RBAC
   up.ps1             cria/atualiza a infra e grava src/servicebus.local.json
   down.ps1           apaga tudo (para a cobrança)
 src/
@@ -111,10 +111,10 @@ pode levar ~20 s enquanto o `DefaultAzureCredential` acha o login do Azure CLI.
 | ---------------------------------- | ------------------------------------------------------------------ |
 | Enviar lote de propostas válidas   | N propostas em batch; o Consumer aprova cada uma                   |
 | Enviar uma proposta sob medida     | idade, capital, plano e falha simulada escolhidos por você         |
-| Proposta recusada por idade        | idade 85 → DLQ (`RegraDeNegocio`)                                  |
+| Proposta recusada por idade        | idade 85 → recusa publicada em `proposta-recusada`, cliente avisado |
 | Falha transitória até a DLQ        | 5 entregas seguidas → DLQ (`MaxDeliveryCountExceeded`)             |
 | Espiar a fila / Espiar a DLQ       | peek, sem consumir; na DLQ mostra o motivo                         |
-| Reprocessar a DLQ                  | devolve a DLQ para a fila                                          |
+| Reprocessar a DLQ                  | devolve a DLQ para a fila (payload inválido fica)                  |
 
 Experimentos sugeridos:
 

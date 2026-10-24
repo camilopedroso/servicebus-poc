@@ -5,7 +5,7 @@ namespace Vida.Producer.Contratos;
 /// <summary>
 /// Corpo de POST /propostas. Campos nulos são sorteados.
 /// </summary>
-/// <param name="Idade">Idade do proponente. Acima de 80 o consumer recusa (DLQ RegraDeNegocio).</param>
+/// <param name="Idade">Idade do proponente. Acima de 80 o consumer recusa e publica PropostaRecusada.</param>
 /// <param name="CapitalSegurado">Capital segurado em reais. Acima de 1.000.000 a apólice cai na assinatura alto-valor.</param>
 /// <param name="Plano">Individual, Familiar ou Empresarial.</param>
 /// <param name="SimularFalha">Se true, o consumer abandona até maxDeliveryCount e o broker manda para a DLQ.</param>

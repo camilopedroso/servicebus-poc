@@ -6,7 +6,7 @@ using Vida.Mensageria.Topologia;
 namespace Vida.Assinantes.Processamento;
 
 /// <summary>
-/// Processa uma assinatura do tópico "apolice-emitida". Uma instância por assinatura:
+/// Processa uma assinatura (de "apolice-emitida" ou "proposta-recusada"). Uma instância por assinatura:
 /// cada uma recebe sua própria cópia das mensagens que passaram no filtro (publish/subscribe),
 /// enquanto várias instâncias da MESMA assinatura dividem as mensagens (competing consumers).
 /// Pode ser ligada e desligada em tempo de execução pelo GerenciadorDeAssinaturas.
@@ -43,7 +43,7 @@ public sealed class ProcessadorDeAssinatura(string assinatura, ServiceBusClient 
         if (_processor is null)
         {
             // Mesma API da fila, só muda o endereço: (tópico, assinatura).
-            _processor = client.CreateProcessor(Topicos.ApoliceEmitida, assinatura, new ServiceBusProcessorOptions
+            _processor = client.CreateProcessor(Assinaturas.TopicoDe(assinatura), assinatura, new ServiceBusProcessorOptions
             {
                 AutoCompleteMessages = false,
                 MaxConcurrentCalls = 2,
@@ -58,7 +58,7 @@ public sealed class ProcessadorDeAssinatura(string assinatura, ServiceBusClient 
         }
 
         await _processor.StartProcessingAsync(cancellationToken);
-        logger.LogInformation("[{Assinatura}] Ouvindo {Topico}/{Assinatura}...", assinatura, Topicos.ApoliceEmitida, assinatura);
+        logger.LogInformation("[{Assinatura}] Ouvindo {Topico}/{Assinatura}...", assinatura, Assinaturas.TopicoDe(assinatura), assinatura);
     }
 
     /// <summary>
@@ -76,7 +76,7 @@ public sealed class ProcessadorDeAssinatura(string assinatura, ServiceBusClient 
 
         await _processor!.StopProcessingAsync(cancellationToken);
         logger.LogInformation(
-            "[{Assinatura}] Parada. Novas apólices ficam retidas na assinatura até ela ser religada.", assinatura);
+            "[{Assinatura}] Parada. Novas mensagens ficam retidas na assinatura até ela ser religada.", assinatura);
     }
 
     /// <summary>
@@ -84,13 +84,22 @@ public sealed class ProcessadorDeAssinatura(string assinatura, ServiceBusClient 
     /// </summary>
     /// <param name="args"></param>
     /// <returns></returns>
-    private async Task ProcessarMensagem(ProcessMessageEventArgs args)
+    private Task ProcessarMensagem(ProcessMessageEventArgs args) =>
+        // O Subject diz o tipo do evento: cada tópico carrega um tipo, mas o handler não depende disso.
+        args.Message.Subject == TiposDeMensagem.PropostaRecusada
+            ? ProcessarRecusa(args)
+            : ProcessarApolice(args);
+
+    /// <summary>
+    /// Processa uma ApoliceEmitida (assinaturas cobranca, notificacao e alto-valor).
+    /// </summary>
+    private async Task ProcessarApolice(ProcessMessageEventArgs args)
     {
         var mensagem = args.Message;
         var apolice = mensagem.Body.ToObjectFromJson<ApoliceEmitida>();
         if (apolice is null)
         {
-            await args.DeadLetterMessageAsync(mensagem, "PayloadInvalido", "Corpo não é uma ApoliceEmitida válida.");
+            await args.DeadLetterMessageAsync(mensagem, MotivosDeDeadLetter.PayloadInvalido, "Corpo não é uma ApoliceEmitida válida.");
             return;
         }
 
@@ -112,6 +121,26 @@ public sealed class ProcessadorDeAssinatura(string assinatura, ServiceBusClient 
         logger.LogInformation(
             "[{Assinatura}] Apólice {ApoliceId} ({Plano}, capital {Capital}, prioridade {Prioridade}): {Acao}.",
             assinatura, apolice.ApoliceId, apolice.Plano, apolice.CapitalSegurado.ToString("C0", PtBr), prioridade, acao);
+    }
+
+    /// <summary>
+    /// Processa uma PropostaRecusada (assinatura notificacao-recusa): avisa o cliente, de forma definitiva.
+    /// </summary>
+    private async Task ProcessarRecusa(ProcessMessageEventArgs args)
+    {
+        var mensagem = args.Message;
+        var recusa = mensagem.Body.ToObjectFromJson<PropostaRecusada>();
+        if (recusa is null)
+        {
+            await args.DeadLetterMessageAsync(mensagem, MotivosDeDeadLetter.PayloadInvalido, "Corpo não é uma PropostaRecusada válida.");
+            return;
+        }
+
+        await args.CompleteMessageAsync(mensagem, args.CancellationToken);
+
+        logger.LogInformation(
+            "[{Assinatura}] Proposta {PropostaId} ({Plano}, capital {Capital}) recusada: {Motivo} Enviar aviso de recusa ao cliente {ClienteId}.",
+            assinatura, recusa.PropostaId, recusa.Plano, recusa.CapitalSegurado.ToString("C0", PtBr), recusa.Motivo, recusa.ClienteId);
     }
 
     /// <summary>

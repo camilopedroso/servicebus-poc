@@ -9,7 +9,7 @@ namespace Vida.Consumer;
 
 /// <summary>
 /// Consumer de subscrição: lê propostas da fila, decide o destino de cada mensagem e,
-/// quando aprova, publica ApoliceEmitida no tópico.
+/// quando aprova, publica ApoliceEmitida; quando recusa por regra de negócio, publica PropostaRecusada.
 /// Rode duas instâncias para ver "competing consumers": cada mensagem vai para só uma delas.
 /// </summary>
 public sealed class Worker(ServiceBusClient client, IConfiguration configuration, ILogger<Worker> logger)
@@ -23,6 +23,7 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
 
     // Sender criado a partir do mesmo client do processor: exigência da transação entre entidades.
     private readonly ServiceBusSender _senderApolices = client.CreateSender(Topicos.ApoliceEmitida);
+    private readonly ServiceBusSender _senderRecusas = client.CreateSender(Topicos.PropostaRecusada);
 
     private ServiceBusProcessor? _processor;
 
@@ -75,7 +76,7 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
         // 1) Mensagem "venenosa" (não dá para ler): tentar de novo não resolve → DLQ direto.
         if (proposta is null)
         {
-            await args.DeadLetterMessageAsync(mensagem, "PayloadInvalido", "Corpo não é uma PropostaSeguroVida válida.");
+            await args.DeadLetterMessageAsync(mensagem, MotivosDeDeadLetter.PayloadInvalido, "Corpo não é uma PropostaSeguroVida válida.");
             return;
         }
 
@@ -90,16 +91,30 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
             return;
         }
 
-        // 3) Regra de negócio violada: não é erro técnico, reprocessar dá o mesmo resultado → DLQ com motivo.
+        // 3) Regra de negócio violada: a proposta FOI analisada, e o resultado é "recusada". Não é falha,
+        //    então não vai para a DLQ (lá ninguém avisaria o cliente, e reprocessar daria a mesma recusa).
+        //    Conclui na fila e publica PropostaRecusada, na mesma transação do caminho feliz.
         if (proposta.Idade > IdadeMaximaAceita)
         {
+            var recusa = new PropostaRecusada(
+                PropostaId: proposta.PropostaId,
+                ClienteId: proposta.ClienteId,
+                Plano: proposta.Plano,
+                CapitalSegurado: proposta.CapitalSegurado,
+                Idade: proposta.Idade,
+                Motivo: $"Idade {proposta.Idade} acima do limite de {IdadeMaximaAceita} anos.",
+                RecusadaEm: DateTimeOffset.UtcNow);
+
+            using (var transacao = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+            {
+                await args.CompleteMessageAsync(mensagem, args.CancellationToken);
+                await _senderRecusas.SendMessageAsync(MensagensRecusa.Criar(recusa), args.CancellationToken);
+                transacao.Complete();
+            }
+
             logger.LogWarning(
-                "[{Instancia}] Proposta {PropostaId} recusada: idade {Idade} acima de {Maxima}.",
-                _instancia, proposta.PropostaId, proposta.Idade, IdadeMaximaAceita);
-            await args.DeadLetterMessageAsync(
-                mensagem,
-                deadLetterReason: "RegraDeNegocio",
-                deadLetterErrorDescription: $"Idade {proposta.Idade} acima do limite de {IdadeMaximaAceita} anos.");
+                "[{Instancia}] Proposta {PropostaId} recusada: idade {Idade} acima de {Maxima}. Recusa publicada em '{Topico}'.",
+                _instancia, proposta.PropostaId, proposta.Idade, IdadeMaximaAceita, Topicos.PropostaRecusada);
             return;
         }
 
@@ -151,6 +166,7 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
             await _processor.DisposeAsync();
         }
         await _senderApolices.DisposeAsync();
+        await _senderRecusas.DisposeAsync();
         await base.StopAsync(cancellationToken);
     }
 }

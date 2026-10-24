@@ -14,9 +14,9 @@ using Vida.Producer.Erros;
 //   curl localhost:5180/filas/propostas/mensagens?dlq=true
 // Fase 1 (fila "propostas"):
 //   POST /propostas/lote                    propostas válidas, enviadas em lote
-//   POST /propostas                         uma proposta: idade > 80 → DLQ; simularFalha → retry até maxDeliveryCount → DLQ
+//   POST /propostas                         uma proposta: idade > 80 → recusa publicada em proposta-recusada; simularFalha → retry até maxDeliveryCount → DLQ
 //   GET  /filas/propostas/mensagens?dlq=    peek na fila (ou na DLQ, com o motivo)
-//   POST /filas/propostas/dlq/reprocessar   move mensagens da DLQ de volta para a fila principal
+//   POST /filas/propostas/dlq/reprocessar   devolve a DLQ para a fila (payload inválido fica na DLQ)
 // Fase 2 (tópico "apolice-emitida"):
 //   POST /apolices                          publica uma ApoliceEmitida direto no tópico (sem passar pela fila)
 //   GET  /assinaturas/{nome}/mensagens?dlq= peek em uma assinatura (ou na DLQ dela)
@@ -63,7 +63,7 @@ app.MapGet("/filas/propostas/mensagens", async (bool? dlq, InspecaoDeEntidades i
     await inspecao.EspiarFilaAsync(dlq ?? false, ct));
 
 app.MapPost("/filas/propostas/dlq/reprocessar", async (ReprocessamentoDaDlq reprocessamento, CancellationToken ct) =>
-    new { Movidas = await reprocessamento.ReprocessarAsync(ct) });
+    await reprocessamento.ReprocessarAsync(ct));
 
 // Fase 2
 app.MapPost("/apolices", async (PublicacaoDeApolice corpo, PublicacaoDeApolices publicacao, CancellationToken ct) =>

@@ -86,7 +86,8 @@ export const cenarios: Cenario[] = [
     fase: 1,
     titulo: 'Enviar uma proposta sob medida',
     mostra: 'Você escolhe os campos que o Consumer e os filtros das assinaturas avaliam.',
-    esperado: 'Até 80 anos, aprovada. Acima de 80, vai para a DLQ. Com falha simulada, 5 entregas e DLQ.',
+    esperado:
+      'Até 80 anos, aprovada. Acima de 80, recusada e o cliente é avisado por notificacao-recusa. Com falha simulada, 5 entregas e DLQ.',
     campos: ['idade', 'capitalSegurado', 'plano', 'simularFalha'],
     executar: enviarProposta,
   },
@@ -94,8 +95,10 @@ export const cenarios: Cenario[] = [
     id: 'recusada',
     fase: 1,
     titulo: 'Proposta recusada por idade',
-    mostra: 'Regra de negócio violada não é erro técnico: tentar de novo dá o mesmo resultado.',
-    esperado: 'O Consumer manda direto para a DLQ com motivo RegraDeNegocio. Confira em "Espiar a DLQ da fila".',
+    mostra:
+      'Recusa por regra de negócio é um desfecho, não uma falha: a mensagem é concluída e o fato vira evento. A DLQ fica para o que não dá para processar.',
+    esperado:
+      'O Consumer conclui a proposta e publica PropostaRecusada no tópico proposta-recusada, na mesma transação. A assinatura notificacao-recusa avisa o cliente. Nada vai para a DLQ.',
     campos: ['idade', 'capitalSegurado', 'plano'],
     padroes: { idade: '85' },
     executar: enviarProposta,
@@ -132,12 +135,19 @@ export const cenarios: Cenario[] = [
     id: 'reprocessar',
     fase: 1,
     titulo: 'Reprocessar a DLQ',
-    mostra: 'Reenvia a cópia antes de completar na DLQ: no pior caso duplica, nunca perde.',
-    esperado: 'A DLQ esvazia e o Consumer processa de novo. As recusadas por idade voltam para a DLQ.',
+    mostra:
+      'Reprocessa só o que estava na DLQ no início e deixa lá o que não tem conserto (payload inválido), para não entrar em loop.',
+    esperado:
+      'As mensagens voltam para a fila e o Consumer dá um desfecho definitivo: aprova, ou recusa e notifica. A DLQ esvazia.',
     campos: [],
     executar: async () => {
-      const { movidas } = await chamar<{ movidas: number }>('producer', 'POST', '/filas/propostas/dlq/reprocessar');
-      return `${plural(movidas, 'mensagem devolvida', 'mensagens devolvidas')} para a fila.`;
+      const { movidas, mantidas } = await chamar<{ movidas: number; mantidas: number }>(
+        'producer',
+        'POST',
+        '/filas/propostas/dlq/reprocessar',
+      );
+      const ficaram = mantidas > 0 ? ` ${plural(mantidas, 'ficou', 'ficaram')} na DLQ por motivo permanente.` : '';
+      return `${plural(movidas, 'mensagem devolvida', 'mensagens devolvidas')} para a fila.${ficaram}`;
     },
   },
   {
@@ -173,7 +183,7 @@ export const cenarios: Cenario[] = [
     fase: 2,
     titulo: 'Espiar a DLQ de uma assinatura',
     mostra: 'Cada assinatura tem a sua própria dead-letter queue.',
-    esperado: 'Normalmente vazia: os assinantes só mandam para a DLQ quando o corpo não é uma ApoliceEmitida.',
+    esperado: 'Normalmente vazia: os assinantes só mandam para a DLQ quando o corpo não pode ser lido.',
     campos: ['assinatura'],
     executar: (v) => espiar(`/assinaturas/${v.assinatura}/mensagens?dlq=true`, `${v.assinatura}/$DeadLetterQueue`)(),
   },
@@ -182,7 +192,8 @@ export const cenarios: Cenario[] = [
     fase: 2,
     titulo: 'Ler as regras das assinaturas',
     mostra: 'Consulta no broker os filtros e actions que o Bicep aplicou.',
-    esperado: 'Uma regra por assinatura: correlation em cobrança, TrueFilter em notificação, SQL com action em alto-valor.',
+    esperado:
+      'Uma regra por assinatura: correlation em cobrança, TrueFilter em notificação, SQL com action em alto-valor e TrueFilter em notificacao-recusa (tópico proposta-recusada).',
     campos: [],
     executar: async () => {
       const regras = await chamar<unknown[]>('producer', 'GET', '/assinaturas/regras');

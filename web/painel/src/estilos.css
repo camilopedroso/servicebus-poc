@@ -26,6 +26,8 @@
   --notificacao-fundo: #ece6f6;
   --alto-valor: #a1306c;
   --alto-valor-fundo: #f6e3ed;
+  --notificacao-recusa: #5f6b14;
+  --notificacao-recusa-fundo: #eef0d8;
 
   --fonte-texto: 'Source Sans 3 Variable', 'Segoe UI', system-ui, sans-serif;
   --fonte-log: 'Source Code Pro Variable', Consolas, monospace;
@@ -64,6 +66,8 @@
     --notificacao-fundo: #2c2643;
     --alto-valor: #ec8cbf;
     --alto-valor-fundo: #3e2333;
+    --notificacao-recusa: #bccb6c;
+    --notificacao-recusa-fundo: #2f3418;
     color-scheme: dark;
   }
 }
@@ -88,6 +92,8 @@
   --notificacao-fundo: #2c2643;
   --alto-valor: #ec8cbf;
   --alto-valor-fundo: #3e2333;
+  --notificacao-recusa: #bccb6c;
+  --notificacao-recusa-fundo: #2f3418;
   color-scheme: dark;
 }
 
@@ -482,6 +488,10 @@ code {
   border-left-color: var(--alto-valor);
 }
 
+.linha[data-assinatura='notificacao-recusa'] {
+  border-left-color: var(--notificacao-recusa);
+}
+
 .selo {
   display: inline-block;
   margin-right: 6px;
@@ -507,6 +517,11 @@ code {
 .selo[data-assinatura='alto-valor'] {
   color: var(--alto-valor);
   background: var(--alto-valor-fundo);
+}
+
+.selo[data-assinatura='notificacao-recusa'] {
+  color: var(--notificacao-recusa);
+  background: var(--notificacao-recusa-fundo);
 }
 
 .linha[data-nivel='Warning'] {

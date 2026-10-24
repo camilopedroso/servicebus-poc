@@ -45,7 +45,7 @@ public static class EndpointsDeAssinaturas
         // Uma chamada de runtime properties por assinatura, em paralelo.
         var estados = gerenciador.Processadores.Select(async processador =>
         {
-            var propriedades = await admin.GetSubscriptionRuntimePropertiesAsync(Topicos.ApoliceEmitida, processador.Nome, ct);
+            var propriedades = await admin.GetSubscriptionRuntimePropertiesAsync(Assinaturas.TopicoDe(processador.Nome), processador.Nome, ct);
             return new EstadoDaAssinatura(
                 processador.Nome,
                 await ObterFiltrosAsync(admin, processador.Nome, ct),
@@ -64,7 +64,7 @@ public static class EndpointsDeAssinaturas
         }
 
         var filtros = new List<string>();
-        await foreach (var regra in admin.GetRulesAsync(Topicos.ApoliceEmitida, assinatura, ct))
+        await foreach (var regra in admin.GetRulesAsync(Assinaturas.TopicoDe(assinatura), assinatura, ct))
         {
             var acao = DescricaoDeRegras.DescreverAcao(regra);
             filtros.Add(acao is null

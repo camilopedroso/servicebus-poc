@@ -35,7 +35,7 @@ O consumer recebe a mensagem **travada**: ela fica invisível para os outros por
 |---|---|---|
 | `CompleteMessageAsync` | Remove da fila | Proposta processada |
 | `AbandonMessageAsync` | Solta o lock, volta **na hora** para a fila, `DeliveryCount++` | Falha transitória |
-| `DeadLetterMessageAsync(reason, description)` | Move para a DLQ com motivo | Regra de negócio / payload inválido |
+| `DeadLetterMessageAsync(reason, description)` | Move para a DLQ com motivo | Payload inválido (não dá para processar) |
 | `DeferMessageAsync` | Fica guardada, só sai lendo pelo `SequenceNumber` | Fase 3 |
 | (lock expira) | Mesmo efeito do Abandon | Consumer caiu ou travou |
 
@@ -48,10 +48,22 @@ consumer precisa ser **idempotente** (fase 3).
 - `maxDeliveryCount` (5 aqui, padrão 10): ao atingir, o **broker** move a mensagem para
   `propostas/$DeadLetterQueue` com `DeadLetterReason = MaxDeliveryCountExceeded`.
 - Expiração por TTL com `deadLetteringOnMessageExpiration = true` → DLQ com `TTLExpiredException`.
-- `DeadLetterMessageAsync` → DLQ com o motivo que **você** escolhe (`RegraDeNegocio`, `PayloadInvalido`).
+- `DeadLetterMessageAsync` → DLQ com o motivo que **você** escolhe (aqui, `PayloadInvalido`).
 - A DLQ **não expira** e não é limpa sozinha: alguém precisa monitorar (alerta de métrica) e tratar.
 - Reprocessar = ler da DLQ, reenviar para a fila principal e só então completar na DLQ
   (ordem importa: no pior caso duplica, nunca perde).
+
+**Recusa de negócio não é dead-letter.** A primeira versão mandava a proposta com idade > 80 para a DLQ
+(`RegraDeNegocio`). Dois problemas apareceram:
+1. Ninguém avisava o cliente: a DLQ é um lugar para operação olhar, não um desfecho de negócio.
+2. Reprocessar a DLQ entrava em **loop**: a proposta voltava para a fila, era recusada de novo, voltava para a DLQ...
+
+Agora a recusa é um **desfecho** do processamento: o consumer conclui a mensagem e publica o evento
+`PropostaRecusada` no tópico `proposta-recusada` (na mesma transação, como a apólice); a assinatura
+`notificacao-recusa` avisa o cliente. A DLQ fica só para o que **não dá para processar** (payload ilegível,
+entregas esgotadas). E o reprocessamento ganhou duas travas contra loop: deixa na DLQ o que tem motivo
+permanente (`PayloadInvalido`) e só reenvia o que já estava na DLQ quando começou (maior `SequenceNumber` lido
+por peek no início).
 
 **Ponto de atenção:** `Abandon` reentrega imediatamente, **sem backoff**.
 Para retry com espera, os padrões comuns são:

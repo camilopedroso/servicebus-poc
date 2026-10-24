@@ -1,5 +1,5 @@
-/** Assinaturas do tópico apolice-emitida, na ordem de Vida.Mensageria.Topologia.Assinaturas. */
-export const assinaturas = ['cobranca', 'notificacao', 'alto-valor'] as const;
+/** Assinaturas dos tópicos apolice-emitida e proposta-recusada, na ordem de Vida.Mensageria.Topologia.Assinaturas. */
+export const assinaturas = ['cobranca', 'notificacao', 'alto-valor', 'notificacao-recusa'] as const;
 
 export type Assinatura = (typeof assinaturas)[number];
 

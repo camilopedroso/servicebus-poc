@@ -46,7 +46,7 @@ public sealed class InspecaoDeEntidades(
     }
 
     /// <summary>
-    /// Espia as mensagens de uma assinatura do tópico ApoliceEmitida.
+    /// Espia as mensagens de uma assinatura (de qualquer tópico).
     /// </summary>
     /// <param name="assinatura">Nome da assinatura.</param>
     /// <param name="deadLetter">Se true, espiar a DLQ; caso contrário, a assinatura.</param>
@@ -54,13 +54,13 @@ public sealed class InspecaoDeEntidades(
     /// <returns>Mensagens encontradas (até 50).</returns>
     public async Task<MensagemEspiada[]> EspiarAssinaturaAsync(string assinatura, bool deadLetter, CancellationToken cancellationToken)
     {
-        await using var receiver = client.CreateReceiver(Topicos.ApoliceEmitida, assinatura, new ServiceBusReceiverOptions
+        await using var receiver = client.CreateReceiver(Assinaturas.TopicoDe(assinatura), assinatura, new ServiceBusReceiverOptions
         {
             SubQueue = deadLetter ? SubQueue.DeadLetter : SubQueue.None,
         });
 
         var mensagens = await receiver.PeekMessagesAsync(MaximoDeMensagens, cancellationToken: cancellationToken);
-        var nome = $"{Topicos.ApoliceEmitida}/subscriptions/{assinatura}{(deadLetter ? "/$DeadLetterQueue" : "")}";
+        var nome = $"{Assinaturas.TopicoDe(assinatura)}/subscriptions/{assinatura}{(deadLetter ? "/$DeadLetterQueue" : "")}";
         logger.LogInformation("{Quantidade} mensagem(ns) em '{Entidade}'.", mensagens.Count, nome);
 
         foreach (var m in mensagens)
@@ -68,14 +68,14 @@ public sealed class InspecaoDeEntidades(
             // Mostra as propriedades: é o que os filtros enxergam (a action da regra pode ter adicionado alguma).
             var propriedades = string.Join(", ", m.ApplicationProperties.Select(p => $"{p.Key}={p.Value}"));
             logger.LogInformation(
-                "  #{Seq} {Subject} apólice {ApoliceId} [{Propriedades}] entregas={Entregas}{Motivo}",
+                "  #{Seq} {Subject} {MessageId} [{Propriedades}] entregas={Entregas}{Motivo}",
                 m.SequenceNumber, m.Subject, m.MessageId, propriedades, m.DeliveryCount, MotivoDaDlq(m, deadLetter));
         }
         return [.. mensagens.Select(Espiada)];
     }
 
     /// <summary>
-    /// Lista as regras de todas as assinaturas do tópico ApoliceEmitida.
+    /// Lista as regras de todas as assinaturas, dos dois tópicos.
     /// </summary>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <returns>Regras por assinatura.</returns>
@@ -86,9 +86,9 @@ public sealed class InspecaoDeEntidades(
         var resultado = new List<RegrasDaAssinatura>();
         foreach (var assinatura in Assinaturas.Todas)
         {
-            logger.LogInformation("{Topico}/{Assinatura}:", Topicos.ApoliceEmitida, assinatura);
+            logger.LogInformation("{Topico}/{Assinatura}:", Assinaturas.TopicoDe(assinatura), assinatura);
             var regras = new List<string>();
-            await foreach (var regra in admin.GetRulesAsync(Topicos.ApoliceEmitida, assinatura, cancellationToken))
+            await foreach (var regra in admin.GetRulesAsync(Assinaturas.TopicoDe(assinatura), assinatura, cancellationToken))
             {
                 var acao = DescricaoDeRegras.DescreverAcao(regra) is { } a ? $" | action: {a}" : "";
                 var linha = $"regra {regra.Name}: {DescricaoDeRegras.DescreverFiltro(regra)}{acao}";
