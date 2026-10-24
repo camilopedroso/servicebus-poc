@@ -1,0 +1,5 @@
+# Mesmo padrão do .gitattributes: LF em todos os arquivos, inclusive no Windows.
+root = true
+
+[*]
+end_of_line = lf
