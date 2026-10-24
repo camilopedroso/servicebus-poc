@@ -34,6 +34,8 @@ bld/
 [Oo]bj/
 [Ll]og/
 [Ll]ogs/
+# Pasta de código (namespace Vida.LogsAoVivo.Logs), não de saída de log.
+!src/Vida.LogsAoVivo/Logs/
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/
