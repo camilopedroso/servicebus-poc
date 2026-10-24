@@ -15,7 +15,7 @@ The work is split into phases (roadmap and status in `README.md`). Each phase ge
 .\infra\up.ps1 -ModoDebug      # same, with lockDuration PT5M (max) on queue and subscriptions, for breakpoint debugging
 .\infra\down.ps1               # delete the resource group. Standard tier bills ~US$0.013/h while it exists, even idle
 az bicep lint -f infra\main.bicep
-.\iniciar.ps1                  # build + start all 3 apps (from bin, output in logs\) + panel, opens browser. -ComInfra runs up.ps1 first; -Parar kills leftovers
+.\iniciar.ps1                  # build + start all 3 apps (from bin, output in logs\) + panel, opens browser. -ComInfra runs up.ps1 first (add -ModoDebug for the 5-min lock); -Parar kills leftovers
 dotnet build                   # solution: ServiceBusPoc.slnx
 dotnet run --project src\Vida.Producer      # HTTP API on :5180; endpoint list in the header comment of src/Vida.Producer/Program.cs
 dotnet run --project src\Vida.Consumer      # :5181 (logs only). Second instance: -- --urls http://localhost:5191

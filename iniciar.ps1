@@ -1,12 +1,14 @@
 # Sobe tudo para estudar: Producer, Consumer, Assinantes e o painel, e abre o navegador.
 # Uso: .\iniciar.ps1                  compila, sobe os 4 processos e abre http://localhost:5173
 #      .\iniciar.ps1 -ComInfra        antes, cria/atualiza a infra no Azure (infra\up.ps1)
+#      .\iniciar.ps1 -ComInfra -ModoDebug   idem, com lock de 5 min (máximo) para parar em breakpoints sem perder a mensagem
 #      .\iniciar.ps1 -SemNavegador    não abre o navegador
 #      .\iniciar.ps1 -Parar           encerra processos que ficaram para trás (ex.: janela fechada no X)
 # Ctrl+C encerra tudo. A saída de cada app fica em logs\<app>.log; o painel mostra os mesmos logs ao vivo.
 # No prompt do Claude: ! pwsh -File iniciar.ps1
 param(
     [switch]$ComInfra,
+    [switch]$ModoDebug,
     [switch]$SemNavegador,
     [switch]$Parar
 )
@@ -41,8 +43,11 @@ if ($Parar) {
 }
 
 # 1) Infra
+if ($ModoDebug -and -not $ComInfra) {
+    throw '-ModoDebug só vale junto com -ComInfra (o lock é configuração da entidade no broker). Com a infra já no ar: .\infra\up.ps1 -ModoDebug'
+}
 if ($ComInfra) {
-    & "$raiz\infra\up.ps1"
+    & "$raiz\infra\up.ps1" -ModoDebug:$ModoDebug
 }
 if (-not (Test-Path "$raiz\src\servicebus.local.json")) {
     throw 'src\servicebus.local.json não existe. Rode .\iniciar.ps1 -ComInfra (ou .\infra\up.ps1) primeiro.'

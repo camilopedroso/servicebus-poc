@@ -44,6 +44,7 @@ Um comando sobe tudo e abre o navegador (Ctrl+C encerra; a saída de cada app fi
 ```powershell
 .\iniciar.ps1               # compila, sobe Producer, Consumer, Assinantes e o painel
 .\iniciar.ps1 -ComInfra     # antes, cria/atualiza a infra (infra\up.ps1)
+.\iniciar.ps1 -ComInfra -ModoDebug   # idem, com lock de 5 min para depurar (ver "Modo debug")
 .\iniciar.ps1 -Parar        # encerra processos que ficaram para trás (ex.: janela fechada no X)
 # ou no prompt do Claude -> ! pwsh -File iniciar.ps1
 ```
