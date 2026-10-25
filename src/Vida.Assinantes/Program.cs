@@ -1,7 +1,6 @@
 using Azure.Identity;
 using Azure.Messaging.ServiceBus;
 using Azure.Messaging.ServiceBus.Administration;
-using Vida.Assinantes.Endpoints;
 using Vida.Assinantes.Processamento;
 using Vida.LogsAoVivo.Logs;
 using Vida.Mensageria.Conexao;
@@ -45,7 +44,7 @@ builder.Services.AddSingleton(sp => new GerenciadorDeAssinaturas(
 builder.Services.AddHostedService(sp => sp.GetRequiredService<GerenciadorDeAssinaturas>());
 
 var app = builder.Build();
-app.MapLogsAoVivo();
-app.MapAssinaturas();
+// Controllers: AssinaturasController (deste app) e LogsController (da Vida.LogsAoVivo, registrado por AddLogsAoVivo).
+app.MapControllers();
 app.Run();
 return 0;

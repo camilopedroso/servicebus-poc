@@ -1,54 +1,38 @@
 using System.Collections.Concurrent;
 using Azure.Messaging.ServiceBus.Administration;
+using Microsoft.AspNetCore.Mvc;
+using Vida.Assinantes.Contratos;
 using Vida.Assinantes.Processamento;
 using Vida.Mensageria.Topologia;
 
-namespace Vida.Assinantes.Endpoints;
+namespace Vida.Assinantes.Controllers;
 
 /// <summary>
 /// Endpoints que o painel usa para ver e ligar/desligar as assinaturas deste app.
 /// </summary>
-public static class EndpointsDeAssinaturas
+/// <param name="gerenciador">Dono dos processors, um por assinatura.</param>
+/// <param name="admin">Lê contagens e regras das assinaturas.</param>
+[ApiController]
+[Route("assinaturas")]
+public sealed class AssinaturasController(GerenciadorDeAssinaturas gerenciador, ServiceBusAdministrationClient admin) : ControllerBase
 {
-    // As regras só mudam com um novo deploy do Bicep: lê uma vez por processo.
+    // As regras só mudam com um novo deploy do Bicep: lê uma vez por processo (static, porque o controller é criado a cada requisição).
     private static readonly ConcurrentDictionary<string, string[]> FiltrosEmCache = new();
 
     /// <summary>
-    /// Mapeia GET /assinaturas e POST /assinaturas/{nome}/iniciar|parar.
+    /// GET /assinaturas: estado, filtros e contagens de cada assinatura.
     /// </summary>
-    /// <param name="app">App onde os endpoints são mapeados.</param>
-    /// <returns>O mesmo app, para encadear.</returns>
-    public static IEndpointRouteBuilder MapAssinaturas(this IEndpointRouteBuilder app)
-    {
-        app.MapGet("/assinaturas", ListarAsync);
-
-        app.MapPost("/assinaturas/{nome}/iniciar", async (string nome, GerenciadorDeAssinaturas gerenciador, CancellationToken ct) =>
-        {
-            if (!gerenciador.Existe(nome)) return AssinaturaDesconhecida(nome);
-            await gerenciador.IniciarAsync(nome, ct);
-            return Results.NoContent();
-        });
-
-        app.MapPost("/assinaturas/{nome}/parar", async (string nome, GerenciadorDeAssinaturas gerenciador, CancellationToken ct) =>
-        {
-            if (!gerenciador.Existe(nome)) return AssinaturaDesconhecida(nome);
-            await gerenciador.PararAsync(nome, ct);
-            return Results.NoContent();
-        });
-
-        return app;
-    }
-
-    private static async Task<EstadoDaAssinatura[]> ListarAsync(
-        GerenciadorDeAssinaturas gerenciador, ServiceBusAdministrationClient admin, CancellationToken ct)
+    [HttpGet]
+    public async Task<EstadoDaAssinatura[]> ListarAsync(CancellationToken cancellationToken)
     {
         // Uma chamada de runtime properties por assinatura, em paralelo.
         var estados = gerenciador.Processadores.Select(async processador =>
         {
-            var propriedades = await admin.GetSubscriptionRuntimePropertiesAsync(Assinaturas.TopicoDe(processador.Nome), processador.Nome, ct);
+            var propriedades = await admin.GetSubscriptionRuntimePropertiesAsync(
+                Assinaturas.TopicoDe(processador.Nome), processador.Nome, cancellationToken);
             return new EstadoDaAssinatura(
                 processador.Nome,
-                await ObterFiltrosAsync(admin, processador.Nome, ct),
+                await ObterFiltrosAsync(processador.Nome, cancellationToken),
                 processador.Ativa,
                 propriedades.Value.ActiveMessageCount,
                 propriedades.Value.DeadLetterMessageCount);
@@ -56,7 +40,35 @@ public static class EndpointsDeAssinaturas
         return await Task.WhenAll(estados);
     }
 
-    private static async Task<string[]> ObterFiltrosAsync(ServiceBusAdministrationClient admin, string assinatura, CancellationToken ct)
+    /// <summary>
+    /// POST /assinaturas/{nome}/iniciar: liga o processor da assinatura.
+    /// </summary>
+    [HttpPost("{nome}/iniciar")]
+    public async Task<IActionResult> IniciarAsync(string nome, CancellationToken cancellationToken)
+    {
+        if (!gerenciador.Existe(nome))
+        {
+            return AssinaturaDesconhecida(nome);
+        }
+        await gerenciador.IniciarAsync(nome, cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// POST /assinaturas/{nome}/parar: desliga o processor; as mensagens ficam retidas na assinatura.
+    /// </summary>
+    [HttpPost("{nome}/parar")]
+    public async Task<IActionResult> PararAsync(string nome, CancellationToken cancellationToken)
+    {
+        if (!gerenciador.Existe(nome))
+        {
+            return AssinaturaDesconhecida(nome);
+        }
+        await gerenciador.PararAsync(nome, cancellationToken);
+        return NoContent();
+    }
+
+    private async Task<string[]> ObterFiltrosAsync(string assinatura, CancellationToken cancellationToken)
     {
         if (FiltrosEmCache.TryGetValue(assinatura, out var emCache))
         {
@@ -64,7 +76,7 @@ public static class EndpointsDeAssinaturas
         }
 
         var filtros = new List<string>();
-        await foreach (var regra in admin.GetRulesAsync(Assinaturas.TopicoDe(assinatura), assinatura, ct))
+        await foreach (var regra in admin.GetRulesAsync(Assinaturas.TopicoDe(assinatura), assinatura, cancellationToken))
         {
             var acao = DescricaoDeRegras.DescreverAcao(regra);
             filtros.Add(acao is null
@@ -74,7 +86,7 @@ public static class EndpointsDeAssinaturas
         return FiltrosEmCache[assinatura] = [.. filtros];
     }
 
-    private static IResult AssinaturaDesconhecida(string nome) => Results.Problem(
+    private ObjectResult AssinaturaDesconhecida(string nome) => Problem(
         statusCode: StatusCodes.Status400BadRequest,
         title: "Assinatura desconhecida",
         detail: $"'{nome}' não existe. Válidas: {string.Join(", ", Assinaturas.Todas)}.");

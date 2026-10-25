@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Endpoint SSE e extensões de WebApplicationBuilder -->
+    <!-- Controller SSE (GET /logs) e extensões de WebApplicationBuilder -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 

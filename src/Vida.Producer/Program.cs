@@ -4,15 +4,12 @@ using Vida.LogsAoVivo.Logs;
 using Vida.Mensageria.Conexao;
 using Vida.Telemetria;
 using Microsoft.EntityFrameworkCore;
-using Vida.Mensageria.Topologia;
-using Vida.Producer.Api;
 using Vida.Producer.Cenarios;
-using Vida.Producer.Contratos;
 using Vida.Producer.Dados;
 using Vida.Producer.Erros;
 using Vida.Producer.Outbox;
 
-// Producer + ferramentas de operação, como API HTTP em http://localhost:5180.
+// Producer + ferramentas de operação, como API HTTP em http://localhost:5180 (controllers em Controllers/).
 // O painel (web/painel) chama estes endpoints; também dá para usar curl. Exemplos:
 //   curl -X POST localhost:5180/propostas/lote -H "Content-Type: application/json" -d '{"quantidade":5}'
 //   curl -X POST localhost:5180/propostas -H "Content-Type: application/json" -d '{"idade":85}'
@@ -53,6 +50,7 @@ builder.AddLogsAoVivo();
 builder.AddTelemetria("Vida.Producer");
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<TratadorDeErros>();
+builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
 // DbContext por requisição (scoped). Sem a connection string, as fases 1 a 3 continuam funcionando:
@@ -80,72 +78,10 @@ builder.Services.AddSingleton<EnvioSemOutbox>();
 
 var app = builder.Build();
 app.UseExceptionHandler();
-app.MapLogsAoVivo();
 app.MapOpenApi();
+// Os endpoints ficam nos controllers (pasta Controllers, mais o LogsController da Vida.LogsAoVivo), descobertos por atributo.
+app.MapControllers();
 
 app.Logger.LogInformation("Namespace do Service Bus: {Namespace}", fqdn);
-app.MapGet("/namespace", () => new { Namespace = fqdn });
-
-// Fase 1
-app.MapPost("/propostas/lote", async (EnvioDeLote corpo, EnvioDePropostas envio, CancellationToken ct) =>
-    corpo.Validar() is { Count: > 0 } erros
-        ? Results.ValidationProblem(erros)
-        : Results.Ok(new { Propostas = await envio.EnviarLoteAsync(corpo.Quantidade, ct) }));
-
-app.MapPost("/propostas", async (EnvioDeProposta corpo, EnvioDePropostas envio, CancellationToken ct) =>
-    corpo.Validar() is { Count: > 0 } erros
-        ? Results.ValidationProblem(erros)
-        : Results.Ok(await envio.EnviarUmaAsync(corpo, ct)));
-
-app.MapPost("/propostas/invalida", async (EnvioDePropostas envio, CancellationToken ct) =>
-    Results.Ok(new { MessageId = await envio.EnviarInvalidaAsync(ct) }));
-
-app.MapGet("/filas/propostas/mensagens", async (bool? dlq, InspecaoDeEntidades inspecao, CancellationToken ct) =>
-    await inspecao.EspiarFilaAsync(dlq ?? false, ct));
-
-app.MapPost("/filas/propostas/dlq/reprocessar", async (ReprocessamentoDaDlq reprocessamento, CancellationToken ct) =>
-    await reprocessamento.ReprocessarAsync(ct));
-
-// Fase 2
-app.MapPost("/apolices", async (PublicacaoDeApolice corpo, PublicacaoDeApolices publicacao, CancellationToken ct) =>
-    corpo.Validar() is { Count: > 0 } erros
-        ? Results.ValidationProblem(erros)
-        : Results.Ok(await publicacao.PublicarAsync(corpo, ct)));
-
-app.MapGet("/assinaturas/regras", async (InspecaoDeEntidades inspecao, CancellationToken ct) =>
-    await inspecao.ListarRegrasAsync(ct));
-
-app.MapGet("/assinaturas/{nome}/mensagens", async (string nome, bool? dlq, InspecaoDeEntidades inspecao, CancellationToken ct) =>
-    Assinaturas.Todas.Contains(nome)
-        ? Results.Ok(await inspecao.EspiarAssinaturaAsync(nome, dlq ?? false, ct))
-        : Results.Problem(
-            statusCode: StatusCodes.Status400BadRequest,
-            title: "Assinatura desconhecida",
-            detail: $"'{nome}' não existe. Válidas: {string.Join(", ", Assinaturas.Todas)}."));
-
-// Fase 3
-app.MapPost("/endossos/em-ordem", async (SequenciaDeEndossos corpo, EnvioDeEndossos envio, CancellationToken ct) =>
-    corpo.Validar() is { Count: > 0 } erros
-        ? Results.ValidationProblem(erros)
-        : Results.Ok(new { Apolices = await envio.EnviarEmOrdemAsync(corpo.Apolices, corpo.Versoes, ct) }));
-
-app.MapPost("/endossos/fora-de-ordem", async (EnvioDeEndossos envio, CancellationToken ct) =>
-{
-    var (apoliceId, ordem) = await envio.EnviarForaDeOrdemAsync(versoes: 5, ct);
-    return Results.Ok(new { ApoliceId = apoliceId, Ordem = ordem });
-});
-
-app.MapPost("/endossos/duplicado", async (EnvioDeEndossos envio, CancellationToken ct) =>
-    Results.Ok(new { ApoliceId = await envio.EnviarDuplicadoAsync(ct) }));
-
-// Fase 4
-app.MapApiDePropostas();
-app.MapOutbox();
-
-app.MapPost("/propostas/sem-outbox", async (EnvioSemOutboxParametros corpo, EnvioSemOutbox envio, BancoDePropostas banco, CancellationToken ct) =>
-{
-    var (proposta, publicada) = await envio.EnviarAsync(banco, corpo.FalharAntesDoEnvio, ct);
-    return Results.Ok(new { proposta.PropostaId, Publicada = publicada });
-});
 
 app.Run();

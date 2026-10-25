@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Vida.Mensageria.Topologia;
-using Vida.Producer.Api;
+using Vida.Producer.Controllers;
 using Vida.Producer.Contratos;
 using Vida.Producer.Dados;
 using Vida.Testes.Integracao.Infra;
@@ -104,7 +104,7 @@ public sealed class ApiDePropostasTestes(FabricaDaApi fabrica)
     private Task<HttpResponseMessage> PostComChave(string chave)
     {
         var requisicao = new HttpRequestMessage(HttpMethod.Post, "/api/propostas") { Content = JsonContent.Create(Valida()) };
-        requisicao.Headers.Add(EndpointsDePropostas.CabecalhoDeIdempotencia, chave);
+        requisicao.Headers.Add(PropostasController.CabecalhoDeIdempotencia, chave);
         return _http.SendAsync(requisicao, TestContext.Current.CancellationToken);
     }
 

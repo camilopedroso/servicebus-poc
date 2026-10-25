@@ -1,0 +1,48 @@
+# Fase 2: tópico "apolice-emitida" e suas assinaturas (cobranca, notificacao, alto-valor).
+# O tópico "proposta-recusada" tem a assinatura notificacao-recusa (alimentada pelo cenário de idade > 80 da fase 1).
+
+@producer = http://localhost:5180
+
+### Publicar uma ApoliceEmitida direto no tópico (campos sorteados)
+POST {{producer}}/apolices
+Content-Type: application/json
+
+{}
+
+### Capital normal: cobranca + notificacao
+POST {{producer}}/apolices
+Content-Type: application/json
+
+{
+  "capitalSegurado": 300000,
+  "plano": "Individual"
+}
+
+### Capital > 1.000.000: requerRevisao = true → alto-valor (com prioridade = 'alta' pela action) + notificacao, sem cobranca
+POST {{producer}}/apolices
+Content-Type: application/json
+
+{
+  "capitalSegurado": 1500000,
+  "plano": "Empresarial"
+}
+
+### Validação: plano inexistente → 400
+POST {{producer}}/apolices
+Content-Type: application/json
+
+{
+  "plano": "Ouro"
+}
+
+### Regras (filtros e actions) de cada assinatura, lidas do broker
+GET {{producer}}/assinaturas/regras
+
+### Peek em uma assinatura (cobranca, notificacao, alto-valor, notificacao-recusa)
+GET {{producer}}/assinaturas/alto-valor/mensagens
+
+### Peek na DLQ de uma assinatura
+GET {{producer}}/assinaturas/cobranca/mensagens?dlq=true
+
+### Assinatura desconhecida → 400
+GET {{producer}}/assinaturas/xyz/mensagens

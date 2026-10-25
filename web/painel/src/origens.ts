@@ -19,8 +19,8 @@ const origens: Record<string, Origem> = {
   EnvioSemOutbox: { rotulo: 'sem outbox', descricao: 'Dual write: grava no banco e publica sem outbox (fase 4)' },
   InspecaoDeEntidades: { rotulo: 'operação', descricao: 'Peek em filas, assinaturas e DLQs; leitura das regras' },
   ReprocessamentoDaDlq: { rotulo: 'operação', descricao: 'Reprocessamento da DLQ' },
-  ApiDePropostas: { rotulo: 'API', descricao: 'API REST /api/propostas: grava a proposta e o outbox numa transação (fase 4)' },
-  Outbox: { rotulo: 'outbox', descricao: 'Operação do outbox: estado e simulação de indisponibilidade' },
+  PropostasController: { rotulo: 'API', descricao: 'API REST /api/propostas: grava a proposta e o outbox numa transação (fase 4)' },
+  OutboxController: { rotulo: 'outbox', descricao: 'Operação do outbox: estado e simulação de indisponibilidade' },
   DespachanteDoOutbox: { rotulo: 'outbox', descricao: 'Despachante: publica no Service Bus o que a API gravou (fase 4)' },
   MigracaoDoBanco: { rotulo: 'banco', descricao: 'Migrations do EF Core na partida' },
   // Consumer

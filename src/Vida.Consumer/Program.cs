@@ -4,7 +4,7 @@ using Vida.LogsAoVivo.Logs;
 using Vida.Mensageria.Conexao;
 using Vida.Telemetria;
 
-// Host web só para expor GET /logs ao painel (web/painel). O trabalho continua no Worker.
+// Host web só para expor GET /logs ao painel (web/painel), pelo LogsController da Vida.LogsAoVivo. O trabalho continua no Worker.
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration.AddJsonFile(
@@ -31,5 +31,5 @@ builder.Services.AddKeyedSingleton(ProcessadorDeEndossos.ChaveDoClient, (sp, _) 
 builder.Services.AddHostedService<ProcessadorDeEndossos>();
 
 var app = builder.Build();
-app.MapLogsAoVivo();
+app.MapControllers();
 app.Run();

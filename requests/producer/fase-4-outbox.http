@@ -1,0 +1,38 @@
+# Fase 4: operação do outbox e o problema que ele resolve (dual write).
+
+@producer = http://localhost:5180
+
+### Estado do outbox: pendentes, publicadas e se a simulação está ligada
+GET {{producer}}/outbox
+
+### Derrubar o Service Bus para o despachante (só simulação: a API continua aceitando propostas)
+POST {{producer}}/outbox/simulacao
+Content-Type: application/json
+
+{
+  "indisponivel": true
+}
+
+### Restabelecer: o despachante publica o que acumulou
+POST {{producer}}/outbox/simulacao
+Content-Type: application/json
+
+{
+  "indisponivel": false
+}
+
+### Sem outbox, falhando entre o INSERT e o envio: proposta gravada, mensagem perdida
+POST {{producer}}/propostas/sem-outbox
+Content-Type: application/json
+
+{
+  "falharAntesDoEnvio": true
+}
+
+### Sem outbox, sem falha: funciona, mas só por sorte
+POST {{producer}}/propostas/sem-outbox
+Content-Type: application/json
+
+{
+  "falharAntesDoEnvio": false
+}

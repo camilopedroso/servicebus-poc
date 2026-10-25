@@ -1,0 +1,12 @@
+# Fase 1: ferramentas de operação da fila "propostas". Peek não consome: só olha.
+
+@producer = http://localhost:5180
+
+### Peek na fila
+GET {{producer}}/filas/propostas/mensagens
+
+### Peek na DLQ (com DeadLetterReason e DeadLetterErrorDescription)
+GET {{producer}}/filas/propostas/mensagens?dlq=true
+
+### Reprocessar a DLQ: devolve as mensagens para a fila (motivos permanentes, como PayloadInvalido, ficam na DLQ)
+POST {{producer}}/filas/propostas/dlq/reprocessar

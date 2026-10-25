@@ -1,0 +1,59 @@
+# Fase 4: API REST de propostas com transactional outbox (precisa do SQL Server local: infra\sql-up.ps1).
+# O POST grava proposta + mensagem do outbox numa transação e responde 201 sem falar com o Service Bus.
+
+@producer = http://localhost:5180
+
+### Criar proposta → 201 Created + Location
+# @name criada
+POST {{producer}}/api/propostas
+Content-Type: application/json
+
+{
+  "clienteId": "CLI-1001",
+  "idade": 42,
+  "capitalSegurado": 350000,
+  "plano": "Familiar"
+}
+
+### Consultar a proposta criada acima: Recebida (no outbox) → EnviadaParaAnalise (publicada)
+GET {{producer}}/api/propostas/{{criada.response.body.$.propostaId}}
+
+### Proposta inexistente → 404
+GET {{producer}}/api/propostas/00000000-0000-0000-0000-000000000000
+
+### Idempotency-Key: primeira chamada → 201
+# @name primeira
+POST {{producer}}/api/propostas
+Content-Type: application/json
+Idempotency-Key: {{$guid}}
+
+{
+  "clienteId": "CLI-1002",
+  "idade": 35,
+  "capitalSegurado": 200000,
+  "plano": "Individual"
+}
+
+### Idempotency-Key repetida (a mesma da chamada acima) → 200 + Idempotent-Replayed: true, mesma proposta, nada gravado
+POST {{producer}}/api/propostas
+Content-Type: application/json
+Idempotency-Key: {{primeira.request.headers.Idempotency-Key}}
+
+{
+  "clienteId": "CLI-1002",
+  "idade": 35,
+  "capitalSegurado": 200000,
+  "plano": "Individual"
+}
+
+### Validação: todos os campos são obrigatórios → 400 com um erro por campo
+POST {{producer}}/api/propostas
+Content-Type: application/json
+
+{
+  "idade": 200,
+  "plano": "Ouro"
+}
+
+### Contrato OpenAPI do Producer
+GET {{producer}}/openapi/v1.json

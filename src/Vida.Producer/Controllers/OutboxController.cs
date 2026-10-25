@@ -1,40 +1,44 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vida.Producer.Contratos;
 using Vida.Producer.Dados;
 using Vida.Producer.Outbox;
 
-namespace Vida.Producer.Api;
+namespace Vida.Producer.Controllers;
 
 /// <summary>
 /// Operação do outbox (fase 4): ver pendentes e simular o Service Bus fora do ar.
 /// </summary>
-public static class EndpointsDoOutbox
+/// <param name="simulacao">Chave liga/desliga que o despachante consulta antes de enviar.</param>
+/// <param name="logger">Logger; aparece com o selo "outbox" na coluna do Producer.</param>
+[ApiController]
+[Route("outbox")]
+public sealed class OutboxController(SimulacaoDeIndisponibilidade simulacao, ILogger<OutboxController> logger) : ControllerBase
 {
     /// <summary>
-    /// Mapeia GET /outbox e POST /outbox/simulacao.
+    /// GET /outbox: quantas mensagens estão pendentes e publicadas, e se a simulação está ligada.
     /// </summary>
-    /// <param name="app">App onde os endpoints são mapeados.</param>
-    /// <returns>O mesmo app, para encadear.</returns>
-    public static IEndpointRouteBuilder MapOutbox(this IEndpointRouteBuilder app)
+    [HttpGet]
+    public async Task<EstadoDoOutbox> ObterEstadoAsync([FromServices] BancoDePropostas banco, CancellationToken cancellationToken)
     {
-        app.MapGet("/outbox", async (BancoDePropostas banco, SimulacaoDeIndisponibilidade simulacao, ILoggerFactory loggers, CancellationToken ct) =>
-        {
-            var pendentes = await banco.OutboxMensagens.CountAsync(m => m.PublicadaEm == null, ct);
-            var publicadas = await banco.OutboxMensagens.CountAsync(m => m.PublicadaEm != null, ct);
-            loggers.CreateLogger("Vida.Producer.Api.Outbox").LogInformation(
-                "Outbox: {Pendentes} pendente(s), {Publicadas} publicada(s). Service Bus {Situacao}.",
-                pendentes, publicadas, simulacao.Ativa ? "indisponível (simulação)" : "disponível");
-            return new EstadoDoOutbox(simulacao.Ativa, pendentes, publicadas);
-        });
+        var pendentes = await banco.OutboxMensagens.CountAsync(m => m.PublicadaEm == null, cancellationToken);
+        var publicadas = await banco.OutboxMensagens.CountAsync(m => m.PublicadaEm != null, cancellationToken);
+        logger.LogInformation(
+            "Outbox: {Pendentes} pendente(s), {Publicadas} publicada(s). Service Bus {Situacao}.",
+            pendentes, publicadas, simulacao.Ativa ? "indisponível (simulação)" : "disponível");
+        return new EstadoDoOutbox(simulacao.Ativa, pendentes, publicadas);
+    }
 
-        app.MapPost("/outbox/simulacao", (SimulacaoDoOutbox corpo, SimulacaoDeIndisponibilidade simulacao, ILoggerFactory loggers) =>
-        {
-            simulacao.Ativa = corpo.Indisponivel;
-            loggers.CreateLogger("Vida.Producer.Api.Outbox").LogWarning(corpo.Indisponivel
-                ? "Simulação: Service Bus FORA DO AR para o despachante do outbox. A API continua aceitando propostas."
-                : "Simulação: Service Bus de volta. O despachante publica o que acumulou.");
-            return new { corpo.Indisponivel };
-        });
-        return app;
+    /// <summary>
+    /// POST /outbox/simulacao: derruba ou restabelece o envio do despachante.
+    /// </summary>
+    [HttpPost("simulacao")]
+    public IActionResult Simular(SimulacaoDoOutbox corpo)
+    {
+        simulacao.Ativa = corpo.Indisponivel;
+        logger.LogWarning(corpo.Indisponivel
+            ? "Simulação: Service Bus FORA DO AR para o despachante do outbox. A API continua aceitando propostas."
+            : "Simulação: Service Bus de volta. O despachante publica o que acumulou.");
+        return Ok(new { corpo.Indisponivel });
     }
 }

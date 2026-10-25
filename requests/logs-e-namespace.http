@@ -1,0 +1,24 @@
+# Endpoints de apoio do painel, presentes nos três apps.
+#
+# GET /logs é Server-Sent Events: a conexão não termina, e o REST Client só mostra a resposta quando ela acaba.
+# Use para ver os cabeçalhos (text/event-stream) e cancele; para acompanhar o stream, prefira o painel ou
+#   curl -N localhost:5180/logs
+
+@producer = http://localhost:5180
+@consumer = http://localhost:5181
+@assinantes = http://localhost:5182
+
+### Namespace do Service Bus em uso
+GET {{producer}}/namespace
+
+### Logs ao vivo do Producer (SSE)
+GET {{producer}}/logs
+Accept: text/event-stream
+
+### Logs ao vivo do Consumer (SSE)
+GET {{consumer}}/logs
+Accept: text/event-stream
+
+### Logs ao vivo do Assinantes (SSE)
+GET {{assinantes}}/logs
+Accept: text/event-stream

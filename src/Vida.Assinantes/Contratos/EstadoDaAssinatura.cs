@@ -1,4 +1,4 @@
-namespace Vida.Assinantes.Endpoints;
+namespace Vida.Assinantes.Contratos;
 
 /// <summary>
 /// Estado de uma assinatura como o painel mostra no seletor de assinaturas.
