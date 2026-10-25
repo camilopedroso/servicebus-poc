@@ -9,7 +9,7 @@ POC para estudar Azure Service Bus em C#/.NET 10, comparando com Kafka e RabbitM
 | 3    | Sessions, detecção de duplicatas, mensagens agendadas, deferral               | ✅      |
 | 4    | API REST + Outbox no SQL Server                                               | ✅      |
 | 5    | Observabilidade (OpenTelemetry → App Insights) + testes                       | ✅      |
-| 6    | (Opcional) Azure DevOps + Azure Functions                                     | ⏳      |
+| 6    | (Opcional) Azure DevOps + Azure Functions                                     | descartada |
 
 Notas de estudo: [fase 1 — filas](docs/fase-1-filas.md) · [fase 2 — tópicos](docs/fase-2-topicos.md) · [fase 3 — sessions](docs/fase-3-sessions.md) · [fase 4 — outbox](docs/fase-4-outbox.md) · [fase 5 — observabilidade e testes](docs/fase-5-observabilidade.md)
 
