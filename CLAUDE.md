@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Study POC for Azure Service Bus in C#/.NET 10, modeled on a life-insurance policy issuance domain ("Vida"). The goal is to explain Service Bus concepts by contrasting them with Kafka and RabbitMQ, which the user already knows. Code identifiers, comments, logs and docs are in **Portuguese (pt-BR)**. Keep that convention.
 
-The work is split into phases (roadmap and status in `README.md`). Each phase gets code plus a study note in `docs/fase-N-*.md` with Kafka/RabbitMQ comparisons, and Microsoft Learn links. Done: 1 queues, settlement, DLQ; 2 topic + subscriptions with filters, cross-entity transaction; 3 sessions/dedup/scheduled/deferral. Next: 4 REST API + Outbox on SQL Server, 5 OpenTelemetry → App Insights + tests, 6 Azure DevOps + Functions (optional).
+The work is split into phases (roadmap and status in `README.md`). Each phase gets code plus a study note in `docs/fase-N-*.md` with Kafka/RabbitMQ comparisons, and Microsoft Learn links. Done: 1 queues, settlement, DLQ; 2 topic + subscriptions with filters, cross-entity transaction; 3 sessions/dedup/scheduled/deferral; 4 REST API + Outbox on SQL Server. Next: 5 OpenTelemetry → App Insights + tests, 6 Azure DevOps + Functions (optional).
 
 ## Commands
 
@@ -14,8 +14,11 @@ The work is split into phases (roadmap and status in `README.md`). Each phase ge
 .\infra\up.ps1                 # create/update Azure infra (RG rg-servicebus-poc, brazilsouth) and write src/servicebus.local.json
 .\infra\up.ps1 -ModoDebug      # same, with lockDuration PT5M (max) on queue and subscriptions, for breakpoint debugging
 .\infra\down.ps1               # delete the resource group. Standard tier bills ~US$0.013/h while it exists, even idle
+.\infra\sql-up.ps1             # local SQL Server 2022 in Docker (container vida-sql, port 14330); writes src/sqlserver.local.json. iniciar.ps1 runs it
+.\infra\sql-down.ps1 [-ApagarDados]   # remove the container (and the volume + connection string)
+dotnet ef migrations add <Nome> --project src\Vida.Producer --output-dir Dados/Migrations   # dotnet-ef is a local tool (dotnet-tools.json); run dotnet tool restore first
 az bicep lint -f infra\main.bicep
-.\iniciar.ps1                  # build + start all 3 apps (from bin, output in logs\) + panel, opens browser. -ComInfra runs up.ps1 first (add -ModoDebug for the 5-min lock); -Parar kills leftovers
+.\iniciar.ps1                  # sql-up.ps1 (non-fatal without Docker), build + start all 3 apps (from bin, output in logs\) + panel, opens browser. -ComInfra runs up.ps1 first (add -ModoDebug for the 5-min lock); -Parar kills leftovers
 dotnet build                   # solution: ServiceBusPoc.slnx
 dotnet run --project src\Vida.Producer      # HTTP API on :5180; endpoint list in the header comment of src/Vida.Producer/Program.cs
 dotnet run --project src\Vida.Consumer      # :5181 (logs only). Second instance: -- --urls http://localhost:5191
@@ -51,8 +54,10 @@ There are no tests yet (planned for phase 5).
 - **The cross-entity-transaction client is exclusive.** With `EnableCrossEntityTransactions`, every link of that client is routed through the first entity it touched, so a receiver on another queue fails with "Local transactions cannot span multiple top-level entities". `ProcessadorDeEndossos` therefore uses its own keyed `ServiceBusClient` (`ProcessadorDeEndossos.ChaveDoClient`). Any new processor in `Vida.Consumer` on a different entity needs the same.
 - **Retry with backoff (phase 3):** with `simularFalha` + `retryComBackoff`, `Worker` completes the message and sends a copy with `ScheduledEnqueueTime` (2^n s) and `tentativa + 1` in one transaction; the simulated dependency recovers at attempt 3, and attempt 5 dead-letters with `TentativasEsgotadas` (not permanent, so resubmit takes it).
 - **Contracts are read strictly:** `SerializacaoDeContratos.Leitura` (required constructor params + nullable annotations). Without it `{}` deserializes into an all-default record and was being approved. Use it whenever a consumer reads a body.
+- **Phase 4 flow (outbox):** `POST /api/propostas` (`Api/EndpointsDePropostas`) adds `PropostaRegistrada` and a `MensagemDeSaida` (the `ServiceBusMessage` from `MensagensProposta.Criar`, serialized) in one `SaveChanges`, returning 201 + Location without touching Service Bus. `Outbox/DespachanteDoOutbox` polls every second inside a DB transaction (`UPDLOCK, READPAST, ROWLOCK`), sends the batch, marks `PublicadaEm` and sets the proposal to `EnviadaParaAnalise`; on `ServiceBusException` it backs off per row (`ProximaTentativaEm`, max 10 s). `Idempotency-Key` maps to a filtered unique index; a repeat returns 200 + `Idempotent-Replayed`. `POST /outbox/simulacao` fakes a broker outage for the dispatcher only; `POST /propostas/sem-outbox` demonstrates the dual-write failure. Migrations run at startup (`Dados/MigracaoDoBanco`, non-fatal: without SQL the API returns 503 via `TratadorDeErros`, phases 1–3 keep working). `src/sqlserver.local.json` is linked into the Producer output like `servicebus.local.json`, so rebuild after the first `sql-up.ps1`.
+- **`System.Security.Cryptography.Pkcs` is pinned on purpose** in `Vida.Producer.csproj` to override a vulnerable transitive version from `Microsoft.Data.SqlClient`. Don't remove it as unused.
 - **DLQ resubmit (`ReprocessamentoDaDlq`)** skips permanent reasons (`MotivosDeDeadLetter.Permanentes`) and only takes messages up to the DLQ's max `SequenceNumber` peeked at the start, so a copy that dies again can't loop.
-- **`Vida.Producer`:** a minimal API (no CLI args). Scenario logic lives in `Cenarios/` (`EnvioDePropostas`, `PublicacaoDeApolices`, `InspecaoDeEntidades`, `ReprocessamentoDaDlq`, `EnvioDeEndossos`), request bodies in `Contratos/` with a `Validar()` method, and `Erros/TratadorDeErros` turns `ServiceBusException`/auth errors into ProblemDetails. It sets `MessageId` to the business id (groundwork for duplicate detection in phase 3), `Subject` to the event type (for subscription filters in phase 2), and `CorrelationId` to the client id. It also hosts the operations tools: peek, DLQ peek, and DLQ resubmit. Resubmit sends the copy before completing the DLQ message, so a failure duplicates rather than loses (at-least-once).
+- **`Vida.Producer`:** a minimal API (no CLI args). Scenario logic lives in `Cenarios/` (`EnvioDePropostas`, `PublicacaoDeApolices`, `InspecaoDeEntidades`, `ReprocessamentoDaDlq`, `EnvioDeEndossos`, `EnvioSemOutbox`), request bodies in `Contratos/` with a `Validar()` method, and `Erros/TratadorDeErros` turns `ServiceBusException`/auth errors into ProblemDetails. It sets `MessageId` to the business id (groundwork for duplicate detection in phase 3), `Subject` to the event type (for subscription filters in phase 2), and `CorrelationId` to the client id. It also hosts the operations tools: peek, DLQ peek, and DLQ resubmit. Resubmit sends the copy before completing the DLQ message, so a failure duplicates rather than loses (at-least-once).
 
 ## Working with the user
 
@@ -65,5 +70,5 @@ There are no tests yet (planned for phase 5).
 ## Conventions for new phases
 
 - Follow the Azure best-practice choices already made: managed identity/RBAC instead of keys, one `ServiceBusClient` singleton per app, infrastructure in Bicep rather than portal clicks, latest stable SDKs (`Azure.Messaging.ServiceBus`, `Azure.Identity`).
-- Keep cost in mind: stay on the Standard tier (Premium is ~US$0.93/h). For anything stateful that isn't Service Bus, such as SQL Server for the outbox, run it locally in Docker.
+- Keep cost in mind: stay on the Standard tier (Premium is ~US$0.93/h). For anything stateful that isn't Service Bus, such as SQL Server for the outbox, run it locally in Docker (`infra/sql-up.ps1`).
 - When finishing a phase, update the status table in `README.md` and add `docs/fase-N-*.md` in the same style as `docs/fase-1-filas.md`.

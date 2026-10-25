@@ -2,10 +2,14 @@
 using Azure.Messaging.ServiceBus.Administration;
 using Vida.LogsAoVivo.Logs;
 using Vida.Mensageria.Conexao;
+using Microsoft.EntityFrameworkCore;
 using Vida.Mensageria.Topologia;
+using Vida.Producer.Api;
 using Vida.Producer.Cenarios;
 using Vida.Producer.Contratos;
+using Vida.Producer.Dados;
 using Vida.Producer.Erros;
+using Vida.Producer.Outbox;
 
 // Producer + ferramentas de operação, como API HTTP em http://localhost:5180.
 // O painel (web/painel) chama estes endpoints; também dá para usar curl. Exemplos:
@@ -27,14 +31,33 @@ using Vida.Producer.Erros;
 //   POST /endossos/fora-de-ordem            5 versões de uma apólice embaralhadas → deferral
 //   POST /endossos/duplicado                v1, v1 de novo (mesmo MessageId) e v2 → o broker descarta a cópia
 //   POST /propostas com retryComBackoff     falha transitória com novas tentativas agendadas (2 s, 4 s...)
+// Fase 4 (API REST + outbox no SQL Server local; contrato em /openapi/v1.json):
+//   POST /api/propostas                     grava proposta + outbox numa transação → 201 Created (Idempotency-Key opcional)
+//   GET  /api/propostas/{id}                status: Recebida (no outbox) ou EnviadaParaAnalise (publicada)
+//   GET  /outbox                            pendentes e publicadas
+//   POST /outbox/simulacao                  {indisponivel}: derruba/restabelece o envio do despachante
+//   POST /propostas/sem-outbox              {falharAntesDoEnvio}: dual write, o problema que o outbox resolve
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration.AddJsonFile(
     Path.Combine(AppContext.BaseDirectory, ServiceBusClientFactory.ArquivoConfiguracaoLocal), optional: true);
+// Fase 4: connection string do SQL Server local, gerada por infra/sql-up.ps1.
+builder.Configuration.AddJsonFile(Path.Combine(AppContext.BaseDirectory, "sqlserver.local.json"), optional: true);
 builder.AddLogsAoVivo();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<TratadorDeErros>();
+builder.Services.AddOpenApi();
+
+// DbContext por requisição (scoped). Sem a connection string, as fases 1 a 3 continuam funcionando:
+// o erro só aparece quando alguém usa o banco (503 com a instrução, pelo TratadorDeErros).
+var conexaoSql = builder.Configuration.GetConnectionString("Propostas");
+builder.Services.AddDbContext<BancoDePropostas>(opcoes =>
+    opcoes.UseSqlServer(conexaoSql ?? throw new BancoNaoConfiguradoException()));
+// Ordem importa: hosted services começam na ordem de registro, então o banco é migrado antes do despachante.
+builder.Services.AddHostedService<MigracaoDoBanco>();
+builder.Services.AddSingleton<SimulacaoDeIndisponibilidade>();
+builder.Services.AddHostedService<DespachanteDoOutbox>();
 
 var fqdn = ServiceBusClientFactory.ObterNamespace(builder.Configuration);
 
@@ -47,10 +70,12 @@ builder.Services.AddSingleton<PublicacaoDeApolices>();
 builder.Services.AddSingleton<InspecaoDeEntidades>();
 builder.Services.AddSingleton<ReprocessamentoDaDlq>();
 builder.Services.AddSingleton<EnvioDeEndossos>();
+builder.Services.AddSingleton<EnvioSemOutbox>();
 
 var app = builder.Build();
 app.UseExceptionHandler();
 app.MapLogsAoVivo();
+app.MapOpenApi();
 
 app.Logger.LogInformation("Namespace do Service Bus: {Namespace}", fqdn);
 app.MapGet("/namespace", () => new { Namespace = fqdn });
@@ -106,5 +131,15 @@ app.MapPost("/endossos/fora-de-ordem", async (EnvioDeEndossos envio, Cancellatio
 
 app.MapPost("/endossos/duplicado", async (EnvioDeEndossos envio, CancellationToken ct) =>
     Results.Ok(new { ApoliceId = await envio.EnviarDuplicadoAsync(ct) }));
+
+// Fase 4
+app.MapApiDePropostas();
+app.MapOutbox();
+
+app.MapPost("/propostas/sem-outbox", async (EnvioSemOutboxParametros corpo, EnvioSemOutbox envio, BancoDePropostas banco, CancellationToken ct) =>
+{
+    var (proposta, publicada) = await envio.EnviarAsync(banco, corpo.FalharAntesDoEnvio, ct);
+    return Results.Ok(new { proposta.PropostaId, Publicada = publicada });
+});
 
 app.Run();

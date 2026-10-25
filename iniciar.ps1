@@ -1,4 +1,5 @@
-# Sobe tudo para estudar: Producer, Consumer, Assinantes e o painel, e abre o navegador.
+# Sobe tudo para estudar: SQL Server local (Docker), Producer, Consumer, Assinantes e o painel, e abre o navegador.
+# O container do SQL Server continua de pé depois do Ctrl+C e do -Parar (é local, não custa); para removê-lo: infra\sql-down.ps1.
 # Uso: .\iniciar.ps1                  compila, sobe os 4 processos e abre http://localhost:5173
 #      .\iniciar.ps1 -ComInfra        antes, cria/atualiza a infra no Azure (infra\up.ps1)
 #      .\iniciar.ps1 -ComInfra -ModoDebug   idem, com lock de 5 min (máximo) para parar em breakpoints sem perder a mensagem
@@ -55,6 +56,14 @@ if (-not (Test-Path "$raiz\src\servicebus.local.json")) {
 Write-Host 'Conferindo a infra no Azure...'
 if ((az group exists -n rg-servicebus-poc) -ne 'true') {
     throw 'O resource group rg-servicebus-poc não existe. Rode .\iniciar.ps1 -ComInfra.'
+}
+
+# 1b) SQL Server local (fase 4). Sem Docker, só avisa: as fases 1 a 3 não dependem dele.
+try {
+    & "$raiz\infra\sql-up.ps1"
+}
+catch {
+    Write-Host "SQL Server não subiu ($($_.Exception.Message)). A API de propostas (fase 4) vai responder 503." -ForegroundColor Yellow
 }
 
 # 2) Portas livres

@@ -2,6 +2,8 @@ using Azure.Identity;
 using Azure.Messaging.ServiceBus;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
+using Vida.Producer.Dados;
 
 namespace Vida.Producer.Erros;
 
@@ -24,6 +26,10 @@ public sealed class TratadorDeErros(IProblemDetailsService problemDetails, ILogg
                 $"Rode 'az login' e tente de novo. {ex.Message}"),
             UnauthorizedAccessException ex => (StatusCodes.Status403Forbidden, "Sem permissão no namespace",
                 $"O RBAC pode levar alguns minutos para propagar depois do up.ps1. {ex.Message}"),
+            // Fase 4: a API de propostas depende do SQL Server local.
+            BancoNaoConfiguradoException ex => (StatusCodes.Status503ServiceUnavailable, "Banco não configurado", ex.Message),
+            SqlException ex => (StatusCodes.Status503ServiceUnavailable, "SQL Server indisponível",
+                $"Rode infra\\sql-up.ps1 (Docker). {ex.Message}"),
             _ => (0, "", ""),
         };
         if (status == 0)

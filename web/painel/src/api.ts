@@ -9,16 +9,37 @@ interface ProblemDetails {
   errors?: Record<string, string[]>;
 }
 
+/** Resposta completa, para cenários que mostram status e cabeçalhos (API REST da fase 4). */
+export interface RespostaDetalhada<T> {
+  status: number;
+  cabecalhos: Headers;
+  dados: T;
+}
+
 /**
  * Chama um app .NET pelo proxy do Vite (/api/producer, /api/consumer, /api/assinantes).
  * Respostas de erro viram ErroDaApi com o texto que o painel mostra ao usuário.
  */
 export async function chamar<T>(app: App, metodo: 'GET' | 'POST', caminho: string, corpo?: unknown): Promise<T> {
+  return (await chamarDetalhado<T>(app, metodo, caminho, corpo)).dados;
+}
+
+/** Como chamar, mas aceita cabeçalhos extras e devolve também o status e os cabeçalhos da resposta. */
+export async function chamarDetalhado<T>(
+  app: App,
+  metodo: 'GET' | 'POST',
+  caminho: string,
+  corpo?: unknown,
+  cabecalhosExtras?: Record<string, string>,
+): Promise<RespostaDetalhada<T>> {
   let resposta: Response;
   try {
     resposta = await fetch(`/api/${app}${caminho}`, {
       method: metodo,
-      headers: corpo === undefined ? undefined : { 'Content-Type': 'application/json' },
+      headers: {
+        ...(corpo === undefined ? {} : { 'Content-Type': 'application/json' }),
+        ...cabecalhosExtras,
+      },
       body: corpo === undefined ? undefined : JSON.stringify(corpo),
     });
   } catch {
@@ -39,7 +60,7 @@ export async function chamar<T>(app: App, metodo: 'GET' | 'POST', caminho: strin
         `O ${nomeDoApp[app]} respondeu ${resposta.status}. Confira se ele está rodando.`,
     );
   }
-  return dados as T;
+  return { status: resposta.status, cabecalhos: resposta.headers, dados: dados as T };
 }
 
 function tentarJson(texto: string): unknown {

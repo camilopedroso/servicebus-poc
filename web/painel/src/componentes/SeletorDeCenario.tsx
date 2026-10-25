@@ -9,6 +9,7 @@ const fases = [
   { fase: 1, rotulo: 'Fase 1: fila propostas' },
   { fase: 2, rotulo: 'Fase 2: tópico apolice-emitida' },
   { fase: 3, rotulo: 'Fase 3: sessions, duplicatas e agendamento' },
+  { fase: 4, rotulo: 'Fase 4: API REST + outbox (SQL Server)' },
 ] as const;
 
 export function SeletorDeCenario({ cenario, onEscolher }: Props) {

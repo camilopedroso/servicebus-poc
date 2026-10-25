@@ -8,6 +8,20 @@
   <ItemGroup>
     <!-- Gerado por infra/up.ps1 -->
     <None Include="..\servicebus.local.json" Link="servicebus.local.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\servicebus.local.json')" />
+    <!-- Gerado por infra/sql-up.ps1 (connection string do SQL Server local, fase 4) -->
+    <None Include="..\sqlserver.local.json" Link="sqlserver.local.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\sqlserver.local.json')" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.13" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.13">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.13" />
+    <!-- Não é usado direto: sobe a versão transitiva do Microsoft.Data.SqlClient 6.1.7 (9.0.11, com vulnerabilidade
+         alta GHSA-846f-f764-76mx). Pode sair quando o EF Core trouxer uma SqlClient que já dependa da versão corrigida. -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
   </ItemGroup>
 
   <PropertyGroup>

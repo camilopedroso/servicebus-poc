@@ -7,11 +7,11 @@ POC para estudar Azure Service Bus em C#/.NET 10, comparando com Kafka e RabbitM
 | 1    | Fila: peek-lock, Complete/Abandon/DeadLetter, retry, DLQ, competing consumers | ✅      |
 | 2    | Tópico + assinaturas com filtros, transação entre entidades                   | ✅      |
 | 3    | Sessions, detecção de duplicatas, mensagens agendadas, deferral               | ✅      |
-| 4    | API REST + Outbox no SQL Server                                               | ⏳      |
+| 4    | API REST + Outbox no SQL Server                                               | ✅      |
 | 5    | Observabilidade (OpenTelemetry → App Insights) + testes                       | ⏳      |
 | 6    | (Opcional) Azure DevOps + Azure Functions                                     | ⏳      |
 
-Notas de estudo: [fase 1 — filas](docs/fase-1-filas.md) · [fase 2 — tópicos](docs/fase-2-topicos.md) · [fase 3 — sessions](docs/fase-3-sessions.md)
+Notas de estudo: [fase 1 — filas](docs/fase-1-filas.md) · [fase 2 — tópicos](docs/fase-2-topicos.md) · [fase 3 — sessions](docs/fase-3-sessions.md) · [fase 4 — outbox](docs/fase-4-outbox.md)
 
 ## Estrutura
 
@@ -22,10 +22,13 @@ infra/
                      fila "endossos" (sessions + detecção de duplicatas), RBAC
   up.ps1             cria/atualiza a infra e grava src/servicebus.local.json
   down.ps1           apaga tudo (para a cobrança)
+  sql-up.ps1         SQL Server 2022 local em Docker (porta 14330, fase 4) e grava src/sqlserver.local.json
+  sql-down.ps1       remove o container (-ApagarDados remove também o volume)
 src/
   Vida.Mensageria/   contratos (PropostaSeguroVida, ApoliceEmitida) + criação do ServiceBusClient
   Vida.LogsAoVivo/   logger que guarda os últimos logs e os transmite em GET /logs (SSE) para o painel
-  Vida.Producer/     API (:5180): envia propostas/apólices e tem as operações (peek, DLQ, reprocessar, regras)
+  Vida.Producer/     API (:5180): envia propostas/apólices e tem as operações (peek, DLQ, reprocessar, regras);
+                     fase 4: API REST /api/propostas com outbox no SQL Server (Api/, Dados/, Outbox/)
   Vida.Consumer/     (:5181) lê a fila; ao aprovar, completa e publica no tópico numa transação;
                      Endossos/ aplica os endossos de cada apólice em ordem (sessions, session state, deferral)
   Vida.Assinantes/   (:5182) um processor por assinatura (cobranca, notificacao, alto-valor), liga/desliga por HTTP
@@ -37,6 +40,7 @@ web/
 
 - .NET 10 SDK
 - Node.js 20+ (para o painel)
+- Docker Desktop (SQL Server da fase 4; sem ele, as fases 1 a 3 funcionam e a API de propostas responde 503)
 - Azure CLI logado (`az login`) — o código autentica com `DefaultAzureCredential`, sem connection string
 
 ## Painel
@@ -61,7 +65,7 @@ dotnet run --project src\Vida.Assinantes
 cd web\painel; npm install; npm run dev     # http://localhost:5173
 ```
 
-- **Cenário**: o dropdown lista os cenários das fases 1 a 3, cada um com seus parâmetros (idade, capital, plano,
+- **Cenário**: o dropdown lista os cenários das fases 1 a 4, cada um com seus parâmetros (idade, capital, plano,
   falha simulada, assinatura). Campo vazio = o Producer sorteia. Não é preciso reiniciar nada para trocar de cenário.
 - **Colunas**: logs ao vivo do Producer, do Consumer e do Assinantes. Se um app cair, a coluna mostra o comando para
   subir de novo e reconecta sozinha.
@@ -162,3 +166,28 @@ Experimentos sugeridos:
 1. **Sessões entre instâncias**: suba um segundo consumer (`dotnet run --project src\Vida.Consumer -- --urls http://localhost:5191`) e envie endossos em ordem com várias apólices. Cada apólice fica inteira numa instância de cada vez; as apólices se dividem entre as duas.
 2. **Duplicata fora da janela**: a janela é de 10 min. Um reenvio depois disso passa pelo broker e é barrado pelo consumer (`versao <= UltimaVersao`): a idempotência no consumer continua necessária.
 3. **Versão que nunca chega**: com o Producer parado no meio de uma sequência, as versões posteriores ficam adiadas. Elas aparecem no peek do portal (Service Bus Explorer) com estado *Deferred*.
+
+## Rodando a fase 4
+
+O `iniciar.ps1` sobe o SQL Server em Docker antes dos apps (`infra\sql-up.ps1`, que também pode ser rodado sozinho).
+Na primeira partida, o Producer cria o banco `VidaPropostas` pelas migrations do EF Core. Grupo "Fase 4: API REST +
+outbox (SQL Server)":
+
+| Cenário no painel                        | O que acontece                                                             |
+| ---------------------------------------- | -------------------------------------------------------------------------- |
+| Criar proposta pela API REST (outbox)    | 201 + Location; o despachante publica em ~1 s; GET mostra EnviadaParaAnalise |
+| POST repetido com Idempotency-Key        | 201 e depois 200 com `Idempotent-Replayed: true`, mesmo id                 |
+| Service Bus fora do ar (outbox acumula)  | a API segue respondendo 201; o outbox acumula com backoff                  |
+| Restabelecer o Service Bus               | as pendentes saem na ordem de gravação                                     |
+| Sem outbox: dual write com falha         | a proposta é gravada e nunca publicada (fica em Recebida)                  |
+| Ver o outbox                             | pendentes e publicadas                                                     |
+
+A API também pode ser chamada direto. O contrato fica em `http://localhost:5180/openapi/v1.json`:
+
+```powershell
+curl -i -X POST localhost:5180/api/propostas -H "Content-Type: application/json" -H "Idempotency-Key: abc-123" `
+  -d '{\"clienteId\":\"CLI-1\",\"idade\":40,\"capitalSegurado\":300000,\"plano\":\"Familiar\"}'
+```
+
+Para olhar as tabelas: conecte em `localhost,14330` (usuário `sa`, senha em `src\sqlserver.local.json`) pelo
+SSMS, Azure Data Studio ou a extensão SQL Server do VS Code.

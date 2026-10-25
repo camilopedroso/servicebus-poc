@@ -1,4 +1,4 @@
-import { chamar } from './api';
+import { chamar, chamarDetalhado } from './api';
 
 /** Campos que um cenário pode pedir. Texto vazio significa "sortear" no Producer. */
 export interface Valores {
@@ -14,7 +14,7 @@ export type Campo = keyof Valores;
 
 export interface Cenario {
   id: string;
-  fase: 1 | 2 | 3;
+  fase: 1 | 2 | 3 | 4;
   titulo: string;
   /** O conceito de Service Bus que o cenário exercita. */
   mostra: string;
@@ -59,6 +59,23 @@ const publicarApolice = async (v: Valores) => {
   });
   return `Apólice ${apolice.apoliceId.slice(0, 8)} publicada com capital ${apolice.capitalSegurado.toLocaleString('pt-BR')}.`;
 };
+
+interface PropostaDaApi {
+  propostaId: string;
+  status: string;
+}
+
+/** Corpo do POST /api/propostas: a API exige todos os campos, então o painel sorteia os que ficarem vazios. */
+const novaProposta = (v: Valores) => ({
+  clienteId: `CLI-${Math.floor(1000 + Math.random() * 9000)}`,
+  idade: numeroOuNulo(v.idade) ?? Math.floor(18 + Math.random() * 52),
+  capitalSegurado: numeroOuNulo(v.capitalSegurado) ?? Math.floor(50 + Math.random() * 1950) * 1000,
+  plano: textoOuNulo(v.plano) ?? planos[Math.floor(Math.random() * planos.length)],
+});
+
+const esperar = (ms: number) => new Promise((resolver) => setTimeout(resolver, ms));
+
+const consultarProposta = (id: string) => chamar<PropostaDaApi>('producer', 'GET', `/api/propostas/${id}`);
 
 const espiar = (caminho: string, onde: string) => async () => {
   const mensagens = await chamar<unknown[]>('producer', 'GET', caminho);
@@ -276,6 +293,116 @@ export const cenarios: Cenario[] = [
         retryComBackoff: true,
       });
       return `Proposta ${proposta.propostaId.slice(0, 8)} enviada com falha simulada e retry agendado.`;
+    },
+  },
+  {
+    id: 'api-criar',
+    fase: 4,
+    titulo: 'Criar proposta pela API REST (outbox)',
+    mostra:
+      'POST /api/propostas grava a proposta e a mensagem do outbox numa única transação do SQL Server e responde 201 sem falar com o Service Bus. O despachante publica em seguida.',
+    esperado:
+      'Producer: "gravada com a mensagem no outbox", depois "Outbox: mensagem publicada" com o atraso em ms. O Consumer aprova como sempre. O GET 2 s depois mostra EnviadaParaAnalise.',
+    campos: ['idade', 'capitalSegurado', 'plano'],
+    executar: async (v) => {
+      const { status, cabecalhos, dados } = await chamarDetalhado<PropostaDaApi>(
+        'producer',
+        'POST',
+        '/api/propostas',
+        novaProposta(v),
+      );
+      await esperar(2000);
+      const depois = await consultarProposta(dados.propostaId);
+      return `${status} Created, Location: ${cabecalhos.get('Location')}. Status logo após o POST: ${dados.status}; 2 s depois: ${depois.status}.`;
+    },
+  },
+  {
+    id: 'api-idempotencia',
+    fase: 4,
+    titulo: 'POST repetido com Idempotency-Key',
+    mostra:
+      'O cliente não recebeu a resposta e repete o POST com a mesma chave. A API devolve a proposta já criada: nada é gravado nem publicado de novo.',
+    esperado:
+      'Primeiro POST: 201. Segundo: 200 com Idempotent-Replayed: true e o mesmo id. Só uma mensagem chega ao Consumer.',
+    campos: ['idade', 'capitalSegurado', 'plano'],
+    executar: async (v) => {
+      const chave = crypto.randomUUID();
+      const corpo = novaProposta(v);
+      const primeiro = await chamarDetalhado<PropostaDaApi>('producer', 'POST', '/api/propostas', corpo, {
+        'Idempotency-Key': chave,
+      });
+      const segundo = await chamarDetalhado<PropostaDaApi>('producer', 'POST', '/api/propostas', corpo, {
+        'Idempotency-Key': chave,
+      });
+      const mesmo = primeiro.dados.propostaId === segundo.dados.propostaId ? 'mesmo id' : 'ids DIFERENTES';
+      return `1º POST: ${primeiro.status}. 2º POST: ${segundo.status} (Idempotent-Replayed: ${segundo.cabecalhos.get('Idempotent-Replayed') ?? 'ausente'}), ${mesmo}.`;
+    },
+  },
+  {
+    id: 'outbox-indisponivel',
+    fase: 4,
+    titulo: 'Service Bus fora do ar (outbox acumula)',
+    mostra:
+      'Simula o Service Bus indisponível só para o despachante. A API continua respondendo 201: o compromisso é com o banco, e o outbox guarda as mensagens.',
+    esperado:
+      'Três 201. No Producer, o despachante avisa que não publicou e reagenda com espera crescente. O Consumer não recebe nada até "Restabelecer o Service Bus".',
+    campos: [],
+    executar: async (v) => {
+      await chamar('producer', 'POST', '/outbox/simulacao', { indisponivel: true });
+      const codigos: number[] = [];
+      for (let i = 0; i < 3; i++) {
+        codigos.push((await chamarDetalhado('producer', 'POST', '/api/propostas', novaProposta(v))).status);
+      }
+      const { pendentes } = await chamar<{ pendentes: number }>('producer', 'GET', '/outbox');
+      return `API respondeu ${codigos.join(', ')}. Outbox com ${plural(pendentes, 'mensagem pendente', 'mensagens pendentes')}.`;
+    },
+  },
+  {
+    id: 'outbox-restabelecer',
+    fase: 4,
+    titulo: 'Restabelecer o Service Bus',
+    mostra: 'Desliga a simulação. O despachante publica o que acumulou, na ordem em que foi gravado.',
+    esperado:
+      'Em até 10 s (o maior backoff), o Producer registra as publicações com o atraso de cada uma, e o Consumer aprova as propostas.',
+    campos: [],
+    executar: async () => {
+      await chamar('producer', 'POST', '/outbox/simulacao', { indisponivel: false });
+      const { pendentes } = await chamar<{ pendentes: number }>('producer', 'GET', '/outbox');
+      return `Service Bus de volta. ${plural(pendentes, 'mensagem pendente', 'mensagens pendentes')} para publicar.`;
+    },
+  },
+  {
+    id: 'dual-write',
+    fase: 4,
+    titulo: 'Sem outbox: dual write com falha',
+    mostra:
+      'O problema que o outbox resolve: grava no banco e publica no Service Bus em dois passos, sem transação entre eles. O processo "cai" entre os dois.',
+    esperado:
+      'O Producer registra a proposta gravada e nunca publicada. O Consumer não recebe nada, e o GET mostra a proposta parada em Recebida.',
+    campos: [],
+    executar: async () => {
+      const { propostaId } = await chamar<{ propostaId: string }>('producer', 'POST', '/propostas/sem-outbox', {
+        falharAntesDoEnvio: true,
+      });
+      await esperar(2000);
+      const depois = await consultarProposta(propostaId);
+      return `Proposta ${propostaId.slice(0, 8)} gravada. 2 s depois: ${depois.status} (e vai continuar assim).`;
+    },
+  },
+  {
+    id: 'outbox-estado',
+    fase: 4,
+    titulo: 'Ver o outbox',
+    mostra: 'Quantas mensagens o despachante ainda não publicou.',
+    esperado: 'Com o Service Bus no ar, zero pendentes depois de alguns segundos.',
+    campos: [],
+    executar: async () => {
+      const estado = await chamar<{ pendentes: number; publicadas: number; serviceBusIndisponivel: boolean }>(
+        'producer',
+        'GET',
+        '/outbox',
+      );
+      return `${estado.pendentes} pendente(s), ${estado.publicadas} publicada(s). Service Bus ${estado.serviceBusIndisponivel ? 'fora do ar (simulação)' : 'no ar'}.`;
     },
   },
 ];

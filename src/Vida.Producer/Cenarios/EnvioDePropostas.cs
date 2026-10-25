@@ -37,7 +37,7 @@ public sealed class EnvioDePropostas(ServiceBusClient client, ILogger<EnvioDePro
             while (enviadas.Count + noLote.Count < quantidade)
             {
                 var proposta = NovaProposta();
-                if (!lote.TryAddMessage(CriarMensagem(proposta, simularFalha: false)))
+                if (!lote.TryAddMessage(MensagensProposta.Criar(proposta)))
                 {
                     break;
                 }
@@ -67,7 +67,7 @@ public sealed class EnvioDePropostas(ServiceBusClient client, ILogger<EnvioDePro
     {
         var proposta = NovaProposta(parametros.Idade, parametros.CapitalSegurado, parametros.Plano);
         await _sender.SendMessageAsync(
-            CriarMensagem(proposta, parametros.SimularFalha, parametros.RetryComBackoff), cancellationToken);
+            MensagensProposta.Criar(proposta, parametros.SimularFalha, parametros.RetryComBackoff), cancellationToken);
         logger.LogInformation(
             "Enviada proposta {PropostaId} ({Plano}, idade {Idade}, capital {Capital}, simularFalha={SimularFalha}, retryComBackoff={RetryComBackoff}).",
             proposta.PropostaId, proposta.Plano, proposta.Idade, proposta.CapitalSegurado.ToString("C0", PtBr),
@@ -113,36 +113,6 @@ public sealed class EnvioDePropostas(ServiceBusClient client, ILogger<EnvioDePro
         CapitalSegurado: capital ?? Random.Shared.Next(50, 2000) * 1_000m,
         Plano: plano ?? Planos.Sortear(),
         CriadaEm: DateTimeOffset.UtcNow);
-
-    /// <summary>
-    /// Cria uma mensagem do Service Bus a partir de uma proposta.
-    /// </summary>
-    /// <param name="proposta">Proposta de seguro de vida.</param>
-    /// <param name="simularFalha">Se true, adiciona a propriedade SimularFalha na mensagem.</param>
-    /// <param name="retryComBackoff">Se true, adiciona a propriedade RetryComBackoff na mensagem.</param>
-    /// <returns>Nova instância de ServiceBusMessage.</returns>
-    private static ServiceBusMessage CriarMensagem(PropostaSeguroVida proposta, bool simularFalha, bool retryComBackoff = false)
-    {
-        var mensagem = new ServiceBusMessage(BinaryData.FromObjectAsJson(proposta))
-        {
-            // MessageId = id de negócio: base para detecção de duplicatas (fase 3).
-            MessageId = proposta.PropostaId.ToString(),
-            ContentType = "application/json",
-            // Subject (antigo "Label") descreve o tipo da mensagem; filtros de assinatura podem usar (fase 2).
-            Subject = TiposDeMensagem.PropostaRecebida,
-            CorrelationId = proposta.ClienteId,
-        };
-        mensagem.ApplicationProperties[Propriedades.Plano] = proposta.Plano;
-        if (simularFalha)
-        {
-            mensagem.ApplicationProperties[Propriedades.SimularFalha] = true;
-        }
-        if (retryComBackoff)
-        {
-            mensagem.ApplicationProperties[Propriedades.RetryComBackoff] = true;
-        }
-        return mensagem;
-    }
 
     public ValueTask DisposeAsync() => _sender.DisposeAsync();
 }
