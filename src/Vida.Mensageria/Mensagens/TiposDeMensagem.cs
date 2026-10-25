@@ -8,4 +8,5 @@ public static class TiposDeMensagem
     public const string PropostaRecebida = "PropostaRecebida";
     public const string ApoliceEmitida = "ApoliceEmitida";
     public const string PropostaRecusada = "PropostaRecusada";
+    public const string EndossoSolicitado = "EndossoSolicitado";
 }

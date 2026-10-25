@@ -14,7 +14,7 @@ export type Campo = keyof Valores;
 
 export interface Cenario {
   id: string;
-  fase: 1 | 2;
+  fase: 1 | 2 | 3;
   titulo: string;
   /** O conceito de Service Bus que o cenário exercita. */
   mostra: string;
@@ -212,6 +212,70 @@ export const cenarios: Cenario[] = [
     executar: async () => {
       const regras = await chamar<unknown[]>('producer', 'GET', '/assinaturas/regras');
       return `Regras lidas de ${plural(regras.length, 'assinatura', 'assinaturas')}. Veja a coluna do Producer.`;
+    },
+  },
+  {
+    id: 'endossos-em-ordem',
+    fase: 3,
+    titulo: 'Endossos em ordem (sessions)',
+    mostra:
+      'SessionId = apólice: as versões de cada apólice saem em ordem e uma de cada vez; apólices diferentes rodam em paralelo.',
+    esperado:
+      'No Consumer, cada apólice abre sua sessão e aplica v1, v2, v3, v4 nessa ordem. As apólices se intercalam entre si, mas nunca uma versão passa outra da mesma apólice.',
+    campos: [],
+    executar: async () => {
+      const { apolices } = await chamar<{ apolices: string[] }>('producer', 'POST', '/endossos/em-ordem', {
+        apolices: 3,
+        versoes: 4,
+      });
+      return `${plural(apolices.length, 'apólice', 'apólices')} com 4 endossos cada.`;
+    },
+  },
+  {
+    id: 'endossos-fora-de-ordem',
+    fase: 3,
+    titulo: 'Endossos fora de ordem (deferral)',
+    mostra:
+      'Session garante a ordem de chegada, não a de negócio. Versão adiantada é adiada (defer) e retomada pelo SequenceNumber guardado no session state.',
+    esperado:
+      'O Consumer adia cada versão que chega antes da hora. Quando a que falta chega, aplica e retoma as adiadas em sequência, até a v5.',
+    campos: [],
+    executar: async () => {
+      const { ordem } = await chamar<{ ordem: number[] }>('producer', 'POST', '/endossos/fora-de-ordem');
+      return `Enviados na ordem ${ordem.map((v) => `v${v}`).join(', ')}.`;
+    },
+  },
+  {
+    id: 'endosso-duplicado',
+    fase: 3,
+    titulo: 'Endosso duplicado (detecção de duplicatas)',
+    mostra:
+      'O producer reenvia a v1 com o mesmo MessageId. O broker aceita o envio, mas descarta a cópia: ela nunca chega ao consumer.',
+    esperado: 'O Producer registra três envios aceitos; o Consumer aplica só v1 e v2, uma vez cada.',
+    campos: [],
+    executar: async () => {
+      const { apoliceId } = await chamar<{ apoliceId: string }>('producer', 'POST', '/endossos/duplicado');
+      return `Apólice ${apoliceId.slice(0, 8)}: 3 envios, 2 mensagens na fila.`;
+    },
+  },
+  {
+    id: 'falha-backoff',
+    fase: 3,
+    titulo: 'Falha transitória com backoff (agendamento)',
+    mostra:
+      'Em vez de Abandon (reentrega na hora), o Consumer conclui e agenda uma cópia para daqui a 2 s, depois 4 s, na mesma transação. A dependência volta na 3ª tentativa.',
+    esperado:
+      'Duas falhas com espera crescente e aprovação na tentativa 3. Compare com "Falha transitória até a DLQ" da fase 1: lá as 5 entregas acabam em segundos.',
+    campos: ['idade', 'capitalSegurado', 'plano'],
+    executar: async (v) => {
+      const proposta = await chamar<{ propostaId: string }>('producer', 'POST', '/propostas', {
+        idade: numeroOuNulo(v.idade),
+        capitalSegurado: numeroOuNulo(v.capitalSegurado),
+        plano: textoOuNulo(v.plano),
+        simularFalha: true,
+        retryComBackoff: true,
+      });
+      return `Proposta ${proposta.propostaId.slice(0, 8)} enviada com falha simulada e retry agendado.`;
     },
   },
 ];

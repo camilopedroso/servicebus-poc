@@ -22,6 +22,11 @@ using Vida.Producer.Erros;
 //   POST /apolices                          publica uma ApoliceEmitida direto no tópico (sem passar pela fila)
 //   GET  /assinaturas/{nome}/mensagens?dlq= peek em uma assinatura (ou na DLQ dela)
 //   GET  /assinaturas/regras                lista as regras (filtros/actions) de cada assinatura
+// Fase 3 (fila "endossos", com sessions e detecção de duplicatas; retry agendado na fila "propostas"):
+//   POST /endossos/em-ordem                 {apolices, versoes}: v1..vN intercaladas entre apólices (sessões em paralelo)
+//   POST /endossos/fora-de-ordem            5 versões de uma apólice embaralhadas → deferral
+//   POST /endossos/duplicado                v1, v1 de novo (mesmo MessageId) e v2 → o broker descarta a cópia
+//   POST /propostas com retryComBackoff     falha transitória com novas tentativas agendadas (2 s, 4 s...)
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,6 +46,7 @@ builder.Services.AddSingleton<EnvioDePropostas>();
 builder.Services.AddSingleton<PublicacaoDeApolices>();
 builder.Services.AddSingleton<InspecaoDeEntidades>();
 builder.Services.AddSingleton<ReprocessamentoDaDlq>();
+builder.Services.AddSingleton<EnvioDeEndossos>();
 
 var app = builder.Build();
 app.UseExceptionHandler();
@@ -85,5 +91,20 @@ app.MapGet("/assinaturas/{nome}/mensagens", async (string nome, bool? dlq, Inspe
             statusCode: StatusCodes.Status400BadRequest,
             title: "Assinatura desconhecida",
             detail: $"'{nome}' não existe. Válidas: {string.Join(", ", Assinaturas.Todas)}."));
+
+// Fase 3
+app.MapPost("/endossos/em-ordem", async (SequenciaDeEndossos corpo, EnvioDeEndossos envio, CancellationToken ct) =>
+    corpo.Validar() is { Count: > 0 } erros
+        ? Results.ValidationProblem(erros)
+        : Results.Ok(new { Apolices = await envio.EnviarEmOrdemAsync(corpo.Apolices, corpo.Versoes, ct) }));
+
+app.MapPost("/endossos/fora-de-ordem", async (EnvioDeEndossos envio, CancellationToken ct) =>
+{
+    var (apoliceId, ordem) = await envio.EnviarForaDeOrdemAsync(versoes: 5, ct);
+    return Results.Ok(new { ApoliceId = apoliceId, Ordem = ordem });
+});
+
+app.MapPost("/endossos/duplicado", async (EnvioDeEndossos envio, CancellationToken ct) =>
+    Results.Ok(new { ApoliceId = await envio.EnviarDuplicadoAsync(ct) }));
 
 app.Run();

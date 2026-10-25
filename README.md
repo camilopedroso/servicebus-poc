@@ -6,26 +6,28 @@ POC para estudar Azure Service Bus em C#/.NET 10, comparando com Kafka e RabbitM
 | ---- | ----------------------------------------------------------------------------- | ------ |
 | 1    | Fila: peek-lock, Complete/Abandon/DeadLetter, retry, DLQ, competing consumers | ✅      |
 | 2    | Tópico + assinaturas com filtros, transação entre entidades                   | ✅      |
-| 3    | Sessions, detecção de duplicatas, mensagens agendadas, deferral               | ⏳      |
+| 3    | Sessions, detecção de duplicatas, mensagens agendadas, deferral               | ✅      |
 | 4    | API REST + Outbox no SQL Server                                               | ⏳      |
 | 5    | Observabilidade (OpenTelemetry → App Insights) + testes                       | ⏳      |
 | 6    | (Opcional) Azure DevOps + Azure Functions                                     | ⏳      |
 
-Notas de estudo: [fase 1 — filas](docs/fase-1-filas.md) · [fase 2 — tópicos](docs/fase-2-topicos.md)
+Notas de estudo: [fase 1 — filas](docs/fase-1-filas.md) · [fase 2 — tópicos](docs/fase-2-topicos.md) · [fase 3 — sessions](docs/fase-3-sessions.md)
 
 ## Estrutura
 
 ```
 infra/
   main.bicep         namespace Standard (só Entra ID, sem SAS), fila "propostas",
-                     tópico "apolice-emitida" com 3 assinaturas e filtros, tópico "proposta-recusada", RBAC
+                     tópico "apolice-emitida" com 3 assinaturas e filtros, tópico "proposta-recusada",
+                     fila "endossos" (sessions + detecção de duplicatas), RBAC
   up.ps1             cria/atualiza a infra e grava src/servicebus.local.json
   down.ps1           apaga tudo (para a cobrança)
 src/
   Vida.Mensageria/   contratos (PropostaSeguroVida, ApoliceEmitida) + criação do ServiceBusClient
   Vida.LogsAoVivo/   logger que guarda os últimos logs e os transmite em GET /logs (SSE) para o painel
   Vida.Producer/     API (:5180): envia propostas/apólices e tem as operações (peek, DLQ, reprocessar, regras)
-  Vida.Consumer/     (:5181) lê a fila; ao aprovar, completa e publica no tópico numa transação
+  Vida.Consumer/     (:5181) lê a fila; ao aprovar, completa e publica no tópico numa transação;
+                     Endossos/ aplica os endossos de cada apólice em ordem (sessions, session state, deferral)
   Vida.Assinantes/   (:5182) um processor por assinatura (cobranca, notificacao, alto-valor), liga/desliga por HTTP
 web/
   painel/            React + Vite: escolhe e executa cenários, mostra os logs dos três apps lado a lado
@@ -59,7 +61,7 @@ dotnet run --project src\Vida.Assinantes
 cd web\painel; npm install; npm run dev     # http://localhost:5173
 ```
 
-- **Cenário**: o dropdown lista os cenários das fases 1 e 2, cada um com seus parâmetros (idade, capital, plano,
+- **Cenário**: o dropdown lista os cenários das fases 1 a 3, cada um com seus parâmetros (idade, capital, plano,
   falha simulada, assinatura). Campo vazio = o Producer sorteia. Não é preciso reiniciar nada para trocar de cenário.
 - **Colunas**: logs ao vivo do Producer, do Consumer e do Assinantes. Se um app cair, a coluna mostra o comando para
   subir de novo e reconecta sozinha.
@@ -142,3 +144,21 @@ Experimentos sugeridos:
 1. **Assinante parado não perde nada**: no seletor "Assinaturas ligadas" da coluna do Assinantes, desligue `notificacao`, publique apólices e veja as pendentes subirem. Religue e ela processa o acúmulo.
 2. **Competing consumers numa assinatura**: suba uma segunda instância só com cobrança (`dotnet run --project src\Vida.Assinantes -- cobranca --urls=http://localhost:5192`) e veja as apólices divididas entre as duas, enquanto `notificacao` continua recebendo todas.
 3. **Nova assinatura**: crie uma no portal com filtro SQL `plano = 'Empresarial'`. Ela só recebe o que for publicado depois de criada.
+
+## Rodando a fase 3
+
+Grupo "Fase 3: sessions, duplicatas e agendamento". Os endossos vão para a fila `endossos` e aparecem na coluna do
+Consumer; clique no id de uma apólice para seguir só os endossos dela.
+
+| Cenário no painel                           | O que acontece                                                          |
+| ------------------------------------------- | ----------------------------------------------------------------------- |
+| Endossos em ordem (sessions)                | 3 apólices × 4 versões intercaladas; cada apólice aplica v1→v4 em ordem |
+| Endossos fora de ordem (deferral)           | 5 versões embaralhadas; adiantadas são adiadas e retomadas em sequência |
+| Endosso duplicado (detecção de duplicatas)  | v1 enviada duas vezes com o mesmo MessageId; o broker descarta a cópia  |
+| Falha transitória com backoff (agendamento) | tentativas agendadas a 2 s e 4 s; aprovada na 3ª                        |
+
+Experimentos sugeridos:
+
+1. **Sessões entre instâncias**: suba um segundo consumer (`dotnet run --project src\Vida.Consumer -- --urls http://localhost:5191`) e envie endossos em ordem com várias apólices. Cada apólice fica inteira numa instância de cada vez; as apólices se dividem entre as duas.
+2. **Duplicata fora da janela**: a janela é de 10 min. Um reenvio depois disso passa pelo broker e é barrado pelo consumer (`versao <= UltimaVersao`): a idempotência no consumer continua necessária.
+3. **Versão que nunca chega**: com o Producer parado no meio de uma sequência, as versões posteriores ficam adiadas. Elas aparecem no peek do portal (Service Bus Explorer) com estado *Deferred*.

@@ -49,6 +49,25 @@ resource propostas 'Microsoft.ServiceBus/namespaces/queues@2024-01-01' = {
   }
 }
 
+// Fase 3: fila de endossos (alterações numa apólice já emitida, que precisam ser aplicadas em ordem).
+// requiresSession e requiresDuplicateDetection só podem ser definidos na CRIAÇÃO da entidade: mudar depois
+// dá erro no deploy. Por isso é uma fila nova, e não a "propostas" com essas opções ligadas.
+resource endossos 'Microsoft.ServiceBus/namespaces/queues@2024-01-01' = {
+  parent: namespace
+  name: 'endossos'
+  properties: {
+    lockDuration: lockDuration
+    maxDeliveryCount: 5
+    defaultMessageTimeToLive: 'P14D'
+    deadLetteringOnMessageExpiration: true
+    // Sessions: mensagens com o mesmo SessionId (a apólice) são entregues em ordem, a um consumer por vez.
+    requiresSession: true
+    // O broker guarda os MessageIds recebidos nesta janela e descarta (em silêncio) quem repetir.
+    requiresDuplicateDetection: true
+    duplicateDetectionHistoryTimeWindow: 'PT10M'
+  }
+}
+
 // Criação do tópico "apolice-emitida" no namespace Service Bus.
 resource apoliceEmitida 'Microsoft.ServiceBus/namespaces/topics@2024-01-01' = {
   parent: namespace

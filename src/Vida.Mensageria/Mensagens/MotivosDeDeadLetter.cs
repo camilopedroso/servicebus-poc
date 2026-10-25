@@ -11,6 +11,11 @@ public static class MotivosDeDeadLetter
     public const string PayloadInvalido = "PayloadInvalido";
 
     /// <summary>
+    /// O retry com backoff esgotou as tentativas. Não é permanente: quando a dependência voltar, reprocessar resolve.
+    /// </summary>
+    public const string TentativasEsgotadas = "TentativasEsgotadas";
+
+    /// <summary>
     /// Motivos em que reprocessar não adianta: a mensagem voltaria para a DLQ na hora.
     /// Precisam de correção (dado ou código) antes de reenviar.
     /// </summary>

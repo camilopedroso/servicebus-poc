@@ -8,6 +8,7 @@ interface Props {
 const fases = [
   { fase: 1, rotulo: 'Fase 1: fila propostas' },
   { fase: 2, rotulo: 'Fase 2: tópico apolice-emitida' },
+  { fase: 3, rotulo: 'Fase 3: sessions, duplicatas e agendamento' },
 ] as const;
 
 export function SeletorDeCenario({ cenario, onEscolher }: Props) {

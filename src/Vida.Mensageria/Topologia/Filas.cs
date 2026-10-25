@@ -4,4 +4,7 @@ namespace Vida.Mensageria.Topologia;
 public static class Filas
 {
     public const string Propostas = "propostas";
+
+    /// <summary>Fase 3. Com sessions (SessionId = ApoliceId) e detecção de duplicatas.</summary>
+    public const string Endossos = "endossos";
 }

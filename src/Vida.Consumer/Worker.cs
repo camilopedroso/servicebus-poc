@@ -16,6 +16,10 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
     : BackgroundService
 {
     private const int IdadeMaximaAceita = 80;
+
+    // Retry com backoff: a falha simulada some nesta tentativa; acima do máximo, DLQ.
+    private const int TentativaEmQueADependenciaVolta = 3;
+    private const int MaximoDeTentativas = 5;
     private static readonly System.Globalization.CultureInfo PtBr = new("pt-BR");
 
     // Identifica a instância nos logs para comparar quando houver mais de um consumer.
@@ -24,6 +28,8 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
     // Sender criado a partir do mesmo client do processor: exigência da transação entre entidades.
     private readonly ServiceBusSender _senderApolices = client.CreateSender(Topicos.ApoliceEmitida);
     private readonly ServiceBusSender _senderRecusas = client.CreateSender(Topicos.PropostaRecusada);
+    // Para reagendar na própria fila (retry com backoff).
+    private readonly ServiceBusSender _senderPropostas = client.CreateSender(Filas.Propostas);
 
     private ServiceBusProcessor? _processor;
 
@@ -83,9 +89,27 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
             return;
         }
 
-        // 2) Falha transitória (ex.: serviço de score fora do ar): Abandon libera o lock e a mensagem
+        var simularFalha = mensagem.ApplicationProperties.TryGetValue(Propriedades.SimularFalha, out var falha) && falha is true;
+        var comBackoff = mensagem.ApplicationProperties.TryGetValue(Propriedades.RetryComBackoff, out var backoff) && backoff is true;
+        var tentativa = mensagem.ApplicationProperties.TryGetValue(Propriedades.Tentativa, out var t) && t is int n ? n : 1;
+
+        // 2a) Falha transitória com retry agendado (fase 3). A dependência simulada volta na 3ª tentativa:
+        //     com backoff, ela teve tempo de se recuperar; com Abandon (2b), as 5 entregas acabam em segundos.
+        if (simularFalha && comBackoff && tentativa < TentativaEmQueADependenciaVolta)
+        {
+            await AgendarNovaTentativa(args, proposta, tentativa);
+            return;
+        }
+        if (simularFalha && comBackoff)
+        {
+            logger.LogInformation(
+                "[{Instancia}] Dependência de volta: proposta {PropostaId} processada na tentativa {Tentativa}.",
+                _instancia, proposta.PropostaId, tentativa);
+        }
+
+        // 2b) Falha transitória (ex.: serviço de score fora do ar): Abandon libera o lock e a mensagem
         //    volta para a fila na hora. Após maxDeliveryCount (5) entregas, o broker manda para a DLQ sozinho.
-        if (mensagem.ApplicationProperties.TryGetValue(Propriedades.SimularFalha, out var falha) && falha is true)
+        if (simularFalha && !comBackoff)
         {
             logger.LogWarning(
                 "[{Instancia}] Falha transitória simulada na proposta {PropostaId} (entrega {Entrega}/5). Abandonando.",
@@ -151,6 +175,46 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
             mensagem.SequenceNumber, apolice.ApoliceId);
     }
 
+    /// <summary>
+    /// Retry com espera: conclui a mensagem atual e agenda uma cópia para daqui a 2, 4, 8... segundos,
+    /// na mesma transação (ou as duas coisas acontecem, ou nenhuma). Service Bus não tem backoff nativo
+    /// no Abandon; o agendamento (ScheduledEnqueueTime) é a forma de esperar sem segurar o lock.
+    /// </summary>
+    private async Task AgendarNovaTentativa(ProcessMessageEventArgs args, PropostaSeguroVida proposta, int tentativa)
+    {
+        var mensagem = args.Message;
+        if (tentativa >= MaximoDeTentativas)
+        {
+            await args.DeadLetterMessageAsync(mensagem, MotivosDeDeadLetter.TentativasEsgotadas,
+                $"{tentativa} tentativas com backoff.", args.CancellationToken);
+            logger.LogError("[{Instancia}] Proposta {PropostaId}: {Tentativa} tentativas esgotadas. DLQ.",
+                _instancia, proposta.PropostaId, tentativa);
+            return;
+        }
+
+        var espera = TimeSpan.FromSeconds(Math.Pow(2, tentativa));
+        // Cópia da recebida (corpo e propriedades). É uma mensagem nova: DeliveryCount recomeça,
+        // por isso a tentativa vai numa propriedade.
+        var copia = new ServiceBusMessage(mensagem)
+        {
+            ScheduledEnqueueTime = DateTimeOffset.UtcNow + espera,
+        };
+        copia.ApplicationProperties[Propriedades.Tentativa] = tentativa + 1;
+
+        using (var transacao = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+        {
+            await args.CompleteMessageAsync(mensagem, args.CancellationToken);
+            // Send com ScheduledEnqueueTime = agendamento. ScheduleMessageAsync faz o mesmo e devolve o
+            // SequenceNumber para cancelar depois (CancelScheduledMessageAsync).
+            await _senderPropostas.SendMessageAsync(copia, args.CancellationToken);
+            transacao.Complete();
+        }
+
+        logger.LogWarning(
+            "[{Instancia}] Falha transitória na proposta {PropostaId} (tentativa {Tentativa}). Nova tentativa agendada para daqui a {Espera} s.",
+            _instancia, proposta.PropostaId, tentativa, espera.TotalSeconds);
+    }
+
     private Task TratarErro(ProcessErrorEventArgs args)
     {
         // Chamado para erros de infraestrutura (rede, lock perdido, permissão) e exceções não tratadas no handler.
@@ -171,6 +235,7 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
         }
         await _senderApolices.DisposeAsync();
         await _senderRecusas.DisposeAsync();
+        await _senderPropostas.DisposeAsync();
         await base.StopAsync(cancellationToken);
     }
 }

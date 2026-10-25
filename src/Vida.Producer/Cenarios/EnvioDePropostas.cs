@@ -66,10 +66,12 @@ public sealed class EnvioDePropostas(ServiceBusClient client, ILogger<EnvioDePro
     public async Task<PropostaSeguroVida> EnviarUmaAsync(EnvioDeProposta parametros, CancellationToken cancellationToken)
     {
         var proposta = NovaProposta(parametros.Idade, parametros.CapitalSegurado, parametros.Plano);
-        await _sender.SendMessageAsync(CriarMensagem(proposta, parametros.SimularFalha), cancellationToken);
+        await _sender.SendMessageAsync(
+            CriarMensagem(proposta, parametros.SimularFalha, parametros.RetryComBackoff), cancellationToken);
         logger.LogInformation(
-            "Enviada proposta {PropostaId} ({Plano}, idade {Idade}, capital {Capital}, simularFalha={SimularFalha}).",
-            proposta.PropostaId, proposta.Plano, proposta.Idade, proposta.CapitalSegurado.ToString("C0", PtBr), parametros.SimularFalha);
+            "Enviada proposta {PropostaId} ({Plano}, idade {Idade}, capital {Capital}, simularFalha={SimularFalha}, retryComBackoff={RetryComBackoff}).",
+            proposta.PropostaId, proposta.Plano, proposta.Idade, proposta.CapitalSegurado.ToString("C0", PtBr),
+            parametros.SimularFalha, parametros.RetryComBackoff);
         return proposta;
     }
 
@@ -117,8 +119,9 @@ public sealed class EnvioDePropostas(ServiceBusClient client, ILogger<EnvioDePro
     /// </summary>
     /// <param name="proposta">Proposta de seguro de vida.</param>
     /// <param name="simularFalha">Se true, adiciona a propriedade SimularFalha na mensagem.</param>
+    /// <param name="retryComBackoff">Se true, adiciona a propriedade RetryComBackoff na mensagem.</param>
     /// <returns>Nova instância de ServiceBusMessage.</returns>
-    private static ServiceBusMessage CriarMensagem(PropostaSeguroVida proposta, bool simularFalha)
+    private static ServiceBusMessage CriarMensagem(PropostaSeguroVida proposta, bool simularFalha, bool retryComBackoff = false)
     {
         var mensagem = new ServiceBusMessage(BinaryData.FromObjectAsJson(proposta))
         {
@@ -133,6 +136,10 @@ public sealed class EnvioDePropostas(ServiceBusClient client, ILogger<EnvioDePro
         if (simularFalha)
         {
             mensagem.ApplicationProperties[Propriedades.SimularFalha] = true;
+        }
+        if (retryComBackoff)
+        {
+            mensagem.ApplicationProperties[Propriedades.RetryComBackoff] = true;
         }
         return mensagem;
     }
