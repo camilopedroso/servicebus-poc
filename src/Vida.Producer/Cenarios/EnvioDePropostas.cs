@@ -74,6 +74,30 @@ public sealed class EnvioDePropostas(ServiceBusClient client, ILogger<EnvioDePro
     }
 
     /// <summary>
+    /// Envia uma mensagem "venenosa": o corpo parece uma proposta, mas a idade vem como texto
+    /// (ex.: integração com um sistema legado que mudou o formato). Nenhuma nova tentativa resolve.
+    /// </summary>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>MessageId da mensagem enviada.</returns>
+    public async Task<string> EnviarInvalidaAsync(CancellationToken cancellationToken)
+    {
+        var messageId = Guid.NewGuid().ToString();
+        var corpo = $$"""
+            {"PropostaId":"{{messageId}}","ClienteId":"CLI-{{Random.Shared.Next(1000, 9999)}}","Idade":"trinta e dois","CapitalSegurado":500000,"Plano":"{{Planos.Sortear()}}","CriadaEm":"{{DateTimeOffset.UtcNow:O}}"}
+            """;
+        var mensagem = new ServiceBusMessage(BinaryData.FromString(corpo))
+        {
+            MessageId = messageId,
+            ContentType = "application/json",
+            Subject = TiposDeMensagem.PropostaRecebida,
+        };
+        await _sender.SendMessageAsync(mensagem, cancellationToken);
+        logger.LogInformation(
+            "Enviada mensagem {MessageId} com corpo inválido (idade como texto): o Consumer não consegue ler.", messageId);
+        return messageId;
+    }
+
+    /// <summary>
     /// Cria uma nova proposta de seguro de vida.
     /// </summary>
     /// <param name="idade">Idade do cliente (opcional; se não informado, será gerada aleatoriamente).</param>

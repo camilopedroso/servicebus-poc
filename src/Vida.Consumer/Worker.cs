@@ -65,7 +65,7 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
         PropostaSeguroVida? proposta;
         try
         {
-            proposta = mensagem.Body.ToObjectFromJson<PropostaSeguroVida>();
+            proposta = mensagem.Body.ToObjectFromJson<PropostaSeguroVida>(SerializacaoDeContratos.Leitura);
         }
         catch (System.Text.Json.JsonException ex)
         {
@@ -77,6 +77,9 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
         if (proposta is null)
         {
             await args.DeadLetterMessageAsync(mensagem, MotivosDeDeadLetter.PayloadInvalido, "Corpo não é uma PropostaSeguroVida válida.");
+            logger.LogError(
+                "[{Instancia}] Mensagem {MessageId} enviada para a DLQ na entrega {Entrega}: {Motivo}. Sem retry, porque repetir dá o mesmo erro.",
+                _instancia, mensagem.MessageId, mensagem.DeliveryCount, MotivosDeDeadLetter.PayloadInvalido);
             return;
         }
 

@@ -96,7 +96,7 @@ public sealed class ProcessadorDeAssinatura(string assinatura, ServiceBusClient 
     private async Task ProcessarApolice(ProcessMessageEventArgs args)
     {
         var mensagem = args.Message;
-        var apolice = mensagem.Body.ToObjectFromJson<ApoliceEmitida>();
+        var apolice = Ler<ApoliceEmitida>(mensagem);
         if (apolice is null)
         {
             await args.DeadLetterMessageAsync(mensagem, MotivosDeDeadLetter.PayloadInvalido, "Corpo não é uma ApoliceEmitida válida.");
@@ -129,7 +129,7 @@ public sealed class ProcessadorDeAssinatura(string assinatura, ServiceBusClient 
     private async Task ProcessarRecusa(ProcessMessageEventArgs args)
     {
         var mensagem = args.Message;
-        var recusa = mensagem.Body.ToObjectFromJson<PropostaRecusada>();
+        var recusa = Ler<PropostaRecusada>(mensagem);
         if (recusa is null)
         {
             await args.DeadLetterMessageAsync(mensagem, MotivosDeDeadLetter.PayloadInvalido, "Corpo não é uma PropostaRecusada válida.");
@@ -141,6 +141,22 @@ public sealed class ProcessadorDeAssinatura(string assinatura, ServiceBusClient 
         logger.LogInformation(
             "[{Assinatura}] Proposta {PropostaId} ({Plano}, capital {Capital}) recusada: {Motivo} Enviar aviso de recusa ao cliente {ClienteId}.",
             assinatura, recusa.PropostaId, recusa.Plano, recusa.CapitalSegurado.ToString("C0", PtBr), recusa.Motivo, recusa.ClienteId);
+    }
+
+    /// <summary>
+    /// Lê o corpo como o contrato esperado. Corpo ilegível volta null (o chamador manda para a DLQ):
+    /// sem o catch, a exceção faria o processor abandonar e gastar as 5 entregas à toa.
+    /// </summary>
+    private static T? Ler<T>(ServiceBusReceivedMessage mensagem) where T : class
+    {
+        try
+        {
+            return mensagem.Body.ToObjectFromJson<T>(SerializacaoDeContratos.Leitura);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return null;
+        }
     }
 
     /// <summary>

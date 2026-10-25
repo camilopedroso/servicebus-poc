@@ -114,6 +114,7 @@ pode levar ~20 s enquanto o `DefaultAzureCredential` acha o login do Azure CLI.
 | Enviar uma proposta sob medida     | idade, capital, plano e falha simulada escolhidos por você         |
 | Proposta recusada por idade        | idade 85 → recusa publicada em `proposta-recusada`, cliente avisado |
 | Falha transitória até a DLQ        | 5 entregas seguidas → DLQ (`MaxDeliveryCountExceeded`)             |
+| Falha irrecuperável                | corpo ilegível → DLQ na 1ª entrega (`PayloadInvalido`)             |
 | Espiar a fila / Espiar a DLQ       | peek, sem consumir; na DLQ mostra o motivo                         |
 | Reprocessar a DLQ                  | devolve a DLQ para a fila (payload inválido fica)                  |
 

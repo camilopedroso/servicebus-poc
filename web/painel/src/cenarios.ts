@@ -114,6 +114,20 @@ export const cenarios: Cenario[] = [
     executar: enviarProposta,
   },
   {
+    id: 'falha-permanente',
+    fase: 1,
+    titulo: 'Falha irrecuperável (payload inválido)',
+    mostra:
+      'Mensagem venenosa: o corpo não pode ser lido (idade como texto). Tentar de novo não resolve, então o Consumer faz dead-letter na hora, sem gastar as 5 entregas.',
+    esperado:
+      'O Consumer registra 1 entrega só e manda para a DLQ com PayloadInvalido. Em "Reprocessar a DLQ", ela fica lá: precisa de correção, não de reenvio.',
+    campos: [],
+    executar: async () => {
+      const { messageId } = await chamar<{ messageId: string }>('producer', 'POST', '/propostas/invalida');
+      return `Mensagem ${messageId.slice(0, 8)} enviada com corpo inválido.`;
+    },
+  },
+  {
     id: 'espiar-fila',
     fase: 1,
     titulo: 'Espiar a fila propostas',

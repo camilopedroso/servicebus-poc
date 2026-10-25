@@ -1,6 +1,8 @@
+using System.Text.Json;
 using Azure.Messaging.ServiceBus;
 using Azure.Messaging.ServiceBus.Administration;
 using Vida.Mensageria.Contratos;
+using Vida.Mensageria.Mensagens;
 using Vida.Mensageria.Topologia;
 using Vida.Producer.Contratos;
 
@@ -37,10 +39,9 @@ public sealed class InspecaoDeEntidades(
 
         foreach (var m in mensagens)
         {
-            var proposta = m.Body.ToObjectFromJson<PropostaSeguroVida>();
             logger.LogInformation(
-                "  #{Seq} proposta {PropostaId} idade={Idade} entregas={Entregas}{Motivo}",
-                m.SequenceNumber, m.MessageId, proposta?.Idade, m.DeliveryCount, MotivoDaDlq(m, deadLetter));
+                "  #{Seq} proposta {PropostaId} {Corpo} entregas={Entregas}{Motivo}",
+                m.SequenceNumber, m.MessageId, DescreverCorpo(m), m.DeliveryCount, MotivoDaDlq(m, deadLetter));
         }
         return [.. mensagens.Select(Espiada)];
     }
@@ -98,6 +99,23 @@ public sealed class InspecaoDeEntidades(
             resultado.Add(new RegrasDaAssinatura(assinatura, [.. regras]));
         }
         return [.. resultado];
+    }
+
+    /// <summary>
+    /// Resume o corpo de uma proposta. Peek serve justamente para investigar mensagem venenosa,
+    /// então não pode quebrar com ela: se o corpo não for uma proposta válida, mostra o texto cru.
+    /// </summary>
+    private static string DescreverCorpo(ServiceBusReceivedMessage m)
+    {
+        try
+        {
+            return $"idade={m.Body.ToObjectFromJson<PropostaSeguroVida>(SerializacaoDeContratos.Leitura)?.Idade}";
+        }
+        catch (JsonException)
+        {
+            var texto = m.Body.ToString();
+            return $"corpo ilegível: {(texto.Length > 120 ? texto[..120] + "..." : texto)}";
+        }
     }
 
     private static string MotivoDaDlq(ServiceBusReceivedMessage m, bool deadLetter) =>

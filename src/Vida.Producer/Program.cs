@@ -15,6 +15,7 @@ using Vida.Producer.Erros;
 // Fase 1 (fila "propostas"):
 //   POST /propostas/lote                    propostas válidas, enviadas em lote
 //   POST /propostas                         uma proposta: idade > 80 → recusa publicada em proposta-recusada; simularFalha → retry até maxDeliveryCount → DLQ
+//   POST /propostas/invalida                corpo ilegível → falha irrecuperável: DLQ na primeira entrega (PayloadInvalido)
 //   GET  /filas/propostas/mensagens?dlq=    peek na fila (ou na DLQ, com o motivo)
 //   POST /filas/propostas/dlq/reprocessar   devolve a DLQ para a fila (payload inválido fica na DLQ)
 // Fase 2 (tópico "apolice-emitida"):
@@ -58,6 +59,9 @@ app.MapPost("/propostas", async (EnvioDeProposta corpo, EnvioDePropostas envio, 
     corpo.Validar() is { Count: > 0 } erros
         ? Results.ValidationProblem(erros)
         : Results.Ok(await envio.EnviarUmaAsync(corpo, ct)));
+
+app.MapPost("/propostas/invalida", async (EnvioDePropostas envio, CancellationToken ct) =>
+    Results.Ok(new { MessageId = await envio.EnviarInvalidaAsync(ct) }));
 
 app.MapGet("/filas/propostas/mensagens", async (bool? dlq, InspecaoDeEntidades inspecao, CancellationToken ct) =>
     await inspecao.EspiarFilaAsync(dlq ?? false, ct));
