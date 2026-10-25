@@ -2,6 +2,7 @@
 using Azure.Messaging.ServiceBus.Administration;
 using Vida.LogsAoVivo.Logs;
 using Vida.Mensageria.Conexao;
+using Vida.Telemetria;
 using Microsoft.EntityFrameworkCore;
 using Vida.Mensageria.Topologia;
 using Vida.Producer.Api;
@@ -44,7 +45,12 @@ builder.Configuration.AddJsonFile(
     Path.Combine(AppContext.BaseDirectory, ServiceBusClientFactory.ArquivoConfiguracaoLocal), optional: true);
 // Fase 4: connection string do SQL Server local, gerada por infra/sql-up.ps1.
 builder.Configuration.AddJsonFile(Path.Combine(AppContext.BaseDirectory, "sqlserver.local.json"), optional: true);
+// Arquivos locais são padrão de desenvolvimento: variável de ambiente e linha de comando continuam valendo mais
+// (no Azure, a config vem do ambiente; nos testes, o WebApplicationFactory passa a dele como linha de comando).
+builder.Configuration.AddEnvironmentVariables().AddCommandLine(args);
 builder.AddLogsAoVivo();
+// Fase 5: OpenTelemetry (traces, métricas, logs) para o Application Insights. Depois da config local, que traz a connection string.
+builder.AddTelemetria("Vida.Producer");
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<TratadorDeErros>();
 builder.Services.AddOpenApi();

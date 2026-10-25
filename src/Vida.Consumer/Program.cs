@@ -2,13 +2,18 @@ using Vida.Consumer;
 using Vida.Consumer.Endossos;
 using Vida.LogsAoVivo.Logs;
 using Vida.Mensageria.Conexao;
+using Vida.Telemetria;
 
 // Host web só para expor GET /logs ao painel (web/painel). O trabalho continua no Worker.
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration.AddJsonFile(
     Path.Combine(AppContext.BaseDirectory, ServiceBusClientFactory.ArquivoConfiguracaoLocal), optional: true);
+// O arquivo local é padrão de desenvolvimento: variável de ambiente e linha de comando continuam valendo mais.
+builder.Configuration.AddEnvironmentVariables().AddCommandLine(args);
 builder.AddLogsAoVivo();
+// Fase 5: OpenTelemetry (traces, métricas, logs) para o Application Insights. Depois da config local, que traz a connection string.
+builder.AddTelemetria("Vida.Consumer");
 
 // Um ServiceBusClient por aplicação (singleton): ele mantém a conexão AMQP e é thread-safe.
 // Transações entre entidades: o Worker completa na fila e publica no tópico atomicamente.

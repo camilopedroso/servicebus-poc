@@ -11,6 +11,7 @@ namespace Vida.LogsAoVivo.Logs;
 /// <param name="Mensagem">Mensagem já formatada.</param>
 /// <param name="Excecao">Tipo e mensagem da exceção, se houver.</param>
 /// <param name="Ids">Ids de negócio extraídos dos placeholders do log (PropostaId, ApoliceId, MessageId).</param>
+/// <param name="TraceId">Trace do OpenTelemetry ativo quando o log foi escrito (fase 5); o mesmo em todos os apps de um fluxo.</param>
 public sealed record RegistroDeLog(
     Guid Processo,
     long Sequencia,
@@ -19,4 +20,5 @@ public sealed record RegistroDeLog(
     string Categoria,
     string Mensagem,
     string? Excecao,
-    IReadOnlyDictionary<string, string> Ids);
+    IReadOnlyDictionary<string, string> Ids,
+    string? TraceId = null);

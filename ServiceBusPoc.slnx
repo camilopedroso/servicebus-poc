@@ -5,5 +5,10 @@
     <Project Path="src/Vida.LogsAoVivo/Vida.LogsAoVivo.csproj" />
     <Project Path="src/Vida.Mensageria/Vida.Mensageria.csproj" />
     <Project Path="src/Vida.Producer/Vida.Producer.csproj" />
+    <Project Path="src/Vida.Telemetria/Vida.Telemetria.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Vida.Testes.Integracao/Vida.Testes.Integracao.csproj" />
+    <Project Path="tests/Vida.Testes.Unidade/Vida.Testes.Unidade.csproj" />
   </Folder>
 </Solution>

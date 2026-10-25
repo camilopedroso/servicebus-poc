@@ -5,6 +5,7 @@ using Vida.Assinantes.Endpoints;
 using Vida.Assinantes.Processamento;
 using Vida.LogsAoVivo.Logs;
 using Vida.Mensageria.Conexao;
+using Vida.Telemetria;
 using Vida.Mensageria.Topologia;
 
 // Uso: dotnet run                        → todas as assinaturas ligadas na partida
@@ -19,11 +20,16 @@ if (desconhecidas.Length > 0)
 }
 
 // Nomes de assinatura não são configuração: só repassa ao host os argumentos no formato --chave=valor.
-var builder = WebApplication.CreateBuilder(args.Where(a => a.StartsWith('-')).ToArray());
+var argumentosDoHost = args.Where(a => a.StartsWith('-')).ToArray();
+var builder = WebApplication.CreateBuilder(argumentosDoHost);
 
 builder.Configuration.AddJsonFile(
     Path.Combine(AppContext.BaseDirectory, ServiceBusClientFactory.ArquivoConfiguracaoLocal), optional: true);
+// O arquivo local é padrão de desenvolvimento: variável de ambiente e linha de comando continuam valendo mais.
+builder.Configuration.AddEnvironmentVariables().AddCommandLine(argumentosDoHost);
 builder.AddLogsAoVivo();
+// Fase 5: OpenTelemetry (traces, métricas, logs) para o Application Insights. Depois da config local, que traz a connection string.
+builder.AddTelemetria("Vida.Assinantes");
 
 builder.Services.AddSingleton(sp =>
     ServiceBusClientFactory.Criar(ServiceBusClientFactory.ObterNamespace(sp.GetRequiredService<IConfiguration>())));

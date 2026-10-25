@@ -7,6 +7,8 @@ const apps = {
   producer: 'http://localhost:5180',
   consumer: 'http://localhost:5181',
   assinantes: 'http://localhost:5182',
+  // Fase 5: Aspire Dashboard local (iniciar.ps1 -ComAspire). O painel só consulta se ele está no ar.
+  aspire: 'http://localhost:18888',
 };
 
 export default defineConfig({

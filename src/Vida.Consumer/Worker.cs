@@ -4,6 +4,7 @@ using Vida.Mensageria.Contratos;
 using Vida.Mensageria.Dominio;
 using Vida.Mensageria.Mensagens;
 using Vida.Mensageria.Topologia;
+using Vida.Telemetria;
 
 namespace Vida.Consumer;
 
@@ -118,11 +119,19 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
             return;
         }
 
+        // Span de negócio, dentro do span do processor (ServiceBusProcessor.ProcessMessage). As tags viram
+        // "custom dimensions" no App Insights: dá para buscar o trace de uma proposta pelo id.
+        using var atividade = FonteDeAtividades.Fonte.StartActivity("AnalisarProposta");
+        atividade?.SetTag("vida.proposta.id", proposta.PropostaId);
+        atividade?.SetTag("vida.proposta.plano", proposta.Plano);
+
         // 3) Regra de negócio violada: a proposta FOI analisada, e o resultado é "recusada". Não é falha,
         //    então não vai para a DLQ (lá ninguém avisaria o cliente, e reprocessar daria a mesma recusa).
         //    Conclui na fila e publica PropostaRecusada, na mesma transação do caminho feliz.
         if (proposta.Idade > IdadeMaximaAceita)
         {
+            atividade?.SetTag("vida.proposta.resultado", "recusada");
+            MetricasDeNegocio.PropostasDecididas.Add(1, new KeyValuePair<string, object?>("resultado", "recusada"));
             var recusa = new PropostaRecusada(
                 PropostaId: proposta.PropostaId,
                 ClienteId: proposta.ClienteId,
@@ -169,6 +178,9 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
             transacao.Complete();
         }
 
+        atividade?.SetTag("vida.proposta.resultado", "aprovada");
+        atividade?.SetTag("vida.apolice.id", apolice.ApoliceId);
+        MetricasDeNegocio.PropostasDecididas.Add(1, new KeyValuePair<string, object?>("resultado", "aprovada"));
         logger.LogInformation(
             "[{Instancia}] Proposta {PropostaId} aprovada: {Plano}, capital {Capital}, idade {Idade} (#{Seq}) → apólice {ApoliceId} publicada.",
             _instancia, proposta.PropostaId, proposta.Plano, proposta.CapitalSegurado.ToString("C0", PtBr), proposta.Idade,

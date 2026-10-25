@@ -3,6 +3,7 @@ using Azure.Messaging.ServiceBus;
 using Vida.Mensageria.Contratos;
 using Vida.Mensageria.Mensagens;
 using Vida.Mensageria.Topologia;
+using Vida.Telemetria;
 
 namespace Vida.Consumer.Endossos;
 
@@ -79,10 +80,16 @@ public sealed class ProcessadorDeEndossos(
         }
 
         var estado = await LerEstado(args);
+        var acao = DecisaoDeEndosso.Decidir(endosso.Versao, estado.UltimaVersao);
+
+        using var atividade = FonteDeAtividades.Fonte.StartActivity("ProcessarEndosso");
+        atividade?.SetTag("vida.apolice.id", endosso.ApoliceId);
+        atividade?.SetTag("vida.endosso.versao", endosso.Versao);
+        atividade?.SetTag("vida.endosso.acao", acao.ToString());
 
         // 1) Versão já aplicada: reenvio depois da janela de duplicatas, ou reentrega após cair entre salvar o estado
         //    e completar. Conclui sem aplicar de novo (consumer idempotente).
-        if (endosso.Versao <= estado.UltimaVersao)
+        if (acao == AcaoDoEndosso.IgnorarJaAplicado)
         {
             await args.CompleteMessageAsync(mensagem, args.CancellationToken);
             logger.LogWarning(
@@ -94,8 +101,9 @@ public sealed class ProcessadorDeEndossos(
         // 2) Chegou adiantada: adia (defer). A mensagem fica na fila, mas só sai buscada pelo SequenceNumber,
         //    que guardamos no session state. O estado é salvo ANTES do defer: se cair entre os dois, a mensagem
         //    volta e é adiada de novo; na ordem inversa, ficaria adiada sem ninguém saber o número dela.
-        if (endosso.Versao > estado.UltimaVersao + 1)
+        if (acao == AcaoDoEndosso.Adiar)
         {
+            MetricasDeNegocio.EndossosAdiados.Add(1);
             estado.Adiadas[endosso.Versao] = mensagem.SequenceNumber;
             await SalvarEstado(args, estado);
             await args.DeferMessageAsync(mensagem, cancellationToken: args.CancellationToken);

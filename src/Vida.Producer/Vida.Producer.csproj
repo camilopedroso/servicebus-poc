@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Vida.Mensageria\Vida.Mensageria.csproj" />
     <ProjectReference Include="..\Vida.LogsAoVivo\Vida.LogsAoVivo.csproj" />
+    <ProjectReference Include="..\Vida.Telemetria\Vida.Telemetria.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -22,6 +23,10 @@
     <!-- Não é usado direto: sobe a versão transitiva do Microsoft.Data.SqlClient 6.1.7 (9.0.11, com vulnerabilidade
          alta GHSA-846f-f764-76mx). Pode sair quando o EF Core trouxer uma SqlClient que já dependa da versão corrigida. -->
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Vida.Testes.Integracao" />
   </ItemGroup>
 
   <PropertyGroup>

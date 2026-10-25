@@ -1,8 +1,11 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using Azure.Messaging.ServiceBus;
 using Microsoft.EntityFrameworkCore;
+using OpenTelemetry;
 using Vida.Mensageria.Mensagens;
 using Vida.Producer.Dados;
+using Vida.Telemetria;
 
 namespace Vida.Producer.Outbox;
 
@@ -53,7 +56,8 @@ public sealed class DespachanteDoOutbox(
     /// Pega até TamanhoDoLote pendentes, publica e marca, tudo dentro de uma transação do banco.
     /// </summary>
     /// <returns>Quantas linhas foram lidas.</returns>
-    private async Task<int> DespacharLoteAsync(CancellationToken cancellationToken)
+    /// <remarks>internal (e não private): os testes de integração rodam um lote sem esperar o timer.</remarks>
+    internal async Task<int> DespacharLoteAsync(CancellationToken cancellationToken)
     {
         await using var escopo = escopos.CreateAsyncScope();
         var banco = escopo.ServiceProvider.GetRequiredService<BancoDePropostas>();
@@ -63,17 +67,27 @@ public sealed class DespachanteDoOutbox(
         // Custo: a transação fica aberta durante o envio ao Service Bus. Com lotes pequenos, aceitável.
         await using var transacao = await banco.Database.BeginTransactionAsync(cancellationToken);
         var agora = DateTimeOffset.UtcNow;
-        var pendentes = await banco.OutboxMensagens
-            .FromSql($"""
-                SELECT TOP ({TamanhoDoLote}) * FROM OutboxMensagens WITH (UPDLOCK, READPAST, ROWLOCK)
-                WHERE PublicadaEm IS NULL AND (ProximaTentativaEm IS NULL OR ProximaTentativaEm <= {agora})
-                ORDER BY Id
-                """)
-            .ToListAsync(cancellationToken);
+        List<MensagemDeSaida> pendentes;
+        // Polling a cada segundo: sem isto, cada consulta vazia viraria um trace no App Insights (86 mil por dia).
+        using (SuppressInstrumentationScope.Begin())
+        {
+            pendentes = await banco.OutboxMensagens
+                .FromSql($"""
+                    SELECT TOP ({TamanhoDoLote}) * FROM OutboxMensagens WITH (UPDLOCK, READPAST, ROWLOCK)
+                    WHERE PublicadaEm IS NULL AND (ProximaTentativaEm IS NULL OR ProximaTentativaEm <= {agora})
+                    ORDER BY Id
+                    """)
+                .ToListAsync(cancellationToken);
+        }
         if (pendentes.Count == 0)
         {
             return 0;
         }
+
+        // Daqui em diante há trabalho de verdade: um span para o lote, com o envio e o UPDATE dentro dele.
+        // As mensagens levam o Diagnostic-Id gravado no POST, então o Consumer continua o trace da requisição.
+        using var atividade = FonteDeAtividades.Fonte.StartActivity("PublicarOutbox");
+        atividade?.SetTag("vida.outbox.mensagens", pendentes.Count);
 
         foreach (var grupo in pendentes.GroupBy(m => m.Destino))
         {
@@ -92,6 +106,7 @@ public sealed class DespachanteDoOutbox(
             }
             catch (ServiceBusException ex)
             {
+                atividade?.SetStatus(ActivityStatusCode.Error, ex.Reason.ToString());
                 MarcarFalha(mensagens, agora, ex);
             }
         }
@@ -109,6 +124,7 @@ public sealed class DespachanteDoOutbox(
         {
             mensagem.PublicadaEm = agora;
             mensagem.UltimoErro = null;
+            MetricasDeNegocio.AtrasoDoOutbox.Record((agora - mensagem.CriadaEm).TotalMilliseconds);
             logger.LogInformation(
                 "Outbox: mensagem {MessageId} publicada em '{Destino}' ({Atraso:F0} ms depois de gravada, tentativa {Tentativa}).",
                 mensagem.MessageId, mensagem.Destino, (agora - mensagem.CriadaEm).TotalMilliseconds, mensagem.Tentativas + 1);

@@ -175,6 +175,46 @@ resource developerDataOwner 'Microsoft.Authorization/roleAssignments@2022-04-01'
   }
 }
 
+// Fase 5: observabilidade. Application Insights "workspace-based": a telemetria fica num Log Analytics workspace,
+// que é quem cobra (por GB ingerido; 5 GB/mês grátis por conta de cobrança).
+resource workspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
+  name: 'log-vida-poc-${uniqueString(resourceGroup().id)}'
+  location: location
+  properties: {
+    sku: { name: 'PerGB2018' }
+    retentionInDays: 30
+    // Teto de ingestão por dia: trava de custo para a POC (atingido o teto, a ingestão para até o dia seguinte).
+    workspaceCapping: { dailyQuotaGb: json('0.1') }
+  }
+}
+
+resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
+  name: 'appi-vida-poc-${uniqueString(resourceGroup().id)}'
+  location: location
+  kind: 'web'
+  properties: {
+    Application_Type: 'web'
+    WorkspaceResourceId: workspace.id
+    // Como no Service Bus: só Entra ID. A connection string identifica o recurso, mas não basta para enviar.
+    DisableLocalAuth: true
+  }
+}
+
+// "Monitoring Metrics Publisher": apesar do nome, publica toda a telemetria (traces, logs, métricas).
+var monitoringMetricsPublisherRoleId = '3913510d-42f4-4e42-8a64-420c390055eb'
+
+resource developerTelemetria 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(appInsights.id, developerPrincipalId, monitoringMetricsPublisherRoleId)
+  scope: appInsights
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', monitoringMetricsPublisherRoleId)
+    principalId: developerPrincipalId
+    principalType: 'User'
+  }
+}
+
 // Outputs com informações do namespace Service Bus criado.
 output fullyQualifiedNamespace string = '${namespace.name}.servicebus.windows.net'
 output namespaceName string = namespace.name
+// Não é segredo com DisableLocalAuth: sem token Entra ID, a ingestão é recusada.
+output appInsightsConnectionString string = appInsights.properties.ConnectionString

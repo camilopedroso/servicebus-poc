@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Azure.Messaging.ServiceBus;
 
@@ -46,17 +47,30 @@ public sealed class MensagemDeSaida
     /// <param name="destino">Fila ou tópico.</param>
     /// <param name="mensagem">Mensagem a publicar depois.</param>
     /// <returns>Linha pronta para o DbContext.</returns>
-    public static MensagemDeSaida De(string destino, ServiceBusMessage mensagem) => new()
+    public static MensagemDeSaida De(string destino, ServiceBusMessage mensagem)
     {
-        Destino = destino,
-        MessageId = mensagem.MessageId,
-        Subject = mensagem.Subject,
-        CorrelationId = mensagem.CorrelationId,
-        ContentType = mensagem.ContentType,
-        Corpo = mensagem.Body.ToString(),
-        Propriedades = JsonSerializer.Serialize(mensagem.ApplicationProperties),
-        CriadaEm = DateTimeOffset.UtcNow,
-    };
+        // Contexto de trace (W3C traceparent) de AGORA, a requisição HTTP que criou a mensagem. O SDK do Service Bus
+        // só preenche o Diagnostic-Id no envio, e o envio acontece depois, dentro do span do despachante: sem isto,
+        // o trace do Consumer ficaria pendurado no despachante, e não no POST que originou a proposta.
+        if (Activity.Current is { } atual && !mensagem.ApplicationProperties.ContainsKey(PropriedadeDeTrace))
+        {
+            mensagem.ApplicationProperties[PropriedadeDeTrace] = atual.Id;
+        }
+        return new()
+        {
+            Destino = destino,
+            MessageId = mensagem.MessageId,
+            Subject = mensagem.Subject,
+            CorrelationId = mensagem.CorrelationId,
+            ContentType = mensagem.ContentType,
+            Corpo = mensagem.Body.ToString(),
+            Propriedades = JsonSerializer.Serialize(mensagem.ApplicationProperties),
+            CriadaEm = DateTimeOffset.UtcNow,
+        };
+    }
+
+    /// <summary>Propriedade em que o SDK do Service Bus carrega o contexto de trace entre producer e consumer.</summary>
+    public const string PropriedadeDeTrace = "Diagnostic-Id";
 
     /// <summary>
     /// Remonta a ServiceBusMessage. O MessageId é o mesmo da gravação: se o despachante publicar e cair antes

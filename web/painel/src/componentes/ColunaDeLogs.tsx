@@ -1,6 +1,8 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { separarAssinatura } from '../assinaturas';
-import { linhaNaTrilha, partesDaMensagem } from '../correlacao';
+import { linhaNaTrilha, partesDaMensagem, type Trilha } from '../correlacao';
+import { enderecoDoAspire } from '../hooks/useAspire';
+import { origemDaCategoria } from '../origens';
 import type { App, EstadoDaConexao, LinhaDeLog } from '../tipos';
 
 interface Props {
@@ -11,12 +13,14 @@ interface Props {
   linhas: LinhaDeLog[];
   estado: EstadoDaConexao;
   onLimpar: () => void;
-  trilha: Set<string> | null;
+  trilha: Trilha | null;
   idFixado: string | null;
   onFixarId: (id: string) => void;
   /** Controles extras no cabeçalho (o seletor de assinaturas, na coluna do Assinantes). */
   controles?: ReactNode;
   ativaNoCelular: boolean;
+  /** Se o Aspire Dashboard está no ar: o trace de cada linha abre nele; senão, o TraceId é copiado. */
+  aspireNoAr: boolean;
 }
 
 const textoDoEstado: Record<EstadoDaConexao, string> = {
@@ -109,6 +113,8 @@ export function ColunaDeLogs(props: Props) {
                 );
               }
               const { assinatura, resto } = separarAssinatura(linha.registro.mensagem);
+              // O selo de assinatura já diz de onde a linha veio; os demais componentes saem da categoria do logger.
+              const origem = assinatura ? null : origemDaCategoria(linha.registro.categoria);
               return (
                 <li
                   key={linha.chave}
@@ -124,6 +130,11 @@ export function ColunaDeLogs(props: Props) {
                     {assinatura && (
                       <span className="selo" data-assinatura={assinatura}>
                         {assinatura}
+                      </span>
+                    )}
+                    {origem && (
+                      <span className="selo selo--componente" title={origem.descricao}>
+                        {origem.rotulo}
                       </span>
                     )}
                     {partesDaMensagem(resto, linha.registro.ids).map((parte, i) =>
@@ -142,6 +153,9 @@ export function ColunaDeLogs(props: Props) {
                         </button>
                       ),
                     )}
+                    {linha.registro.traceId && (
+                      <ControleDeTrace traceId={linha.registro.traceId} aspireNoAr={props.aspireNoAr} />
+                    )}
                     {linha.registro.excecao && <span className="linha__excecao">{linha.registro.excecao}</span>}
                   </span>
                 </li>
@@ -157,6 +171,47 @@ export function ColunaDeLogs(props: Props) {
         </button>
       )}
     </section>
+  );
+}
+
+/**
+ * Fase 5: do log ao trace. Com o Aspire Dashboard no ar, abre o trace nele (aparece na hora). Sem ele, copia o
+ * TraceId para colar na busca do Application Insights (Transaction search), onde o trace chega em alguns minutos.
+ */
+function ControleDeTrace({ traceId, aspireNoAr }: { traceId: string; aspireNoAr: boolean }) {
+  const [copiado, setCopiado] = useState(false);
+
+  if (aspireNoAr) {
+    return (
+      <a
+        className="linha__trace"
+        href={`${enderecoDoAspire}/traces/detail/${traceId}`}
+        target="_blank"
+        rel="noreferrer"
+        title={`Abrir o trace ${traceId} no Aspire Dashboard`}
+      >
+        trace ↗
+      </a>
+    );
+  }
+
+  const copiar = async () => {
+    try {
+      await navigator.clipboard.writeText(traceId);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 1500);
+    } catch {
+      // Sem permissão de área de transferência: o TraceId continua visível no tooltip.
+    }
+  };
+  return (
+    <button
+      className="linha__trace"
+      onClick={copiar}
+      title={`TraceId ${traceId}\nCopia para buscar no Application Insights (Transaction search).\nPara abrir na hora: iniciar.ps1 -ComAspire`}
+    >
+      {copiado ? 'copiado' : 'trace'}
+    </button>
   );
 }
 

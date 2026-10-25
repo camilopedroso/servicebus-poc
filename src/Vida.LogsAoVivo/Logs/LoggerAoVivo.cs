@@ -49,6 +49,7 @@ public sealed class LoggerAoVivo(string categoria, CanalDeLogs canal) : ILogger
             Categoria: _categoriaCurta,
             Mensagem: formatter(state, exception),
             Excecao: exception is null ? null : $"{exception.GetType().Name}: {exception.Message}",
-            Ids: ids));
+            Ids: ids,
+            TraceId: System.Diagnostics.Activity.Current?.TraceId.ToHexString()));
     }
 }

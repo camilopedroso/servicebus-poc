@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using OpenTelemetry;
 
 namespace Vida.Producer.Dados;
 
@@ -18,7 +19,11 @@ public sealed class MigracaoDoBanco(IServiceScopeFactory escopos, ILogger<Migrac
             {
                 await using var escopo = escopos.CreateAsyncScope();
                 var banco = escopo.ServiceProvider.GetRequiredService<BancoDePropostas>();
-                await banco.Database.MigrateAsync(cancellationToken);
+                // As consultas da migração (histórico, CREATE TABLE) não são trabalho do app: fora do trace.
+                using (SuppressInstrumentationScope.Begin())
+                {
+                    await banco.Database.MigrateAsync(cancellationToken);
+                }
                 logger.LogInformation("Banco VidaPropostas pronto (migrations aplicadas).");
                 return;
             }

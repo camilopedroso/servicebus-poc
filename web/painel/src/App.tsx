@@ -5,15 +5,16 @@ import { ColunaDeLogs } from './componentes/ColunaDeLogs';
 import { CamposDoCenario } from './componentes/CamposDoCenario';
 import { ControleDeAssinaturas } from './componentes/ControleDeAssinaturas';
 import { SeletorDeCenario } from './componentes/SeletorDeCenario';
-import { idsDaTrilha } from './correlacao';
+import { montarTrilha } from './correlacao';
+import { useAspire } from './hooks/useAspire';
 import { useLogsAoVivo } from './hooks/useLogsAoVivo';
 import type { App as NomeDoApp } from './tipos';
 
 type Resultado = { tipo: 'executando' } | { tipo: 'ok'; texto: string } | { tipo: 'erro'; texto: string } | null;
 
 const colunas: { app: NomeDoApp; papel: string; comando: string }[] = [
-  { app: 'producer', papel: 'Envia para a fila e para o tópico', comando: 'dotnet run --project src\\Vida.Producer' },
-  { app: 'consumer', papel: 'Fila propostas, publica nos tópicos', comando: 'dotnet run --project src\\Vida.Consumer' },
+  { app: 'producer', papel: 'Cenários, API REST e outbox', comando: 'dotnet run --project src\\Vida.Producer' },
+  { app: 'consumer', papel: 'Filas propostas e endossos; publica nos tópicos', comando: 'dotnet run --project src\\Vida.Consumer' },
   { app: 'assinantes', papel: 'Assinaturas dos tópicos', comando: 'dotnet run --project src\\Vida.Assinantes' },
 ];
 
@@ -25,6 +26,7 @@ export function App() {
   const [idFixado, setIdFixado] = useState<string | null>(null);
   const [colunaNoCelular, setColunaNoCelular] = useState<NomeDoApp>('producer');
   const [namespace, setNamespace] = useState<string | null>(null);
+  const aspireNoAr = useAspire();
 
   const logs = {
     producer: useLogsAoVivo('producer'),
@@ -44,7 +46,7 @@ export function App() {
     logs.assinantes.linhas,
   ];
   const trilha = useMemo(
-    () => (idFixado ? idsDaTrilha(idFixado, [...linhasProducer, ...linhasConsumer, ...linhasAssinantes]) : null),
+    () => (idFixado ? montarTrilha(idFixado, [...linhasProducer, ...linhasConsumer, ...linhasAssinantes]) : null),
     [idFixado, linhasProducer, linhasConsumer, linhasAssinantes],
   );
 
@@ -109,10 +111,10 @@ export function App() {
           <>
             <p className="trilha__texto">
               Acompanhando <code>{idFixado}</code>
-              {trilha && trilha.size > 1 && (
+              {trilha && trilha.ids.size > 1 && (
                 <>
                   {' '}
-                  e mais {trilha.size - 1} {trilha.size === 2 ? 'id ligado' : 'ids ligados'} a ele
+                  e mais {trilha.ids.size - 1} {trilha.ids.size === 2 ? 'id ligado' : 'ids ligados'} a ele
                 </>
               )}
             </p>
@@ -156,6 +158,7 @@ export function App() {
             onFixarId={fixar}
             controles={app === 'assinantes' ? <ControleDeAssinaturas versao={versao} /> : undefined}
             ativaNoCelular={colunaNoCelular === app}
+            aspireNoAr={aspireNoAr}
           />
         ))}
       </main>

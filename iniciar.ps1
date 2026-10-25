@@ -4,6 +4,7 @@
 #      .\iniciar.ps1 -ComInfra        antes, cria/atualiza a infra no Azure (infra\up.ps1)
 #      .\iniciar.ps1 -ComInfra -ModoDebug   idem, com lock de 5 min (máximo) para parar em breakpoints sem perder a mensagem
 #      .\iniciar.ps1 -SemNavegador    não abre o navegador
+#      .\iniciar.ps1 -ComAspire       também manda a telemetria para o Aspire Dashboard local (Docker), em http://localhost:18888
 #      .\iniciar.ps1 -Parar           encerra processos que ficaram para trás (ex.: janela fechada no X)
 # Ctrl+C encerra tudo. A saída de cada app fica em logs\<app>.log; o painel mostra os mesmos logs ao vivo.
 # No prompt do Claude: ! pwsh -File iniciar.ps1
@@ -11,6 +12,7 @@ param(
     [switch]$ComInfra,
     [switch]$ModoDebug,
     [switch]$SemNavegador,
+    [switch]$ComAspire,
     [switch]$Parar
 )
 
@@ -89,6 +91,17 @@ $pastaDeLogs = New-Item -ItemType Directory -Force "$raiz\logs"
 $processos = @()
 # Mesmo ambiente que o launchSettings.json usa no dotnet run (os processos filhos herdam).
 $env:DOTNET_ENVIRONMENT = 'Development'
+if ($ComAspire) {
+    # Fase 5: o App Insights leva minutos para mostrar um trace; o Aspire Dashboard mostra na hora (OTLP).
+    # Anônimo só porque é local. A distro detecta o endpoint e exporta para os dois destinos.
+    if (-not (docker ps -q --filter 'name=^vida-aspire$')) {
+        docker rm -f vida-aspire 2>$null | Out-Null
+        docker run -d --name vida-aspire -p 18888:18888 -p 4317:18889 `
+            -e DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=true mcr.microsoft.com/dotnet/aspire-dashboard:latest | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'Não consegui subir o Aspire Dashboard (o Docker está rodando?).' }
+    }
+    $env:OTEL_EXPORTER_OTLP_ENDPOINT = 'http://localhost:4317'
+}
 try {
     foreach ($app in $apps) {
         # Sobe o executável direto (não "dotnet run"): assim o PID guardado é o do app, e o Ctrl+C o encerra de fato.
@@ -115,6 +128,7 @@ try {
 
     Write-Host ''
     Write-Host 'Tudo no ar: http://localhost:5173' -ForegroundColor Green
+    if ($ComAspire) { Write-Host 'Traces ao vivo no Aspire Dashboard: http://localhost:18888' -ForegroundColor Green }
     Write-Host 'A primeira chamada ao Service Bus pode levar ~20 s (DefaultAzureCredential procurando o login do az).'
     Write-Host 'Ctrl+C encerra tudo. Ao terminar de estudar: .\infra\down.ps1 (a infra cobra ~US$ 0,013/h).'
     if (-not $SemNavegador) {

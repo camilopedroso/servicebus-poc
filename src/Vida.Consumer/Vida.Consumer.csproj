@@ -10,6 +10,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Vida.Mensageria\Vida.Mensageria.csproj" />
     <ProjectReference Include="..\Vida.LogsAoVivo\Vida.LogsAoVivo.csproj" />
+    <ProjectReference Include="..\Vida.Telemetria\Vida.Telemetria.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -28,9 +28,13 @@ if ($LASTEXITCODE -ne 0) { throw 'Deploy falhou.' }
 
 $fqdn = $outputs.fullyQualifiedNamespace.value
 
-# Producer e consumer leem este arquivo (ignorado pelo git).
+# Os três apps leem este arquivo (ignorado pelo git). O nome ficou da fase 1; desde a fase 5 ele também
+# leva a connection string do Application Insights, que só funciona com token Entra ID (DisableLocalAuth).
 $settingsPath = Join-Path $PSScriptRoot '..\src\servicebus.local.json'
-@{ ServiceBus = @{ FullyQualifiedNamespace = $fqdn } } |
+@{
+    ServiceBus = @{ FullyQualifiedNamespace = $fqdn }
+    ApplicationInsights = @{ ConnectionString = $outputs.appInsightsConnectionString.value }
+} |
     ConvertTo-Json -Depth 3 |
     Set-Content -Path $settingsPath -Encoding utf8
 

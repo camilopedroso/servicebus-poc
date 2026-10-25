@@ -11,6 +11,8 @@ export interface RegistroDeLog {
   mensagem: string;
   excecao: string | null;
   ids: Record<string, string>;
+  /** Trace do OpenTelemetry (fase 5): o mesmo nos três apps quando a mensagem é do mesmo fluxo. */
+  traceId?: string | null;
 }
 
 /** Linha exibida: um registro ou o aviso de que o processo foi reiniciado. */

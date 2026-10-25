@@ -8,10 +8,10 @@ POC para estudar Azure Service Bus em C#/.NET 10, comparando com Kafka e RabbitM
 | 2    | Tópico + assinaturas com filtros, transação entre entidades                   | ✅      |
 | 3    | Sessions, detecção de duplicatas, mensagens agendadas, deferral               | ✅      |
 | 4    | API REST + Outbox no SQL Server                                               | ✅      |
-| 5    | Observabilidade (OpenTelemetry → App Insights) + testes                       | ⏳      |
+| 5    | Observabilidade (OpenTelemetry → App Insights) + testes                       | ✅      |
 | 6    | (Opcional) Azure DevOps + Azure Functions                                     | ⏳      |
 
-Notas de estudo: [fase 1 — filas](docs/fase-1-filas.md) · [fase 2 — tópicos](docs/fase-2-topicos.md) · [fase 3 — sessions](docs/fase-3-sessions.md) · [fase 4 — outbox](docs/fase-4-outbox.md)
+Notas de estudo: [fase 1 — filas](docs/fase-1-filas.md) · [fase 2 — tópicos](docs/fase-2-topicos.md) · [fase 3 — sessions](docs/fase-3-sessions.md) · [fase 4 — outbox](docs/fase-4-outbox.md) · [fase 5 — observabilidade e testes](docs/fase-5-observabilidade.md)
 
 ## Estrutura
 
@@ -19,7 +19,8 @@ Notas de estudo: [fase 1 — filas](docs/fase-1-filas.md) · [fase 2 — tópico
 infra/
   main.bicep         namespace Standard (só Entra ID, sem SAS), fila "propostas",
                      tópico "apolice-emitida" com 3 assinaturas e filtros, tópico "proposta-recusada",
-                     fila "endossos" (sessions + detecção de duplicatas), RBAC
+                     fila "endossos" (sessions + detecção de duplicatas), Application Insights + Log Analytics
+                     (só Entra ID, teto diário de 0,1 GB), RBAC
   up.ps1             cria/atualiza a infra e grava src/servicebus.local.json
   down.ps1           apaga tudo (para a cobrança)
   sql-up.ps1         SQL Server 2022 local em Docker (porta 14330, fase 4) e grava src/sqlserver.local.json
@@ -27,11 +28,15 @@ infra/
 src/
   Vida.Mensageria/   contratos (PropostaSeguroVida, ApoliceEmitida) + criação do ServiceBusClient
   Vida.LogsAoVivo/   logger que guarda os últimos logs e os transmite em GET /logs (SSE) para o painel
+  Vida.Telemetria/   OpenTelemetry nos três apps (Microsoft OpenTelemetry Distro → App Insights e/ou OTLP)
   Vida.Producer/     API (:5180): envia propostas/apólices e tem as operações (peek, DLQ, reprocessar, regras);
                      fase 4: API REST /api/propostas com outbox no SQL Server (Api/, Dados/, Outbox/)
   Vida.Consumer/     (:5181) lê a fila; ao aprovar, completa e publica no tópico numa transação;
                      Endossos/ aplica os endossos de cada apólice em ordem (sessions, session state, deferral)
   Vida.Assinantes/   (:5182) um processor por assinatura (cobranca, notificacao, alto-valor), liga/desliga por HTTP
+tests/
+  Vida.Testes.Unidade/     xUnit v3: domínio, contratos, mensagens, decisão de endosso, outbox
+  Vida.Testes.Integracao/  API + outbox contra SQL Server real (Testcontainers; precisa de Docker)
 web/
   painel/            React + Vite: escolhe e executa cenários, mostra os logs dos três apps lado a lado
 ```
@@ -69,7 +74,12 @@ cd web\painel; npm install; npm run dev     # http://localhost:5173
   falha simulada, assinatura). Campo vazio = o Producer sorteia. Não é preciso reiniciar nada para trocar de cenário.
 - **Colunas**: logs ao vivo do Producer, do Consumer e do Assinantes. Se um app cair, a coluna mostra o comando para
   subir de novo e reconecta sozinha.
-- **Trilha**: clique em um id (proposta ou apólice) para destacar a mesma mensagem nas três colunas.
+- **Trilha**: clique em um id (proposta ou apólice) para destacar a mesma mensagem nas três colunas. Linhas sem
+  id de negócio (ex.: "Lote enviado com N mensagens") entram pelo TraceId da fase 5.
+- **Selos**: cada coluna é um processo; o selo diz de qual componente dele a linha veio (`API`, `outbox`, `cenário`
+  no Producer; `propostas`, `endossos` no Consumer; a assinatura no Assinantes).
+- **Trace** (fase 5): no fim de cada linha, abre o trace no Aspire Dashboard (com `-ComAspire`) ou copia o TraceId
+  para buscar no Application Insights.
 - **Assinaturas ligadas**: no cabeçalho da coluna do Assinantes, liga e desliga cada assinatura e mostra quantas
   mensagens estão pendentes.
 
@@ -191,3 +201,23 @@ curl -i -X POST localhost:5180/api/propostas -H "Content-Type: application/json"
 
 Para olhar as tabelas: conecte em `localhost,14330` (usuário `sa`, senha em `src\sqlserver.local.json`) pelo
 SSMS, Azure Data Studio ou a extensão SQL Server do VS Code.
+
+## Rodando a fase 5
+
+**Telemetria.** Depois do `up.ps1`, os três apps mandam traces, métricas e logs para o Application Insights
+(autenticação Entra ID, sem chave). Os dados aparecem no portal em 2 a 5 minutos: Application Map, Transaction search
+(busque pelo id da proposta) ou Logs (KQL, exemplos em [docs/fase-5-observabilidade.md](docs/fase-5-observabilidade.md)).
+Para ver na hora, suba com o Aspire Dashboard local:
+
+```powershell
+.\iniciar.ps1 -ComAspire    # traces, logs e métricas em http://localhost:18888 (além do App Insights)
+```
+
+Um POST em `/api/propostas` (cenário "Criar proposta pela API REST") gera um trace só, do HTTP até as assinaturas.
+
+**Testes.** Com o Docker rodando (os de integração sobem um SQL Server descartável):
+
+```powershell
+dotnet test                                          # tudo (unidade + integração)
+dotnet test --project tests\Vida.Testes.Unidade      # só unidade, sem infraestrutura
+```
