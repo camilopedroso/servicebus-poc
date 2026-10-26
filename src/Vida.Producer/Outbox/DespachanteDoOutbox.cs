@@ -71,6 +71,10 @@ public sealed class DespachanteDoOutbox(
         // Polling a cada segundo: sem isto, cada consulta vazia viraria um trace no App Insights (86 mil por dia).
         using (SuppressInstrumentationScope.Begin())
         {
+            // no select: 
+            // o UPDLOCK reserva as linhas que você leu até o commit na linha 120", 
+            // o ROWLOCK faz essa reserva valer linha por linha, 
+            // e o READPAST faz as outras instâncias pularem as linhas reservadas.
             pendentes = await banco.OutboxMensagens
                 .FromSql($"""
                     SELECT TOP ({TamanhoDoLote}) * FROM Propostas.OutboxMensagens WITH (UPDLOCK, READPAST, ROWLOCK)
