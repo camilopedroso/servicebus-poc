@@ -4,7 +4,7 @@ using Vida.Producer.Outbox;
 namespace Vida.Producer.Dados;
 
 /// <summary>
-/// Banco da API de propostas (SQL Server local, em Docker). Propostas e OutboxMensagens ficam no mesmo banco
+/// Banco da API de propostas (SQL Server local, em Docker). Registradas e OutboxMensagens ficam no mesmo banco
 /// de propósito: é o que permite gravar as duas numa única transação local, sem 2PC com o Service Bus.
 /// </summary>
 /// <param name="options">Opções do EF Core (connection string vem de src/sqlserver.local.json).</param>
@@ -16,9 +16,13 @@ public sealed class BancoDePropostas(DbContextOptions<BancoDePropostas> options)
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // Schema com nome de negócio no lugar do dbo: [VidaPropostas].[Propostas].[OutboxMensagens].
+        // Em SQL Server o schema é namespace e fronteira de permissão (GRANT ... ON SCHEMA::Propostas).
+        modelBuilder.HasDefaultSchema("Propostas");
+
         modelBuilder.Entity<PropostaRegistrada>(proposta =>
         {
-            proposta.ToTable("Propostas");
+            proposta.ToTable("Registradas");
             proposta.HasKey(p => p.PropostaId);
             proposta.Property(p => p.ClienteId).HasMaxLength(20);
             proposta.Property(p => p.Plano).HasMaxLength(20);

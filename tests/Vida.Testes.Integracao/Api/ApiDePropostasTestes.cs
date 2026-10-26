@@ -10,6 +10,18 @@ using Vida.Testes.Integracao.Infra;
 
 namespace Vida.Testes.Integracao.Api;
 
+/// <summary>
+/// Testes de integração da API de propostas: o Producer inteiro roda em memória (WebApplicationFactory), com o
+/// mesmo Program.cs, os mesmos controllers e o mesmo BancoDePropostas do desenvolvimento. O que muda é só o banco:
+/// um SQL Server descartável em Docker (Testcontainers), com a mesma imagem do infra/sql-up.ps1. Na partida, o
+/// Producer aplica as migrations nele, então o schema testado é o que as migrations produzem, não uma cópia.
+/// <para>
+/// Por que não SQLite ou o provider InMemory: o código depende de recursos do SQL Server que eles não têm, ou
+/// emulam de outro jeito: hints de lock no despachante (UPDLOCK, READPAST), índice único filtrado da
+/// Idempotency-Key, schema Propostas, migrations geradas para SQL Server. Um teste verde no SQLite não provaria
+/// que isso funciona.
+/// </para>
+/// </summary>
 [Collection(ColecaoDoBanco.Nome)]
 public sealed class ApiDePropostasTestes(FabricaDaApi fabrica)
 {
@@ -20,18 +32,24 @@ public sealed class ApiDePropostasTestes(FabricaDaApi fabrica)
     [Fact]
     public async Task Post_grava_proposta_e_mensagem_do_outbox_juntas()
     {
+        // Requisição HTTP de verdade, mas em memória (sem porta aberta): passa por roteamento, validação e
+        // PropostasController, que grava proposta e mensagem do outbox num único SaveChanges no container.
         var resposta = await _http.PostAsJsonAsync("/api/propostas", Valida(), TestContext.Current.CancellationToken);
 
+        // O contrato HTTP: 201 + Location apontando para o GET, e a proposta ainda só "Recebida".
         Assert.Equal(HttpStatusCode.Created, resposta.StatusCode);
         var criada = await resposta.Content.ReadFromJsonAsync<PropostaResposta>(TestContext.Current.CancellationToken);
         Assert.Equal($"/api/propostas/{criada!.PropostaId}", resposta.Headers.Location!.OriginalString);
         Assert.Equal("Recebida", criada.Status);
 
+        // O efeito no banco: um escopo novo dá um DbContext novo, então a linha vem do SQL Server, não do cache
+        // do EF. Se o SELECT acha a mensagem, ela foi gravada junto com a proposta.
         await using var escopo = fabrica.Services.CreateAsyncScope();
         var banco = escopo.ServiceProvider.GetRequiredService<BancoDePropostas>();
         var linha = await banco.OutboxMensagens.SingleAsync(
             m => m.MessageId == criada.PropostaId.ToString(), TestContext.Current.CancellationToken);
         Assert.Equal(Filas.Propostas, linha.Destino);
+        // Ainda não publicada: a API não fala com o Service Bus, e o despachante foi tirado do host na FabricaDaApi.
         Assert.Null(linha.PublicadaEm);
     }
 

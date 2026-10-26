@@ -1,7 +1,7 @@
 namespace Vida.Producer.Dados;
 
 /// <summary>
-/// Proposta gravada pela API (tabela Propostas). É o dado de negócio; a mensagem para o Service Bus
+/// Proposta gravada pela API (tabela Propostas.Registradas). É o dado de negócio; a mensagem para o Service Bus
 /// vai para a tabela OutboxMensagens na mesma transação.
 /// </summary>
 public sealed class PropostaRegistrada

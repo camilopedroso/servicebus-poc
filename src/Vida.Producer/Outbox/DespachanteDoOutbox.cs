@@ -73,7 +73,7 @@ public sealed class DespachanteDoOutbox(
         {
             pendentes = await banco.OutboxMensagens
                 .FromSql($"""
-                    SELECT TOP ({TamanhoDoLote}) * FROM OutboxMensagens WITH (UPDLOCK, READPAST, ROWLOCK)
+                    SELECT TOP ({TamanhoDoLote}) * FROM Propostas.OutboxMensagens WITH (UPDLOCK, READPAST, ROWLOCK)
                     WHERE PublicadaEm IS NULL AND (ProximaTentativaEm IS NULL OR ProximaTentativaEm <= {agora})
                     ORDER BY Id
                     """)

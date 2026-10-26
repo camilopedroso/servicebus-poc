@@ -17,6 +17,7 @@ namespace Vida.Producer.Dados.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
+                .HasDefaultSchema("Propostas")
                 .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
@@ -66,7 +67,7 @@ namespace Vida.Producer.Dados.Migrations
                         .IsUnique()
                         .HasFilter("[ChaveDeIdempotencia] IS NOT NULL");
 
-                    b.ToTable("Propostas", (string)null);
+                    b.ToTable("Registradas", "Propostas");
                 });
 
             modelBuilder.Entity("Vida.Producer.Outbox.MensagemDeSaida", b =>
@@ -129,7 +130,7 @@ namespace Vida.Producer.Dados.Migrations
                         .HasDatabaseName("IX_OutboxMensagens_Pendentes")
                         .HasFilter("[PublicadaEm] IS NULL");
 
-                    b.ToTable("OutboxMensagens", (string)null);
+                    b.ToTable("OutboxMensagens", "Propostas");
                 });
 #pragma warning restore 612, 618
         }

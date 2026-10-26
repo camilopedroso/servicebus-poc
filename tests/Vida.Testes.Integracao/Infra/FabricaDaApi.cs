@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Testcontainers.MsSql;
 using Vida.Producer.Outbox;
@@ -10,9 +9,25 @@ namespace Vida.Testes.Integracao.Infra;
 /// <summary>
 /// Sobe o Producer em memória contra um SQL Server descartável (Testcontainers). O Service Bus não é usado:
 /// o despachante é tirado do host, e os testes do outbox o executam à mão com um sender falso.
+/// <para>
+/// Três peças:
+/// <list type="bullet">
+/// <item><see cref="WebApplicationFactory{TEntryPoint}"/> (Microsoft.AspNetCore.Mvc.Testing): roda o Program.cs do
+/// Producer de verdade, com DI, middlewares e controllers, sobre um TestServer em memória. O CreateClient() devolve
+/// um HttpClient que fala com ele sem abrir porta.</item>
+/// <item><see cref="MsSqlContainer"/> (Testcontainers.MsSql): um SQL Server real em Docker, criado só para esta
+/// execução. Na partida, o Producer aplica as migrations nele (MigracaoDoBanco), então o banco começa vazio e com
+/// exatamente o schema que as migrations produzem.</item>
+/// <item><see cref="IAsyncLifetime"/> (xUnit): sobe o container antes do primeiro teste e o destrói no fim. Como a
+/// fábrica é fixture da coleção <see cref="ColecaoDoBanco"/>, isso acontece uma vez para todos os testes.</item>
+/// </list>
+/// </para>
 /// </summary>
 public sealed class FabricaDaApi : WebApplicationFactory<Program>, IAsyncLifetime
 {
+    // Mesma imagem do infra/sql-up.ps1: o teste roda na mesma engine e versão do banco de desenvolvimento.
+    // O Testcontainers mapeia a 1433 do container para uma porta livre aleatória, então não conflita com o
+    // vida-sql (14330), e espera o SQL Server aceitar conexão antes de liberar o StartAsync.
     private readonly MsSqlContainer _sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
 
     public async ValueTask InitializeAsync() => await _sql.StartAsync();
@@ -21,7 +36,10 @@ public sealed class FabricaDaApi : WebApplicationFactory<Program>, IAsyncLifetim
     {
         // Chegam ao Program.cs como linha de comando, que vale mais que os arquivos *.local.json da máquina:
         // sem isso, o teste usaria o banco de desenvolvimento e mandaria telemetria para o App Insights.
+        // A connection string já vem com host, porta sorteada, usuário e senha do container.
         builder.UseSetting("ConnectionStrings:Propostas", _sql.GetConnectionString());
+        // Namespace fictício: o ServiceBusClient do Producer só conecta no primeiro envio, e nenhum teste daqui
+        // envia por ele (a API grava no outbox; o despachante dos testes usa o ServiceBusFalso).
         builder.UseSetting("ServiceBus:FullyQualifiedNamespace", "teste.servicebus.windows.net");
         builder.UseSetting("ApplicationInsights:ConnectionString", "");
         builder.UseEnvironment("Testes");
@@ -37,6 +55,8 @@ public sealed class FabricaDaApi : WebApplicationFactory<Program>, IAsyncLifetim
 
     public override async ValueTask DisposeAsync()
     {
+        // Primeiro o host (fecha as conexões do EF), depois o container. Se o processo morrer antes de chegar
+        // aqui, o Ryuk (container auxiliar do Testcontainers) remove o SQL Server sozinho.
         await base.DisposeAsync();
         await _sql.DisposeAsync();
     }
