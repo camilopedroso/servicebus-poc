@@ -19,9 +19,13 @@ namespace Vida.Producer.Controllers;
 [ApiController]
 [Route("api/propostas")]
 [Tags("Propostas")]
-public sealed class PropostasController(BancoDePropostas banco, ILogger<PropostasController> logger) : ControllerBase
+public sealed class PropostasController(
+    BancoDePropostas banco,
+    ILogger<PropostasController> logger) : ControllerBase
 {
-    /// <summary>Cabeçalho que torna o POST seguro para repetir (mesma chave = mesma proposta).</summary>
+    /// <summary>
+    /// Cabeçalho que torna o POST seguro para repetir (mesma chave = mesma proposta).
+    /// </summary>
     public const string CabecalhoDeIdempotencia = "Idempotency-Key";
 
     /// <summary>
@@ -49,7 +53,13 @@ public sealed class PropostasController(BancoDePropostas banco, ILogger<Proposta
         }
 
         var proposta = new PropostaSeguroVida(
-            Guid.NewGuid(), corpo.ClienteId!, corpo.Idade!.Value, corpo.CapitalSegurado!.Value, corpo.Plano!, DateTimeOffset.UtcNow);
+            PropostaId: Guid.NewGuid(),
+            ClienteId: corpo.ClienteId!,
+            Idade: corpo.Idade!.Value,
+            CapitalSegurado: corpo.CapitalSegurado!.Value,
+            Plano: corpo.Plano!,
+            CriadaEm: DateTimeOffset.UtcNow);
+
         var registro = new PropostaRegistrada
         {
             PropostaId = proposta.PropostaId,
@@ -62,8 +72,14 @@ public sealed class PropostasController(BancoDePropostas banco, ILogger<Proposta
             ChaveDeIdempotencia = chave,
         };
         banco.Propostas.Add(registro);
+
         // A mensagem é montada pela mesma fábrica do envio direto e guardada como linha do outbox.
-        banco.OutboxMensagens.Add(MensagemDeSaida.De(Filas.Propostas, MensagensProposta.Criar(proposta)));
+        banco.OutboxMensagens.Add(
+            MensagemDeSaida.De(
+                destino: Filas.Propostas,
+                mensagem: MensagensProposta.Criar(proposta)
+            )
+        );
 
         try
         {
