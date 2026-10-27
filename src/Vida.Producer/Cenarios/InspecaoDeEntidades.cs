@@ -28,10 +28,11 @@ public sealed class InspecaoDeEntidades(
     public async Task<MensagemEspiada[]> EspiarFilaAsync(bool deadLetter, CancellationToken cancellationToken)
     {
         // Peek não trava nem consome: útil para inspeção/suporte, sem afetar consumers.
-        await using var receiver = client.CreateReceiver(Filas.Propostas, new ServiceBusReceiverOptions
+        var opcoes = new ServiceBusReceiverOptions
         {
             SubQueue = deadLetter ? SubQueue.DeadLetter : SubQueue.None,
-        });
+        };
+        await using var receiver = client.CreateReceiver(Filas.Propostas, opcoes);
 
         var mensagens = await receiver.PeekMessagesAsync(MaximoDeMensagens, cancellationToken: cancellationToken);
         var nome = deadLetter ? $"{Filas.Propostas}/$DeadLetterQueue" : Filas.Propostas;
@@ -39,9 +40,11 @@ public sealed class InspecaoDeEntidades(
 
         foreach (var m in mensagens)
         {
+            var corpo = DescreverCorpo(m);
+            var motivo = MotivoDaDlq(m, deadLetter);
             logger.LogInformation(
                 "  #{Seq} proposta {PropostaId} {Corpo} entregas={Entregas}{Motivo}",
-                m.SequenceNumber, m.MessageId, DescreverCorpo(m), m.DeliveryCount, MotivoDaDlq(m, deadLetter));
+                m.SequenceNumber, m.MessageId, corpo, m.DeliveryCount, motivo);
         }
         return [.. mensagens.Select(Espiada)];
     }
@@ -55,22 +58,27 @@ public sealed class InspecaoDeEntidades(
     /// <returns>Mensagens encontradas (até 50).</returns>
     public async Task<MensagemEspiada[]> EspiarAssinaturaAsync(string assinatura, bool deadLetter, CancellationToken cancellationToken)
     {
-        await using var receiver = client.CreateReceiver(Assinaturas.TopicoDe(assinatura), assinatura, new ServiceBusReceiverOptions
+        var topico = Assinaturas.TopicoDe(assinatura);
+        var opcoes = new ServiceBusReceiverOptions
         {
             SubQueue = deadLetter ? SubQueue.DeadLetter : SubQueue.None,
-        });
+        };
+        await using var receiver = client.CreateReceiver(topico, assinatura, opcoes);
 
         var mensagens = await receiver.PeekMessagesAsync(MaximoDeMensagens, cancellationToken: cancellationToken);
-        var nome = $"{Assinaturas.TopicoDe(assinatura)}/subscriptions/{assinatura}{(deadLetter ? "/$DeadLetterQueue" : "")}";
+        var sufixoDaDlq = deadLetter ? "/$DeadLetterQueue" : "";
+        var nome = $"{topico}/subscriptions/{assinatura}{sufixoDaDlq}";
         logger.LogInformation("{Quantidade} mensagem(ns) em '{Entidade}'.", mensagens.Count, nome);
 
         foreach (var m in mensagens)
         {
             // Mostra as propriedades: é o que os filtros enxergam (a action da regra pode ter adicionado alguma).
-            var propriedades = string.Join(", ", m.ApplicationProperties.Select(p => $"{p.Key}={p.Value}"));
+            var pares = m.ApplicationProperties.Select(p => $"{p.Key}={p.Value}");
+            var propriedades = string.Join(", ", pares);
+            var motivo = MotivoDaDlq(m, deadLetter);
             logger.LogInformation(
                 "  #{Seq} {Subject} {MessageId} [{Propriedades}] entregas={Entregas}{Motivo}",
-                m.SequenceNumber, m.Subject, m.MessageId, propriedades, m.DeliveryCount, MotivoDaDlq(m, deadLetter));
+                m.SequenceNumber, m.Subject, m.MessageId, propriedades, m.DeliveryCount, motivo);
         }
         return [.. mensagens.Select(Espiada)];
     }
@@ -87,12 +95,16 @@ public sealed class InspecaoDeEntidades(
         var resultado = new List<RegrasDaAssinatura>();
         foreach (var assinatura in Assinaturas.Todas)
         {
-            logger.LogInformation("{Topico}/{Assinatura}:", Assinaturas.TopicoDe(assinatura), assinatura);
+            var topico = Assinaturas.TopicoDe(assinatura);
+            logger.LogInformation("{Topico}/{Assinatura}:", topico, assinatura);
             var regras = new List<string>();
-            await foreach (var regra in admin.GetRulesAsync(Assinaturas.TopicoDe(assinatura), assinatura, cancellationToken))
+            var regrasDoBroker = admin.GetRulesAsync(topico, assinatura, cancellationToken);
+            await foreach (var regra in regrasDoBroker)
             {
-                var acao = DescricaoDeRegras.DescreverAcao(regra) is { } a ? $" | action: {a}" : "";
-                var linha = $"regra {regra.Name}: {DescricaoDeRegras.DescreverFiltro(regra)}{acao}";
+                var filtro = DescricaoDeRegras.DescreverFiltro(regra);
+                var descricaoDaAcao = DescricaoDeRegras.DescreverAcao(regra);
+                var acao = descricaoDaAcao is null ? "" : $" | action: {descricaoDaAcao}";
+                var linha = $"regra {regra.Name}: {filtro}{acao}";
                 logger.LogInformation("  {Regra}", linha);
                 regras.Add(linha);
             }
@@ -109,12 +121,14 @@ public sealed class InspecaoDeEntidades(
     {
         try
         {
-            return $"idade={m.Body.ToObjectFromJson<PropostaSeguroVida>(SerializacaoDeContratos.Leitura)?.Idade}";
+            var proposta = m.Body.ToObjectFromJson<PropostaSeguroVida>(SerializacaoDeContratos.Leitura);
+            return $"idade={proposta?.Idade}";
         }
         catch (JsonException)
         {
             var texto = m.Body.ToString();
-            return $"corpo ilegível: {(texto.Length > 120 ? texto[..120] + "..." : texto)}";
+            var resumo = texto.Length > 120 ? texto[..120] + "..." : texto;
+            return $"corpo ilegível: {resumo}";
         }
     }
 

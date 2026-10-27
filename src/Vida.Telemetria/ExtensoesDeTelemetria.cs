@@ -40,27 +40,27 @@ public static class ExtensoesDeTelemetria
             return builder;
         }
 
-        builder.Services.AddOpenTelemetry()
-            .ConfigureResource(recurso => recurso.AddService(servico))
-            .WithTracing(traces => traces.AddSource(FonteDeAtividades.Nome))
-            .WithMetrics(metricas => metricas.AddMeter(MetricasDeNegocio.Nome))
-            .UseMicrosoftOpenTelemetry(opcoes =>
+        var openTelemetry = builder.Services.AddOpenTelemetry();
+        openTelemetry.ConfigureResource(recurso => recurso.AddService(servico));
+        openTelemetry.WithTracing(traces => traces.AddSource(FonteDeAtividades.Nome));
+        openTelemetry.WithMetrics(metricas => metricas.AddMeter(MetricasDeNegocio.Nome));
+        openTelemetry.UseMicrosoftOpenTelemetry(opcoes =>
+        {
+            // Explícito: com a connection string definida em código, a autodetecção deixava o OTLP de fora.
+            var paraAzureMonitor = string.IsNullOrWhiteSpace(conexao) ? ExportTarget.None : ExportTarget.AzureMonitor;
+            var paraOtlp = string.IsNullOrWhiteSpace(otlp) ? ExportTarget.None : ExportTarget.Otlp;
+            opcoes.Exporters = paraAzureMonitor | paraOtlp;
+            if (!string.IsNullOrWhiteSpace(conexao))
             {
-                // Explícito: com a connection string definida em código, a autodetecção deixava o OTLP de fora.
-                opcoes.Exporters =
-                    (string.IsNullOrWhiteSpace(conexao) ? ExportTarget.None : ExportTarget.AzureMonitor)
-                    | (string.IsNullOrWhiteSpace(otlp) ? ExportTarget.None : ExportTarget.Otlp);
-                if (!string.IsNullOrWhiteSpace(conexao))
-                {
-                    opcoes.AzureMonitor.ConnectionString = conexao;
-                    // O App Insights tem DisableLocalAuth: sem token Entra ID, a ingestão é recusada.
-                    // Localmente é o az login; no Azure seria a managed identity do app.
-                    opcoes.AzureMonitor.Credential = new DefaultAzureCredential();
-                    // Na POC, todo trace interessa: sem amostragem (o padrão limita a 5 traces/s).
-                    opcoes.AzureMonitor.TracesPerSecond = null;
-                    opcoes.AzureMonitor.SamplingRatio = 1.0F;
-                }
-            });
+                opcoes.AzureMonitor.ConnectionString = conexao;
+                // O App Insights tem DisableLocalAuth: sem token Entra ID, a ingestão é recusada.
+                // Localmente é o az login; no Azure seria a managed identity do app.
+                opcoes.AzureMonitor.Credential = new DefaultAzureCredential();
+                // Na POC, todo trace interessa: sem amostragem (o padrão limita a 5 traces/s).
+                opcoes.AzureMonitor.TracesPerSecond = null;
+                opcoes.AzureMonitor.SamplingRatio = 1.0F;
+            }
+        });
 
         // Rotas que o painel chama o tempo todo (SSE de logs, polling das assinaturas) não viram trace: só ruído e custo.
         // Filtrada a requisição, os spans filhos (ex.: chamadas do administration client) também não são gravados.

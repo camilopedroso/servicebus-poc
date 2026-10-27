@@ -56,6 +56,8 @@ public sealed class MensagemDeSaida
         {
             mensagem.ApplicationProperties[PropriedadeDeTrace] = atual.Id;
         }
+        var corpo = mensagem.Body.ToString();
+        var propriedades = JsonSerializer.Serialize(mensagem.ApplicationProperties);
         return new()
         {
             Destino = destino,
@@ -63,8 +65,8 @@ public sealed class MensagemDeSaida
             Subject = mensagem.Subject,
             CorrelationId = mensagem.CorrelationId,
             ContentType = mensagem.ContentType,
-            Corpo = mensagem.Body.ToString(),
-            Propriedades = JsonSerializer.Serialize(mensagem.ApplicationProperties),
+            Corpo = corpo,
+            Propriedades = propriedades,
             CriadaEm = DateTimeOffset.UtcNow,
         };
     }
@@ -79,7 +81,8 @@ public sealed class MensagemDeSaida
     /// <returns>Mensagem pronta para envio.</returns>
     public ServiceBusMessage ParaServiceBus()
     {
-        var mensagem = new ServiceBusMessage(BinaryData.FromString(Corpo))
+        var bytes = BinaryData.FromString(Corpo);
+        var mensagem = new ServiceBusMessage(bytes)
         {
             MessageId = MessageId,
             Subject = Subject,

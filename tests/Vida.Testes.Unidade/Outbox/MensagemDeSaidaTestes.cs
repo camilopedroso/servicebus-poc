@@ -17,12 +17,15 @@ public class MensagemDeSaidaTestes
         var original = MensagensProposta.Criar(Proposta, simularFalha: true);
         original.ApplicationProperties["numero"] = 42L;
 
-        var remontada = MensagemDeSaida.De(Filas.Propostas, original).ParaServiceBus();
+        var linha = MensagemDeSaida.De(Filas.Propostas, original);
+        var remontada = linha.ParaServiceBus();
 
         Assert.Equal(original.MessageId, remontada.MessageId);
         Assert.Equal(original.Subject, remontada.Subject);
         Assert.Equal(original.CorrelationId, remontada.CorrelationId);
-        Assert.Equal(original.Body.ToString(), remontada.Body.ToString());
+        var corpoOriginal = original.Body.ToString();
+        var corpoRemontado = remontada.Body.ToString();
+        Assert.Equal(corpoOriginal, corpoRemontado);
         // JSON não guarda tipo .NET: sem a conversão, bool e número voltariam como string e os filtros SQL não casariam.
         Assert.Equal(true, remontada.ApplicationProperties[Propriedades.SimularFalha]);
         Assert.Equal(42L, remontada.ApplicationProperties["numero"]);
@@ -32,11 +35,16 @@ public class MensagemDeSaidaTestes
     [Fact]
     public void Grava_o_contexto_de_trace_do_momento_da_gravacao()
     {
-        using var requisicao = new Activity("POST /api/propostas").SetIdFormat(ActivityIdFormat.W3C).Start();
+        using var requisicao = new Activity("POST /api/propostas");
+        requisicao.SetIdFormat(ActivityIdFormat.W3C);
+        requisicao.Start();
 
-        var linha = MensagemDeSaida.De(Filas.Propostas, MensagensProposta.Criar(Proposta));
+        var mensagem = MensagensProposta.Criar(Proposta);
+        var linha = MensagemDeSaida.De(Filas.Propostas, mensagem);
         // O despachante publica depois, dentro de outro span: o Diagnostic-Id tem de continuar sendo o da requisição.
-        using var despachante = new Activity("PublicarOutbox").SetIdFormat(ActivityIdFormat.W3C).Start();
+        using var despachante = new Activity("PublicarOutbox");
+        despachante.SetIdFormat(ActivityIdFormat.W3C);
+        despachante.Start();
         var publicada = linha.ParaServiceBus();
 
         Assert.Equal(requisicao.Id, publicada.ApplicationProperties[MensagemDeSaida.PropriedadeDeTrace]);
@@ -47,8 +55,11 @@ public class MensagemDeSaidaTestes
     {
         Activity.Current = null;
 
-        var linha = MensagemDeSaida.De(Filas.Propostas, MensagensProposta.Criar(Proposta));
+        var mensagem = MensagensProposta.Criar(Proposta);
+        var linha = MensagemDeSaida.De(Filas.Propostas, mensagem);
+        var publicada = linha.ParaServiceBus();
 
-        Assert.False(linha.ParaServiceBus().ApplicationProperties.ContainsKey(MensagemDeSaida.PropriedadeDeTrace));
+        var temDiagnosticId = publicada.ApplicationProperties.ContainsKey(MensagemDeSaida.PropriedadeDeTrace);
+        Assert.False(temDiagnosticId);
     }
 }

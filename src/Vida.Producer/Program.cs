@@ -38,13 +38,15 @@ using Vida.Producer.Outbox;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Configuration.AddJsonFile(
-    Path.Combine(AppContext.BaseDirectory, ServiceBusClientFactory.ArquivoConfiguracaoLocal), optional: true);
+var arquivoDoServiceBus = Path.Combine(AppContext.BaseDirectory, ServiceBusClientFactory.ArquivoConfiguracaoLocal);
+builder.Configuration.AddJsonFile(arquivoDoServiceBus, optional: true);
 // Fase 4: connection string do SQL Server local, gerada por infra/sql-up.ps1.
-builder.Configuration.AddJsonFile(Path.Combine(AppContext.BaseDirectory, "sqlserver.local.json"), optional: true);
+var arquivoDoSqlServer = Path.Combine(AppContext.BaseDirectory, "sqlserver.local.json");
+builder.Configuration.AddJsonFile(arquivoDoSqlServer, optional: true);
 // Arquivos locais são padrão de desenvolvimento: variável de ambiente e linha de comando continuam valendo mais
 // (no Azure, a config vem do ambiente; nos testes, o WebApplicationFactory passa a dele como linha de comando).
-builder.Configuration.AddEnvironmentVariables().AddCommandLine(args);
+builder.Configuration.AddEnvironmentVariables();
+builder.Configuration.AddCommandLine(args);
 builder.AddLogsAoVivo();
 // Fase 5: OpenTelemetry (traces, métricas, logs) para o Application Insights. Depois da config local, que traz a connection string.
 builder.AddTelemetria("Vida.Producer");
@@ -68,7 +70,11 @@ var fqdn = ServiceBusClientFactory.ObterNamespace(builder.Configuration);
 // Um ServiceBusClient por aplicação (singleton): ele mantém a conexão AMQP e é thread-safe.
 builder.Services.AddSingleton(_ => ServiceBusClientFactory.Criar(fqdn));
 // Administration client = operações de gerenciamento (listar regras) pelo data plane.
-builder.Services.AddSingleton(_ => new ServiceBusAdministrationClient(fqdn, new DefaultAzureCredential()));
+builder.Services.AddSingleton(_ =>
+{
+    var credencial = new DefaultAzureCredential();
+    return new ServiceBusAdministrationClient(fqdn, credencial);
+});
 builder.Services.AddSingleton<EnvioDePropostas>();
 builder.Services.AddSingleton<PublicacaoDeApolices>();
 builder.Services.AddSingleton<InspecaoDeEntidades>();

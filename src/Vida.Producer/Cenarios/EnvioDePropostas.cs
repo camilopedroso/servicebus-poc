@@ -37,7 +37,8 @@ public sealed class EnvioDePropostas(ServiceBusClient client, ILogger<EnvioDePro
             while (enviadas.Count + noLote.Count < quantidade)
             {
                 var proposta = NovaProposta();
-                if (!lote.TryAddMessage(MensagensProposta.Criar(proposta)))
+                var mensagem = MensagensProposta.Criar(proposta);
+                if (!lote.TryAddMessage(mensagem))
                 {
                     break;
                 }
@@ -47,11 +48,12 @@ public sealed class EnvioDePropostas(ServiceBusClient client, ILogger<EnvioDePro
             logger.LogInformation("Lote enviado com {Quantidade} mensagem(ns).", lote.Count);
             foreach (var proposta in noLote)
             {
+                var capital = proposta.CapitalSegurado.ToString("C0", PtBr);
                 logger.LogInformation(
                     "  proposta {PropostaId}: {Plano}, idade {Idade}, capital {Capital}.",
-                    proposta.PropostaId, proposta.Plano, proposta.Idade, proposta.CapitalSegurado.ToString("C0", PtBr));
+                    proposta.PropostaId, proposta.Plano, proposta.Idade, capital);
+                enviadas.Add(proposta.PropostaId);
             }
-            enviadas.AddRange(noLote.Select(p => p.PropostaId));
         }
         logger.LogInformation("Total: {Quantidade} proposta(s) em '{Fila}'.", enviadas.Count, Filas.Propostas);
         return [.. enviadas];
@@ -66,11 +68,12 @@ public sealed class EnvioDePropostas(ServiceBusClient client, ILogger<EnvioDePro
     public async Task<PropostaSeguroVida> EnviarUmaAsync(EnvioDeProposta parametros, CancellationToken cancellationToken)
     {
         var proposta = NovaProposta(parametros.Idade, parametros.CapitalSegurado, parametros.Plano);
-        await _sender.SendMessageAsync(
-            MensagensProposta.Criar(proposta, parametros.SimularFalha, parametros.RetryComBackoff), cancellationToken);
+        var mensagem = MensagensProposta.Criar(proposta, parametros.SimularFalha, parametros.RetryComBackoff);
+        await _sender.SendMessageAsync(mensagem, cancellationToken);
+        var capital = proposta.CapitalSegurado.ToString("C0", PtBr);
         logger.LogInformation(
             "Enviada proposta {PropostaId} ({Plano}, idade {Idade}, capital {Capital}, simularFalha={SimularFalha}, retryComBackoff={RetryComBackoff}).",
-            proposta.PropostaId, proposta.Plano, proposta.Idade, proposta.CapitalSegurado.ToString("C0", PtBr),
+            proposta.PropostaId, proposta.Plano, proposta.Idade, capital,
             parametros.SimularFalha, parametros.RetryComBackoff);
         return proposta;
     }
@@ -83,11 +86,15 @@ public sealed class EnvioDePropostas(ServiceBusClient client, ILogger<EnvioDePro
     /// <returns>MessageId da mensagem enviada.</returns>
     public async Task<string> EnviarInvalidaAsync(CancellationToken cancellationToken)
     {
-        var messageId = Guid.NewGuid().ToString();
+        var propostaId = Guid.NewGuid();
+        var messageId = propostaId.ToString();
+        var numeroDoCliente = Random.Shared.Next(1000, 9999);
+        var plano = Planos.Sortear();
         var corpo = $$"""
-            {"PropostaId":"{{messageId}}","ClienteId":"CLI-{{Random.Shared.Next(1000, 9999)}}","Idade":"trinta e dois","CapitalSegurado":500000,"Plano":"{{Planos.Sortear()}}","CriadaEm":"{{DateTimeOffset.UtcNow:O}}"}
+            {"PropostaId":"{{messageId}}","ClienteId":"CLI-{{numeroDoCliente}}","Idade":"trinta e dois","CapitalSegurado":500000,"Plano":"{{plano}}","CriadaEm":"{{DateTimeOffset.UtcNow:O}}"}
             """;
-        var mensagem = new ServiceBusMessage(BinaryData.FromString(corpo))
+        var bytes = BinaryData.FromString(corpo);
+        var mensagem = new ServiceBusMessage(bytes)
         {
             MessageId = messageId,
             ContentType = "application/json",

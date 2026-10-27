@@ -34,7 +34,8 @@ public sealed class ApiDePropostasTestes(FabricaDaApi fabrica)
     {
         // Requisição HTTP de verdade, mas em memória (sem porta aberta): passa por roteamento, validação e
         // PropostasController, que grava proposta e mensagem do outbox num único SaveChanges no container.
-        var resposta = await _http.PostAsJsonAsync("/api/propostas", Valida(), TestContext.Current.CancellationToken);
+        var corpo = Valida();
+        var resposta = await _http.PostAsJsonAsync("/api/propostas", corpo, TestContext.Current.CancellationToken);
 
         // O contrato HTTP: 201 + Location apontando para o GET, e a proposta ainda só "Recebida".
         Assert.Equal(HttpStatusCode.Created, resposta.StatusCode);
@@ -46,8 +47,8 @@ public sealed class ApiDePropostasTestes(FabricaDaApi fabrica)
         // do EF. Se o SELECT acha a mensagem, ela foi gravada junto com a proposta.
         await using var escopo = fabrica.Services.CreateAsyncScope();
         var banco = escopo.ServiceProvider.GetRequiredService<BancoDePropostas>();
-        var linha = await banco.OutboxMensagens.SingleAsync(
-            m => m.MessageId == criada.PropostaId.ToString(), TestContext.Current.CancellationToken);
+        var messageId = criada.PropostaId.ToString();
+        var linha = await banco.OutboxMensagens.SingleAsync(m => m.MessageId == messageId, TestContext.Current.CancellationToken);
         Assert.Equal(Filas.Propostas, linha.Destino);
         // Ainda não publicada: a API não fala com o Service Bus, e o despachante foi tirado do host na FabricaDaApi.
         Assert.Null(linha.PublicadaEm);
@@ -56,8 +57,9 @@ public sealed class ApiDePropostasTestes(FabricaDaApi fabrica)
     [Fact]
     public async Task Get_devolve_a_proposta_criada()
     {
-        var criada = await (await _http.PostAsJsonAsync("/api/propostas", Valida(), TestContext.Current.CancellationToken))
-            .Content.ReadFromJsonAsync<PropostaResposta>(TestContext.Current.CancellationToken);
+        var corpo = Valida();
+        var resposta = await _http.PostAsJsonAsync("/api/propostas", corpo, TestContext.Current.CancellationToken);
+        var criada = await resposta.Content.ReadFromJsonAsync<PropostaResposta>(TestContext.Current.CancellationToken);
 
         var lida = await _http.GetFromJsonAsync<PropostaResposta>(
             $"/api/propostas/{criada!.PropostaId}", TestContext.Current.CancellationToken);
@@ -68,7 +70,8 @@ public sealed class ApiDePropostasTestes(FabricaDaApi fabrica)
     [Fact]
     public async Task Get_de_id_inexistente_e_404()
     {
-        var resposta = await _http.GetAsync($"/api/propostas/{Guid.NewGuid()}", TestContext.Current.CancellationToken);
+        var idInexistente = Guid.NewGuid();
+        var resposta = await _http.GetAsync($"/api/propostas/{idInexistente}", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, resposta.StatusCode);
     }
@@ -80,48 +83,64 @@ public sealed class ApiDePropostasTestes(FabricaDaApi fabrica)
         var banco = escopo.ServiceProvider.GetRequiredService<BancoDePropostas>();
         var antes = await banco.Propostas.CountAsync(TestContext.Current.CancellationToken);
 
-        var resposta = await _http.PostAsJsonAsync(
-            "/api/propostas", new NovaProposta(null, 200, null, "Ouro"), TestContext.Current.CancellationToken);
+        var corpoInvalido = new NovaProposta(null, 200, null, "Ouro");
+        var resposta = await _http.PostAsJsonAsync("/api/propostas", corpoInvalido, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, resposta.StatusCode);
-        Assert.Equal(antes, await banco.Propostas.CountAsync(TestContext.Current.CancellationToken));
+        var depois = await banco.Propostas.CountAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(antes, depois);
     }
 
     [Fact]
     public async Task Idempotency_Key_repetida_devolve_a_mesma_proposta()
     {
-        var chave = Guid.NewGuid().ToString();
+        var guid = Guid.NewGuid();
+        var chave = guid.ToString();
 
         var primeira = await PostComChave(chave);
         var segunda = await PostComChave(chave);
 
         Assert.Equal(HttpStatusCode.Created, primeira.StatusCode);
         Assert.Equal(HttpStatusCode.OK, segunda.StatusCode);
-        Assert.Equal("true", segunda.Headers.GetValues("Idempotent-Replayed").Single());
+        var cabecalho = segunda.Headers.GetValues("Idempotent-Replayed");
+        var repetida = cabecalho.Single();
+        Assert.Equal("true", repetida);
         var a = await primeira.Content.ReadFromJsonAsync<PropostaResposta>(TestContext.Current.CancellationToken);
         var b = await segunda.Content.ReadFromJsonAsync<PropostaResposta>(TestContext.Current.CancellationToken);
         Assert.Equal(a!.PropostaId, b!.PropostaId);
-        Assert.Equal(1, await ContarMensagensDoOutbox(a.PropostaId));
+        var mensagensNoOutbox = await ContarMensagensDoOutbox(a.PropostaId);
+        Assert.Equal(1, mensagensNoOutbox);
     }
 
     [Fact]
     public async Task Posts_simultaneos_com_a_mesma_chave_criam_uma_proposta_so()
     {
         // A busca pela chave não basta: dois POSTs podem passar por ela ao mesmo tempo. O índice único decide.
-        var chave = Guid.NewGuid().ToString();
+        var guid = Guid.NewGuid();
+        var chave = guid.ToString();
 
-        var respostas = await Task.WhenAll(Enumerable.Range(0, 10).Select(_ => PostComChave(chave)));
+        // Dispara os 10 POSTs antes de esperar qualquer um: é isso que os faz concorrer.
+        var envios = new List<Task<HttpResponseMessage>>();
+        for (var i = 0; i < 10; i++)
+        {
+            var envio = PostComChave(chave);
+            envios.Add(envio);
+        }
+        var respostas = await Task.WhenAll(envios);
 
         Assert.All(respostas, r => Assert.True(r.IsSuccessStatusCode, $"Status {r.StatusCode}"));
         Assert.Single(respostas, r => r.StatusCode == HttpStatusCode.Created);
         await using var escopo = fabrica.Services.CreateAsyncScope();
         var banco = escopo.ServiceProvider.GetRequiredService<BancoDePropostas>();
-        Assert.Equal(1, await banco.Propostas.CountAsync(p => p.ChaveDeIdempotencia == chave, TestContext.Current.CancellationToken));
+        var gravadas = await banco.Propostas.CountAsync(p => p.ChaveDeIdempotencia == chave, TestContext.Current.CancellationToken);
+        Assert.Equal(1, gravadas);
     }
 
     private Task<HttpResponseMessage> PostComChave(string chave)
     {
-        var requisicao = new HttpRequestMessage(HttpMethod.Post, "/api/propostas") { Content = JsonContent.Create(Valida()) };
+        var corpo = Valida();
+        var conteudo = JsonContent.Create(corpo);
+        var requisicao = new HttpRequestMessage(HttpMethod.Post, "/api/propostas") { Content = conteudo };
         requisicao.Headers.Add(PropostasController.CabecalhoDeIdempotencia, chave);
         return _http.SendAsync(requisicao, TestContext.Current.CancellationToken);
     }
@@ -130,6 +149,7 @@ public sealed class ApiDePropostasTestes(FabricaDaApi fabrica)
     {
         await using var escopo = fabrica.Services.CreateAsyncScope();
         var banco = escopo.ServiceProvider.GetRequiredService<BancoDePropostas>();
-        return await banco.OutboxMensagens.CountAsync(m => m.MessageId == propostaId.ToString(), TestContext.Current.CancellationToken);
+        var messageId = propostaId.ToString();
+        return await banco.OutboxMensagens.CountAsync(m => m.MessageId == messageId, TestContext.Current.CancellationToken);
     }
 }

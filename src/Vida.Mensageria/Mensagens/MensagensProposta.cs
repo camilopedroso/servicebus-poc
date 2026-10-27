@@ -18,7 +18,8 @@ public static class MensagensProposta
     /// <returns>Mensagem do Service Bus pronta para envio.</returns>
     public static ServiceBusMessage Criar(PropostaSeguroVida proposta, bool simularFalha = false, bool retryComBackoff = false)
     {
-        var mensagem = new ServiceBusMessage(BinaryData.FromObjectAsJson(proposta))
+        var corpo = BinaryData.FromObjectAsJson(proposta);
+        var mensagem = new ServiceBusMessage(corpo)
         {
             // MessageId = id de negócio: base para detecção de duplicatas.
             MessageId = proposta.PropostaId.ToString(),

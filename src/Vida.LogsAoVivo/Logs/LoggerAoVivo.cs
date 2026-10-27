@@ -13,7 +13,7 @@ public sealed class LoggerAoVivo(string categoria, CanalDeLogs canal) : ILogger
     // Placeholders que o painel usa para ligar uma linha de uma coluna às linhas das outras.
     private static readonly HashSet<string> NomesDeIds = ["PropostaId", "ApoliceId", "MessageId"];
 
-    private readonly string _categoriaCurta = categoria[(categoria.LastIndexOf('.') + 1)..];
+    private readonly string _categoriaCurta = SemNamespace(categoria);
 
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
@@ -41,15 +41,28 @@ public sealed class LoggerAoVivo(string categoria, CanalDeLogs canal) : ILogger
             }
         }
 
-        canal.Publicar(new RegistroDeLog(
+        var nivel = logLevel.ToString();
+        var mensagem = formatter(state, exception);
+        var excecao = exception is null ? null : $"{exception.GetType().Name}: {exception.Message}";
+        var atividade = System.Diagnostics.Activity.Current;
+        var traceId = atividade?.TraceId.ToHexString();
+
+        var registro = new RegistroDeLog(
             Processo: canal.Processo,
             Sequencia: 0, // atribuída pelo canal ao publicar
             Momento: DateTimeOffset.Now,
-            Nivel: logLevel.ToString(),
+            Nivel: nivel,
             Categoria: _categoriaCurta,
-            Mensagem: formatter(state, exception),
-            Excecao: exception is null ? null : $"{exception.GetType().Name}: {exception.Message}",
+            Mensagem: mensagem,
+            Excecao: excecao,
             Ids: ids,
-            TraceId: System.Diagnostics.Activity.Current?.TraceId.ToHexString()));
+            TraceId: traceId);
+        canal.Publicar(registro);
+    }
+
+    private static string SemNamespace(string categoria)
+    {
+        var ultimoPonto = categoria.LastIndexOf('.');
+        return categoria[(ultimoPonto + 1)..];
     }
 }

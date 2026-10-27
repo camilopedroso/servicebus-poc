@@ -33,19 +33,23 @@ public sealed class DespachanteDoOutboxTestes(FabricaDaApi fabrica)
     // Mesmo construtor que o host usaria: escopos do container de DI da fábrica (cada lote abre o seu
     // BancoDePropostas), o broker falso no lugar do ServiceBusClient, e a simulação de indisponibilidade
     // desligada (quem desliga o broker nestes testes é o ServiceBusFalso.ForaDoAr).
-    private DespachanteDoOutbox NovoDespachante() => new(
-        fabrica.Services.GetRequiredService<IServiceScopeFactory>(),
-        _serviceBus,
-        new SimulacaoDeIndisponibilidade(),
-        NullLogger<DespachanteDoOutbox>.Instance);
+    private DespachanteDoOutbox NovoDespachante()
+    {
+        var escopos = fabrica.Services.GetRequiredService<IServiceScopeFactory>();
+        var simulacao = new SimulacaoDeIndisponibilidade();
+        var logger = NullLogger<DespachanteDoOutbox>.Instance;
+        return new DespachanteDoOutbox(escopos, _serviceBus, simulacao, logger);
+    }
 
     // Arrange pela própria API, não por INSERT direto: a linha do outbox nasce como em produção, com a mensagem
     // serializada por MensagemDeSaida.De.
     private async Task<Guid> CriarProposta()
     {
-        var resposta = await fabrica.CreateClient().PostAsJsonAsync(
-            "/api/propostas", new NovaProposta("CLI-1", 40, 300_000m, "Familiar"), TestContext.Current.CancellationToken);
-        return (await resposta.Content.ReadFromJsonAsync<PropostaResposta>(TestContext.Current.CancellationToken))!.PropostaId;
+        var http = fabrica.CreateClient();
+        var corpo = new NovaProposta("CLI-1", 40, 300_000m, "Familiar");
+        var resposta = await http.PostAsJsonAsync("/api/propostas", corpo, TestContext.Current.CancellationToken);
+        var criada = await resposta.Content.ReadFromJsonAsync<PropostaResposta>(TestContext.Current.CancellationToken);
+        return criada!.PropostaId;
     }
 
     // Escopo novo = DbContext novo: o que volta é o estado gravado no SQL Server, não o cache do EF.
@@ -53,19 +57,23 @@ public sealed class DespachanteDoOutboxTestes(FabricaDaApi fabrica)
     {
         await using var escopo = fabrica.Services.CreateAsyncScope();
         var banco = escopo.ServiceProvider.GetRequiredService<BancoDePropostas>();
-        return (await banco.Propostas.SingleAsync(p => p.PropostaId == id, TestContext.Current.CancellationToken),
-            await banco.OutboxMensagens.SingleAsync(m => m.MessageId == id.ToString(), TestContext.Current.CancellationToken));
+        var messageId = id.ToString();
+        var proposta = await banco.Propostas.SingleAsync(p => p.PropostaId == id, TestContext.Current.CancellationToken);
+        var linha = await banco.OutboxMensagens.SingleAsync(m => m.MessageId == messageId, TestContext.Current.CancellationToken);
+        return (proposta, linha);
     }
 
     [Fact]
     public async Task Publica_a_pendente_e_marca_proposta_e_linha()
     {
         var id = await CriarProposta();
+        var despachante = NovoDespachante();
 
-        await NovoDespachante().DespacharLoteAsync(TestContext.Current.CancellationToken);
+        await despachante.DespacharLoteAsync(TestContext.Current.CancellationToken);
 
         // Enviada uma vez só, para a fila de propostas, com o MessageId estável (o id da proposta).
-        var (destino, mensagem) = Assert.Single(_serviceBus.Enviadas, e => e.Mensagem.MessageId == id.ToString());
+        var messageId = id.ToString();
+        var (destino, mensagem) = Assert.Single(_serviceBus.Enviadas, e => e.Mensagem.MessageId == messageId);
         Assert.Equal(Filas.Propostas, destino);
         // E marcada na mesma transação que segurou o lock: a linha sai das pendentes e a proposta avança.
         var (proposta, linha) = await Ler(id);
@@ -79,8 +87,9 @@ public sealed class DespachanteDoOutboxTestes(FabricaDaApi fabrica)
         var id = await CriarProposta();
         // O envio lança ServiceBusException(ServiceCommunicationProblem), como o SDK com o namespace inacessível.
         _serviceBus.ForaDoAr = true;
+        var despachante = NovoDespachante();
 
-        await NovoDespachante().DespacharLoteAsync(TestContext.Current.CancellationToken);
+        await despachante.DespacharLoteAsync(TestContext.Current.CancellationToken);
 
         // A falha não perde nada: a linha continua pendente, conta a tentativa, agenda a próxima no futuro e guarda
         // o erro para diagnóstico. A proposta fica em Recebida até a publicação acontecer.
@@ -107,7 +116,9 @@ public sealed class DespachanteDoOutboxTestes(FabricaDaApi fabrica)
         await despachante.DespacharLoteAsync(TestContext.Current.CancellationToken);
 
         // ProximaTentativaEm ainda está no futuro (2 s): o despachante pula a linha.
-        Assert.DoesNotContain(_serviceBus.Enviadas, e => e.Mensagem.MessageId == id.ToString());
-        Assert.Null((await Ler(id)).Linha.PublicadaEm);
+        var messageId = id.ToString();
+        Assert.DoesNotContain(_serviceBus.Enviadas, e => e.Mensagem.MessageId == messageId);
+        var (_, linha) = await Ler(id);
+        Assert.Null(linha.PublicadaEm);
     }
 }

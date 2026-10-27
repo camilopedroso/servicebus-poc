@@ -23,7 +23,8 @@ public sealed class EndossosController(EnvioDeEndossos envio) : ControllerBase
         {
             return this.ProblemaDeValidacao(erros);
         }
-        return Ok(new { Apolices = await envio.EnviarEmOrdemAsync(corpo.Apolices, corpo.Versoes, cancellationToken) });
+        var apolices = await envio.EnviarEmOrdemAsync(corpo.Apolices, corpo.Versoes, cancellationToken);
+        return Ok(new { Apolices = apolices });
     }
 
     /// <summary>
@@ -40,6 +41,9 @@ public sealed class EndossosController(EnvioDeEndossos envio) : ControllerBase
     /// POST /endossos/duplicado: v1, v1 de novo (mesmo MessageId) e v2 → o broker descarta a cópia.
     /// </summary>
     [HttpPost("duplicado")]
-    public async Task<IActionResult> EnviarDuplicadoAsync(CancellationToken cancellationToken) =>
-        Ok(new { ApoliceId = await envio.EnviarDuplicadoAsync(cancellationToken) });
+    public async Task<IActionResult> EnviarDuplicadoAsync(CancellationToken cancellationToken)
+    {
+        var apoliceId = await envio.EnviarDuplicadoAsync(cancellationToken);
+        return Ok(new { ApoliceId = apoliceId });
+    }
 }

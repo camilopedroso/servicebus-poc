@@ -13,7 +13,13 @@ namespace Vida.Producer.Cenarios;
 public sealed class EnvioDeEndossos(ServiceBusClient client, ILogger<EnvioDeEndossos> logger) : IAsyncDisposable
 {
     private static readonly string[] Tipos =
-        ["Troca de beneficiário", "Aumento de capital", "Inclusão de cobertura", "Mudança de forma de pagamento", "Atualização cadastral"];
+    [
+        "Troca de beneficiário",
+        "Aumento de capital",
+        "Inclusão de cobertura",
+        "Mudança de forma de pagamento",
+        "Atualização cadastral"
+    ];
 
     private readonly ServiceBusSender _sender = client.CreateSender(Filas.Endossos);
 
@@ -26,19 +32,40 @@ public sealed class EnvioDeEndossos(ServiceBusClient client, ILogger<EnvioDeEndo
     /// <returns>Ids das apólices.</returns>
     public async Task<Guid[]> EnviarEmOrdemAsync(int apolices, int versoes, CancellationToken cancellationToken)
     {
-        var ids = Enumerable.Range(0, apolices).Select(_ => Guid.NewGuid()).ToArray();
+        var ids = new Guid[apolices];
+        for (var i = 0; i < apolices; i++)
+        {
+            ids[i] = Guid.NewGuid();
+        }
+
         // Uma única chamada: a ordem dentro do lote é preservada no broker.
-        var mensagens = Enumerable.Range(1, versoes)
-            .SelectMany(versao => ids.Select(id => MensagensEndosso.Criar(Novo(id, versao))))
-            .ToList();
+        var mensagens = new List<ServiceBusMessage>();
+        for (var versao = 1; versao <= versoes; versao++)
+        {
+            foreach (var id in ids)
+            {
+                var endosso = NovoEndosso(id, versao);
+                var mensagem = MensagensEndosso.Criar(endosso);
+                mensagens.Add(mensagem);
+            }
+        }
+
         await _sender.SendMessagesAsync(mensagens, cancellationToken);
 
         foreach (var id in ids)
         {
-            logger.LogInformation("Apólice {ApoliceId}: endossos v1 a v{Versoes} enviados.", id, versoes);
+            logger.LogInformation(
+                "Apólice {ApoliceId}: endossos v1 a v{Versoes} enviados.",
+                id,
+                versoes);
         }
-        logger.LogInformation("{Total} endossos em '{Fila}', intercalados entre {Apolices} apólices.",
-            mensagens.Count, Filas.Endossos, apolices);
+
+        logger.LogInformation(
+            "{Total} endossos em '{Fila}', intercalados entre {Apolices} apólices.",
+            mensagens.Count,
+            Filas.Endossos,
+            apolices);
+
         return ids;
     }
 
@@ -51,19 +78,29 @@ public sealed class EnvioDeEndossos(ServiceBusClient client, ILogger<EnvioDeEndo
     public async Task<(Guid ApoliceId, int[] Ordem)> EnviarForaDeOrdemAsync(int versoes, CancellationToken cancellationToken)
     {
         var id = Guid.NewGuid();
-        var ordem = Enumerable.Range(1, versoes).ToArray();
+        var emOrdem = Enumerable.Range(1, versoes);
+        var ordem = emOrdem.ToArray();
+
         // Embaralha até sair de fato fora de ordem.
-        while (ordem.SequenceEqual(Enumerable.Range(1, versoes)))
+        while (ordem.SequenceEqual(emOrdem))
         {
             Random.Shared.Shuffle(ordem);
         }
 
         foreach (var versao in ordem)
         {
-            await _sender.SendMessageAsync(MensagensEndosso.Criar(Novo(id, versao)), cancellationToken);
+            var endosso = NovoEndosso(id, versao);
+            var mensagem = MensagensEndosso.Criar(endosso);
+            await _sender.SendMessageAsync(mensagem, cancellationToken);
         }
-        logger.LogInformation("Apólice {ApoliceId}: endossos enviados na ordem {Ordem}.",
-            id, string.Join(", ", ordem.Select(v => $"v{v}")));
+
+        var rotulos = ordem.Select(v => $"v{v}");
+        var ordemDeEnvio = string.Join(", ", rotulos);
+        logger.LogInformation(
+            "Apólice {ApoliceId}: endossos enviados na ordem {Ordem}.",
+            id,
+            ordemDeEnvio);
+
         return (id, ordem);
     }
 
@@ -76,18 +113,30 @@ public sealed class EnvioDeEndossos(ServiceBusClient client, ILogger<EnvioDeEndo
     public async Task<Guid> EnviarDuplicadoAsync(CancellationToken cancellationToken)
     {
         var id = Guid.NewGuid();
-        var v1 = Novo(id, 1);
-        await _sender.SendMessageAsync(MensagensEndosso.Criar(v1), cancellationToken);
+        var v1 = NovoEndosso(id, 1);
+        var v2 = NovoEndosso(id, 2);
+
+        var primeiroEnvioV1 = MensagensEndosso.Criar(v1);
+        await _sender.SendMessageAsync(primeiroEnvioV1, cancellationToken);
+
         // Simula o producer que não recebeu a confirmação (timeout) e reenvia. Mensagem nova, mesmo MessageId.
-        await _sender.SendMessageAsync(MensagensEndosso.Criar(v1), cancellationToken);
-        await _sender.SendMessageAsync(MensagensEndosso.Criar(Novo(id, 2)), cancellationToken);
+        var reenvioV1 = MensagensEndosso.Criar(v1);
+        await _sender.SendMessageAsync(reenvioV1, cancellationToken);
+
+        var envioV2 = MensagensEndosso.Criar(v2);
+        await _sender.SendMessageAsync(envioV2, cancellationToken);
+
         logger.LogInformation(
             "Apólice {ApoliceId}: enviados v1, v1 de novo (MessageId {MessageId}) e v2. Os três envios foram aceitos.",
             id, $"{id}/v1");
         return id;
     }
 
-    private static EndossoSolicitado Novo(Guid apoliceId, int versao) =>
+    // Origem da versão: aqui o cenário inventa o número (1..N). Num sistema real ela viria do sistema de registro
+    // da apólice (sequência de endossos por apólice, gerada na mesma transação que grava o endosso), para ser
+    // estável entre reenvios. Destino: MensagensEndosso.Criar a põe no MessageId (dedup do broker) e o
+    // ProcessadorDeEndossos a compara com a última versão aplicada (dedup e ordenação na aplicação).
+    private static EndossoSolicitado NovoEndosso(Guid apoliceId, int versao) =>
         new(apoliceId, versao, Tipos[(versao - 1) % Tipos.Length], DateTimeOffset.UtcNow);
 
     public ValueTask DisposeAsync() => _sender.DisposeAsync();

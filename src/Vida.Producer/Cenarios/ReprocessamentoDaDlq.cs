@@ -38,12 +38,13 @@ public sealed class ReprocessamentoDaDlq(ServiceBusClient client, ILogger<Reproc
         // Ficam travadas (peek-lock) até o fim: se fossem liberadas na hora, o próximo receive as traria de volta.
         var mantidas = new Dictionary<long, ServiceBusReceivedMessage>();
         var movidas = 0;
+        var esperaMaxima = TimeSpan.FromSeconds(3);
         try
         {
             while (true)
             {
                 var mensagens = await dlqReceiver.ReceiveMessagesAsync(
-                    maxMessages: 20, maxWaitTime: TimeSpan.FromSeconds(3), cancellationToken);
+                    maxMessages: 20, maxWaitTime: esperaMaxima, cancellationToken);
                 if (mensagens.Count == 0) break;
 
                 foreach (var m in mensagens)
@@ -104,7 +105,11 @@ public sealed class ReprocessamentoDaDlq(ServiceBusClient client, ILogger<Reproc
             // Peek continua de onde parou a cada chamada: lê a DLQ inteira em páginas.
             var pagina = await receiver.PeekMessagesAsync(maxMessages: 250, cancellationToken: cancellationToken);
             if (pagina.Count == 0) return ultima;
-            ultima = Math.Max(ultima ?? long.MinValue, pagina.Max(m => m.SequenceNumber));
+            var maiorDaPagina = pagina.Max(m => m.SequenceNumber);
+            if (ultima is null || maiorDaPagina > ultima)
+            {
+                ultima = maiorDaPagina;
+            }
         }
     }
 

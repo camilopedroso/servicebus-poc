@@ -51,11 +51,12 @@ public sealed class CanalDeLogs
     /// <returns>Sequência assíncrona de registros.</returns>
     public async IAsyncEnumerable<RegistroDeLog> Acompanhar([EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        var canal = Channel.CreateBounded<RegistroDeLog>(new BoundedChannelOptions(1_000)
+        var opcoes = new BoundedChannelOptions(1_000)
         {
             FullMode = BoundedChannelFullMode.DropOldest,
             SingleReader = true,
-        });
+        };
+        var canal = Channel.CreateBounded<RegistroDeLog>(opcoes);
 
         RegistroDeLog[] historico;
         lock (_trava)

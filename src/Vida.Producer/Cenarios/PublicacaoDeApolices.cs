@@ -27,20 +27,26 @@ public sealed class PublicacaoDeApolices(ServiceBusClient client, ILogger<Public
     public async Task<ApoliceEmitida> PublicarAsync(PublicacaoDeApolice parametros, CancellationToken cancellationToken)
     {
         var capitalSegurado = parametros.CapitalSegurado ?? Random.Shared.Next(50, 2000) * 1_000m;
+        var numeroDoCliente = Random.Shared.Next(1000, 9999);
+        var plano = parametros.Plano ?? Planos.Sortear();
+        var premioMensal = CalculadoraDePremio.CalcularMensal(capitalSegurado, idade: 40);
+        var requerRevisao = PoliticaDeRevisao.RequerRevisao(capitalSegurado);
         var apolice = new ApoliceEmitida(
             ApoliceId: Guid.NewGuid(),
             PropostaId: Guid.NewGuid(),
-            ClienteId: $"CLI-{Random.Shared.Next(1000, 9999)}",
-            Plano: parametros.Plano ?? Planos.Sortear(),
+            ClienteId: $"CLI-{numeroDoCliente}",
+            Plano: plano,
             CapitalSegurado: capitalSegurado,
-            PremioMensal: CalculadoraDePremio.CalcularMensal(capitalSegurado, idade: 40),
+            PremioMensal: premioMensal,
             EmitidaEm: DateTimeOffset.UtcNow,
-            RequerRevisao: PoliticaDeRevisao.RequerRevisao(capitalSegurado));
+            RequerRevisao: requerRevisao);
 
-        await _sender.SendMessageAsync(MensagensApolice.Criar(apolice), cancellationToken);
+        var mensagem = MensagensApolice.Criar(apolice);
+        await _sender.SendMessageAsync(mensagem, cancellationToken);
+        var capital = capitalSegurado.ToString("C0", PtBr);
         logger.LogInformation(
             "Publicada apólice {ApoliceId} ({Plano}, capital {Capital}) em '{Topico}'.",
-            apolice.ApoliceId, apolice.Plano, capitalSegurado.ToString("C0", PtBr), Topicos.ApoliceEmitida);
+            apolice.ApoliceId, apolice.Plano, capital, Topicos.ApoliceEmitida);
         return apolice;
     }
 

@@ -15,7 +15,10 @@ public class MensagensApoliceTestes
     [Fact]
     public void Propriedades_de_roteamento_tem_o_tipo_que_o_filtro_espera()
     {
-        var mensagem = MensagensApolice.Criar(Apolice(1_500_000m, revisao: true));
+        var apolice = Apolice(1_500_000m, revisao: true);
+
+        var mensagem = MensagensApolice.Criar(apolice);
+
 
         Assert.IsType<bool>(mensagem.ApplicationProperties[Propriedades.RequerRevisao]);
         Assert.IsType<long>(mensagem.ApplicationProperties[Propriedades.CapitalSegurado]);
@@ -26,7 +29,9 @@ public class MensagensApoliceTestes
     [Fact]
     public void Subject_e_o_tipo_do_evento()
     {
-        var mensagem = MensagensApolice.Criar(Apolice(100_000m, revisao: false));
+        var apolice = Apolice(100_000m, revisao: false);
+
+        var mensagem = MensagensApolice.Criar(apolice);
 
         Assert.Equal(TiposDeMensagem.ApoliceEmitida, mensagem.Subject);
     }

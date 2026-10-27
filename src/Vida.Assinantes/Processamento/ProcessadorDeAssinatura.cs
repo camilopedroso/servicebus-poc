@@ -39,15 +39,18 @@ public sealed class ProcessadorDeAssinatura(string assinatura, ServiceBusClient 
             return;
         }
 
+        var topico = Assinaturas.TopicoDe(assinatura);
+
         // O processor pode ser parado e iniciado de novo: é criado uma vez só e reaproveitado.
         if (_processor is null)
         {
-            // Mesma API da fila, só muda o endereço: (tópico, assinatura).
-            _processor = client.CreateProcessor(Assinaturas.TopicoDe(assinatura), assinatura, new ServiceBusProcessorOptions
+            var opcoes = new ServiceBusProcessorOptions
             {
                 AutoCompleteMessages = false,
                 MaxConcurrentCalls = 2,
-            });
+            };
+            // Mesma API da fila, só muda o endereço: (tópico, assinatura).
+            _processor = client.CreateProcessor(topico, assinatura, opcoes);
 
             _processor.ProcessMessageAsync += ProcessarMensagem;
             _processor.ProcessErrorAsync += args =>
@@ -58,7 +61,7 @@ public sealed class ProcessadorDeAssinatura(string assinatura, ServiceBusClient 
         }
 
         await _processor.StartProcessingAsync(cancellationToken);
-        logger.LogInformation("[{Assinatura}] Ouvindo {Topico}/{Assinatura}...", assinatura, Assinaturas.TopicoDe(assinatura), assinatura);
+        logger.LogInformation("[{Assinatura}] Ouvindo {Topico}/{Assinatura}...", assinatura, topico, assinatura);
     }
 
     /// <summary>
@@ -108,9 +111,10 @@ public sealed class ProcessadorDeAssinatura(string assinatura, ServiceBusClient 
             ? valor?.ToString()
             : "normal";
 
+        var premio = apolice.PremioMensal.ToString("C", PtBr);
         var acao = assinatura switch
         {
-            Assinaturas.Cobranca => $"gerar boleto do 1º prêmio: {apolice.PremioMensal.ToString("C", PtBr)}",
+            Assinaturas.Cobranca => $"gerar boleto do 1º prêmio: {premio}",
             Assinaturas.Notificacao => $"enviar boas-vindas ao cliente {apolice.ClienteId}",
             Assinaturas.AltoValor => "encaminhar para resseguro e revisão manual",
             _ => "registrar",
@@ -118,9 +122,10 @@ public sealed class ProcessadorDeAssinatura(string assinatura, ServiceBusClient 
 
         await args.CompleteMessageAsync(mensagem, args.CancellationToken);
 
+        var capital = apolice.CapitalSegurado.ToString("C0", PtBr);
         logger.LogInformation(
             "[{Assinatura}] Apólice {ApoliceId} ({Plano}, capital {Capital}, prioridade {Prioridade}): {Acao}.",
-            assinatura, apolice.ApoliceId, apolice.Plano, apolice.CapitalSegurado.ToString("C0", PtBr), prioridade, acao);
+            assinatura, apolice.ApoliceId, apolice.Plano, capital, prioridade, acao);
     }
 
     /// <summary>
@@ -138,9 +143,10 @@ public sealed class ProcessadorDeAssinatura(string assinatura, ServiceBusClient 
 
         await args.CompleteMessageAsync(mensagem, args.CancellationToken);
 
+        var capital = recusa.CapitalSegurado.ToString("C0", PtBr);
         logger.LogInformation(
             "[{Assinatura}] Proposta {PropostaId} ({Plano}, capital {Capital}) recusada: {Motivo} Enviar aviso de recusa ao cliente {ClienteId}.",
-            assinatura, recusa.PropostaId, recusa.Plano, recusa.CapitalSegurado.ToString("C0", PtBr), recusa.Motivo, recusa.ClienteId);
+            assinatura, recusa.PropostaId, recusa.Plano, capital, recusa.Motivo, recusa.ClienteId);
     }
 
     /// <summary>

@@ -18,9 +18,12 @@ public static class ExtensoesDeLogsAoVivo
     public static WebApplicationBuilder AddLogsAoVivo(this WebApplicationBuilder builder)
     {
         builder.Services.AddSingleton<CanalDeLogs>();
-        builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<ILoggerProvider, ProvedorDeLogsAoVivo>());
+        var provedor = ServiceDescriptor.Singleton<ILoggerProvider, ProvedorDeLogsAoVivo>();
+        builder.Services.TryAddEnumerable(provedor);
         // O controller mora nesta biblioteca, não no app: o application part explícito garante que o MVC o encontre.
-        builder.Services.AddControllers().AddApplicationPart(typeof(LogsController).Assembly);
+        var mvc = builder.Services.AddControllers();
+        var estaBiblioteca = typeof(LogsController).Assembly;
+        mvc.AddApplicationPart(estaBiblioteca);
         return builder;
     }
 }

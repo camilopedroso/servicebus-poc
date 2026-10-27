@@ -28,7 +28,13 @@ public sealed class FabricaDaApi : WebApplicationFactory<Program>, IAsyncLifetim
     // Mesma imagem do infra/sql-up.ps1: o teste roda na mesma engine e versão do banco de desenvolvimento.
     // O Testcontainers mapeia a 1433 do container para uma porta livre aleatória, então não conflita com o
     // vida-sql (14330), e espera o SQL Server aceitar conexão antes de liberar o StartAsync.
-    private readonly MsSqlContainer _sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
+    private readonly MsSqlContainer _sql;
+
+    public FabricaDaApi()
+    {
+        var construtor = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest");
+        _sql = construtor.Build();
+    }
 
     public async ValueTask InitializeAsync() => await _sql.StartAsync();
 
@@ -37,7 +43,8 @@ public sealed class FabricaDaApi : WebApplicationFactory<Program>, IAsyncLifetim
         // Chegam ao Program.cs como linha de comando, que vale mais que os arquivos *.local.json da máquina:
         // sem isso, o teste usaria o banco de desenvolvimento e mandaria telemetria para o App Insights.
         // A connection string já vem com host, porta sorteada, usuário e senha do container.
-        builder.UseSetting("ConnectionStrings:Propostas", _sql.GetConnectionString());
+        var conexao = _sql.GetConnectionString();
+        builder.UseSetting("ConnectionStrings:Propostas", conexao);
         // Namespace fictício: o ServiceBusClient do Producer só conecta no primeiro envio, e nenhum teste daqui
         // envia por ele (a API grava no outbox; o despachante dos testes usa o ServiceBusFalso).
         builder.UseSetting("ServiceBus:FullyQualifiedNamespace", "teste.servicebus.windows.net");

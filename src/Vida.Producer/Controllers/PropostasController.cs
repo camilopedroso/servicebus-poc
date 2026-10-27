@@ -47,9 +47,13 @@ public sealed class PropostasController(
         }
 
         // Repetição de um POST que já deu certo (o cliente não recebeu a resposta e tentou de novo).
-        if (chave is not null && await BuscarPorChaveAsync(chave, cancellationToken) is { } existente)
+        if (chave is not null)
         {
-            return Repetida(existente);
+            var existente = await BuscarPorChaveAsync(chave, cancellationToken);
+            if (existente is not null)
+            {
+                return Repetida(existente);
+            }
         }
 
         var proposta = new PropostaSeguroVida(
@@ -74,12 +78,9 @@ public sealed class PropostasController(
         banco.Propostas.Add(registro);
 
         // A mensagem é montada pela mesma fábrica do envio direto e guardada como linha do outbox.
-        banco.OutboxMensagens.Add(
-            MensagemDeSaida.De(
-                destino: Filas.Propostas,
-                mensagem: MensagensProposta.Criar(proposta)
-            )
-        );
+        var mensagem = MensagensProposta.Criar(proposta);
+        var linhaDoOutbox = MensagemDeSaida.De(destino: Filas.Propostas, mensagem: mensagem);
+        banco.OutboxMensagens.Add(linhaDoOutbox);
 
         try
         {
@@ -90,14 +91,16 @@ public sealed class PropostasController(
         {
             // Corrida: outro POST com a mesma chave gravou entre a busca e o INSERT. O índice único decide.
             banco.ChangeTracker.Clear();
-            return Repetida((await BuscarPorChaveAsync(chave, cancellationToken))!);
+            var vencedora = await BuscarPorChaveAsync(chave, cancellationToken);
+            return Repetida(vencedora!);
         }
 
         logger.LogInformation(
             "API: proposta {PropostaId} gravada com a mensagem no outbox ({Plano}, idade {Idade}). 201 sem falar com o Service Bus.",
             registro.PropostaId, registro.Plano, registro.Idade);
         // Location relativo, como antes; CreatedAtAction geraria uma URL absoluta.
-        return Created($"/api/propostas/{registro.PropostaId}", PropostaResposta.De(registro));
+        var resposta = PropostaResposta.De(registro);
+        return Created($"/api/propostas/{registro.PropostaId}", resposta);
     }
 
     /// <summary>
@@ -107,13 +110,22 @@ public sealed class PropostasController(
     [EndpointName("ObterProposta")]
     [ProducesResponseType<PropostaResposta>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<PropostaResposta>> ObterAsync(Guid id, CancellationToken cancellationToken) =>
-        await banco.Propostas.AsNoTracking().FirstOrDefaultAsync(p => p.PropostaId == id, cancellationToken) is { } proposta
-            ? PropostaResposta.De(proposta)
-            : Problem(statusCode: StatusCodes.Status404NotFound, title: "Proposta não encontrada", detail: $"Nenhuma proposta com id {id}.");
+    public async Task<ActionResult<PropostaResposta>> ObterAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var somenteLeitura = banco.Propostas.AsNoTracking();
+        var proposta = await somenteLeitura.FirstOrDefaultAsync(p => p.PropostaId == id, cancellationToken);
+        if (proposta is null)
+        {
+            return Problem(statusCode: StatusCodes.Status404NotFound, title: "Proposta não encontrada", detail: $"Nenhuma proposta com id {id}.");
+        }
+        return PropostaResposta.De(proposta);
+    }
 
-    private Task<PropostaRegistrada?> BuscarPorChaveAsync(string chave, CancellationToken cancellationToken) =>
-        banco.Propostas.AsNoTracking().FirstOrDefaultAsync(p => p.ChaveDeIdempotencia == chave, cancellationToken);
+    private Task<PropostaRegistrada?> BuscarPorChaveAsync(string chave, CancellationToken cancellationToken)
+    {
+        var somenteLeitura = banco.Propostas.AsNoTracking();
+        return somenteLeitura.FirstOrDefaultAsync(p => p.ChaveDeIdempotencia == chave, cancellationToken);
+    }
 
     private OkObjectResult Repetida(PropostaRegistrada existente)
     {
@@ -122,6 +134,7 @@ public sealed class PropostasController(
         logger.LogInformation(
             "API: Idempotency-Key repetida. Devolvendo a proposta {PropostaId} já criada, sem gravar nem publicar de novo.",
             existente.PropostaId);
-        return Ok(PropostaResposta.De(existente));
+        var resposta = PropostaResposta.De(existente);
+        return Ok(resposta);
     }
 }

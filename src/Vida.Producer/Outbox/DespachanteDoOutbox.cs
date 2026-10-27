@@ -35,8 +35,10 @@ public sealed class DespachanteDoOutbox(
             try
             {
                 // Lote cheio: provavelmente há mais pendentes, então não espera o próximo tique.
-                while (await DespacharLoteAsync(stoppingToken) == TamanhoDoLote)
+                var lidas = await DespacharLoteAsync(stoppingToken);
+                while (lidas == TamanhoDoLote)
                 {
+                    lidas = await DespacharLoteAsync(stoppingToken);
                 }
                 ultimoErro = null;
             }
@@ -92,7 +94,8 @@ public sealed class DespachanteDoOutbox(
         using var atividade = FonteDeAtividades.Fonte.StartActivity("PublicarOutbox");
         atividade?.SetTag("vida.outbox.mensagens", pendentes.Count);
 
-        foreach (var grupo in pendentes.GroupBy(m => m.Destino))
+        var gruposPorDestino = pendentes.GroupBy(m => m.Destino);
+        foreach (var grupo in gruposPorDestino)
         {
             var mensagens = grupo.ToList();
             try
@@ -104,7 +107,8 @@ public sealed class DespachanteDoOutbox(
                 }
                 var sender = _senders.GetOrAdd(grupo.Key, client.CreateSender);
                 // Lista na ordem do Id: o broker preserva a ordem dentro da chamada.
-                await sender.SendMessagesAsync(mensagens.Select(m => m.ParaServiceBus()), cancellationToken);
+                var remontadas = mensagens.Select(m => m.ParaServiceBus());
+                await sender.SendMessagesAsync(remontadas, cancellationToken);
                 await MarcarPublicadasAsync(banco, mensagens, agora, cancellationToken);
             }
             catch (ServiceBusException ex)
@@ -127,10 +131,11 @@ public sealed class DespachanteDoOutbox(
         {
             mensagem.PublicadaEm = agora;
             mensagem.UltimoErro = null;
-            MetricasDeNegocio.AtrasoDoOutbox.Record((agora - mensagem.CriadaEm).TotalMilliseconds);
+            var atraso = agora - mensagem.CriadaEm;
+            MetricasDeNegocio.AtrasoDoOutbox.Record(atraso.TotalMilliseconds);
             logger.LogInformation(
                 "Outbox: mensagem {MessageId} publicada em '{Destino}' ({Atraso:F0} ms depois de gravada, tentativa {Tentativa}).",
-                mensagem.MessageId, mensagem.Destino, (agora - mensagem.CriadaEm).TotalMilliseconds, mensagem.Tentativas + 1);
+                mensagem.MessageId, mensagem.Destino, atraso.TotalMilliseconds, mensagem.Tentativas + 1);
         }
 
         // Atualiza a proposta junto, na mesma transação. Acopla o despachante às propostas, mas evita outro
@@ -141,11 +146,14 @@ public sealed class DespachanteDoOutbox(
             .ToList();
         if (propostas.Count > 0)
         {
-            await banco.Propostas
-                .Where(p => propostas.Contains(p.PropostaId))
-                .ExecuteUpdateAsync(s => s
-                    .SetProperty(p => p.Status, StatusDaProposta.EnviadaParaAnalise)
-                    .SetProperty(p => p.EnviadaEm, agora), cancellationToken);
+            var enviadas = banco.Propostas.Where(p => propostas.Contains(p.PropostaId));
+            await enviadas.ExecuteUpdateAsync(
+                colunas =>
+                {
+                    colunas.SetProperty(p => p.Status, StatusDaProposta.EnviadaParaAnalise);
+                    colunas.SetProperty(p => p.EnviadaEm, agora);
+                },
+                cancellationToken);
         }
     }
 
@@ -157,7 +165,9 @@ public sealed class DespachanteDoOutbox(
         foreach (var mensagem in mensagens)
         {
             mensagem.Tentativas++;
-            espera = TimeSpan.FromSeconds(Math.Min(Math.Pow(2, mensagem.Tentativas), EsperaMaxima.TotalSeconds));
+            var segundos = Math.Pow(2, mensagem.Tentativas);
+            var segundosLimitados = Math.Min(segundos, EsperaMaxima.TotalSeconds);
+            espera = TimeSpan.FromSeconds(segundosLimitados);
             mensagem.ProximaTentativaEm = agora + espera;
             mensagem.UltimoErro = texto.Length > 1000 ? texto[..1000] : texto;
         }

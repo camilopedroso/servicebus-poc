@@ -15,7 +15,8 @@ public static class MensagensApolice
     /// <returns>Mensagem do Service Bus pronta para envio.</returns>
     public static ServiceBusMessage Criar(ApoliceEmitida apolice)
     {
-        var mensagem = new ServiceBusMessage(BinaryData.FromObjectAsJson(apolice))
+        var corpo = BinaryData.FromObjectAsJson(apolice);
+        var mensagem = new ServiceBusMessage(corpo)
         {
             MessageId = apolice.ApoliceId.ToString(),
             ContentType = "application/json",

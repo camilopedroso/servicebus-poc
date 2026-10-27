@@ -80,6 +80,9 @@ public sealed class ProcessadorDeEndossos(
         }
 
         var estado = await LerEstado(args);
+        // endosso.Versao vem do corpo, definida pelo producer (EnvioDeEndossos.NovoEndosso); a mesma versão já foi usada no
+        // MessageId para a dedup do broker. Aqui é a segunda camada: compara com a última versão aplicada, guardada no
+        // session state, e pega o que a janela do broker não pega (reentrega após lock perdido, reenvio tardio).
         var acao = DecisaoDeEndosso.Decidir(endosso.Versao, estado.UltimaVersao);
 
         using var atividade = FonteDeAtividades.Fonte.StartActivity("ProcessarEndosso");
@@ -117,8 +120,11 @@ public sealed class ProcessadorDeEndossos(
         await Aplicar(args, mensagem, endosso, estado);
         while (estado.Adiadas.TryGetValue(estado.UltimaVersao + 1, out var sequencia))
         {
-            var adiadas = await args.GetReceiveActions().ReceiveDeferredMessagesAsync([sequencia], args.CancellationToken);
-            if (adiadas.Count == 0 || Ler(adiadas[0]) is not { } proximo)
+            var acoesDeRecebimento = args.GetReceiveActions();
+            var adiadas = await acoesDeRecebimento.ReceiveDeferredMessagesAsync([sequencia], args.CancellationToken);
+            var adiada = adiadas.Count > 0 ? adiadas[0] : null;
+            var proximo = adiada is null ? null : Ler(adiada);
+            if (adiada is null || proximo is null)
             {
                 // Expirou (TTL) ou foi removida: não há como seguir sem ela.
                 logger.LogError("[{Instancia}] Apólice {ApoliceId}: endosso adiado #{Seq} não encontrado.",
@@ -127,7 +133,7 @@ public sealed class ProcessadorDeEndossos(
             }
             logger.LogInformation("[{Instancia}] Apólice {ApoliceId}: retomando endosso v{Versao} adiado (#{Seq}).",
                 _instancia, proximo.ApoliceId, proximo.Versao, sequencia);
-            await Aplicar(args, adiadas[0], proximo, estado);
+            await Aplicar(args, adiada, proximo, estado);
         }
     }
 
@@ -154,13 +160,20 @@ public sealed class ProcessadorDeEndossos(
     {
         var bytes = await args.GetSessionStateAsync(args.CancellationToken);
         // Sessão nova não tem estado (null).
-        return bytes is null || bytes.ToMemory().IsEmpty
-            ? new EstadoDaSessao()
-            : bytes.ToObjectFromJson<EstadoDaSessao>() ?? new EstadoDaSessao();
+        if (bytes is null || bytes.IsEmpty)
+        {
+            return new EstadoDaSessao();
+        }
+
+        var estado = bytes.ToObjectFromJson<EstadoDaSessao>();
+        return estado ?? new EstadoDaSessao();
     }
 
-    private static Task SalvarEstado(ProcessSessionMessageEventArgs args, EstadoDaSessao estado) =>
-        args.SetSessionStateAsync(BinaryData.FromObjectAsJson(estado), args.CancellationToken);
+    private static Task SalvarEstado(ProcessSessionMessageEventArgs args, EstadoDaSessao estado)
+    {
+        var bytes = BinaryData.FromObjectAsJson(estado);
+        return args.SetSessionStateAsync(bytes, args.CancellationToken);
+    }
 
     private static EndossoSolicitado? Ler(ServiceBusReceivedMessage mensagem)
     {

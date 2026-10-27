@@ -26,7 +26,8 @@ public sealed class CenariosDePropostasController(EnvioDePropostas envio) : Cont
         {
             return this.ProblemaDeValidacao(erros);
         }
-        return Ok(new { Propostas = await envio.EnviarLoteAsync(corpo.Quantidade, cancellationToken) });
+        var propostas = await envio.EnviarLoteAsync(corpo.Quantidade, cancellationToken);
+        return Ok(new { Propostas = propostas });
     }
 
     /// <summary>
@@ -46,8 +47,11 @@ public sealed class CenariosDePropostasController(EnvioDePropostas envio) : Cont
     /// POST /propostas/invalida: corpo ilegível → DLQ na primeira entrega (PayloadInvalido).
     /// </summary>
     [HttpPost("invalida")]
-    public async Task<IActionResult> EnviarInvalidaAsync(CancellationToken cancellationToken) =>
-        Ok(new { MessageId = await envio.EnviarInvalidaAsync(cancellationToken) });
+    public async Task<IActionResult> EnviarInvalidaAsync(CancellationToken cancellationToken)
+    {
+        var messageId = await envio.EnviarInvalidaAsync(cancellationToken);
+        return Ok(new { MessageId = messageId });
+    }
 
     /// <summary>
     /// POST /propostas/sem-outbox: grava no banco e publica, sem outbox. O problema que o outbox resolve.

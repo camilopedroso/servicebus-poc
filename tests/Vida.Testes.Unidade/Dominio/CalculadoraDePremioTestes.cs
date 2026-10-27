@@ -17,6 +17,8 @@ public class CalculadoraDePremioTestes
     public void Premio_tem_duas_casas_decimais()
     {
         // 123.457 × (0,0002 + 33 × 0,00001) = 65,43221 → 65,43
-        Assert.Equal(65.43m, CalculadoraDePremio.CalcularMensal(123_457m, idade: 33));
+        var premio = CalculadoraDePremio.CalcularMensal(123_457m, idade: 33);
+
+        Assert.Equal(65.43m, premio);
     }
 }

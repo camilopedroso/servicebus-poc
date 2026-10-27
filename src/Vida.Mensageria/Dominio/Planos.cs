@@ -12,5 +12,9 @@ public static class Planos
     public static readonly string[] Todos = [Individual, Familiar, Empresarial];
 
     /// <summary>Sorteia um plano, para gerar propostas e apólices de teste.</summary>
-    public static string Sortear() => Random.Shared.GetItems(Todos, 1)[0];
+    public static string Sortear()
+    {
+        var sorteados = Random.Shared.GetItems(Todos, 1);
+        return sorteados[0];
+    }
 }

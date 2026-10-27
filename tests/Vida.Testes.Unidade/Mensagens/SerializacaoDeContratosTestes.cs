@@ -9,8 +9,11 @@ namespace Vida.Testes.Unidade.Mensagens;
 /// </summary>
 public class SerializacaoDeContratosTestes
 {
-    private static PropostaSeguroVida? Ler(string json) =>
-        BinaryData.FromString(json).ToObjectFromJson<PropostaSeguroVida>(SerializacaoDeContratos.Leitura);
+    private static PropostaSeguroVida? Ler(string json)
+    {
+        var corpo = BinaryData.FromString(json);
+        return corpo.ToObjectFromJson<PropostaSeguroVida>(SerializacaoDeContratos.Leitura);
+    }
 
     [Theory]
     [InlineData("{}")]
@@ -26,7 +29,10 @@ public class SerializacaoDeContratosTestes
     {
         var original = new PropostaSeguroVida(Guid.NewGuid(), "CLI-1", 30, 100_000m, "Familiar", DateTimeOffset.UtcNow);
 
-        var lida = Ler(BinaryData.FromObjectAsJson(original).ToString());
+        var corpo = BinaryData.FromObjectAsJson(original);
+        var json = corpo.ToString();
+
+        var lida = Ler(json);
 
         Assert.Equal(original, lida);
     }

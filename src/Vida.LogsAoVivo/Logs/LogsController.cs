@@ -21,10 +21,11 @@ public sealed class LogsController(CanalDeLogs canal, IHostApplicationLifetime c
     /// </summary>
     /// <returns>O stream SSE.</returns>
     [HttpGet]
-    public IResult Acompanhar() =>
-        TypedResults.ServerSentEvents(
-            Acompanhar(canal, HttpContext.RequestAborted, ciclo.ApplicationStopping),
-            eventType: "log");
+    public IResult Acompanhar()
+    {
+        var registros = Acompanhar(canal, HttpContext.RequestAborted, ciclo.ApplicationStopping);
+        return TypedResults.ServerSentEvents(registros, eventType: "log");
+    }
 
     /// <summary>
     /// Acompanha o canal até o painel desconectar ou o app começar a encerrar. Sem o segundo token,
@@ -34,7 +35,8 @@ public sealed class LogsController(CanalDeLogs canal, IHostApplicationLifetime c
         CanalDeLogs canal, [EnumeratorCancellation] CancellationToken desconectou, CancellationToken encerrando)
     {
         using var cancelamento = CancellationTokenSource.CreateLinkedTokenSource(desconectou, encerrando);
-        var enumerador = canal.Acompanhar(cancelamento.Token).GetAsyncEnumerator(cancelamento.Token);
+        var registros = canal.Acompanhar(cancelamento.Token);
+        var enumerador = registros.GetAsyncEnumerator(cancelamento.Token);
         try
         {
             while (true)

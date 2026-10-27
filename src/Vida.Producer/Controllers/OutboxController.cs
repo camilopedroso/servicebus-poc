@@ -23,9 +23,10 @@ public sealed class OutboxController(SimulacaoDeIndisponibilidade simulacao, ILo
     {
         var pendentes = await banco.OutboxMensagens.CountAsync(m => m.PublicadaEm == null, cancellationToken);
         var publicadas = await banco.OutboxMensagens.CountAsync(m => m.PublicadaEm != null, cancellationToken);
+        var situacao = simulacao.Ativa ? "indisponível (simulação)" : "disponível";
         logger.LogInformation(
             "Outbox: {Pendentes} pendente(s), {Publicadas} publicada(s). Service Bus {Situacao}.",
-            pendentes, publicadas, simulacao.Ativa ? "indisponível (simulação)" : "disponível");
+            pendentes, publicadas, situacao);
         return new EstadoDoOutbox(simulacao.Ativa, pendentes, publicadas);
     }
 

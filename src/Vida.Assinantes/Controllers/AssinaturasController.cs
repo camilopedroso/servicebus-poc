@@ -25,18 +25,13 @@ public sealed class AssinaturasController(GerenciadorDeAssinaturas gerenciador, 
     [HttpGet]
     public async Task<EstadoDaAssinatura[]> ListarAsync(CancellationToken cancellationToken)
     {
-        // Uma chamada de runtime properties por assinatura, em paralelo.
-        var estados = gerenciador.Processadores.Select(async processador =>
+        // Uma chamada de runtime properties por assinatura, em paralelo: dispara todas e só depois espera.
+        var estados = new List<Task<EstadoDaAssinatura>>();
+        foreach (var processador in gerenciador.Processadores)
         {
-            var propriedades = await admin.GetSubscriptionRuntimePropertiesAsync(
-                Assinaturas.TopicoDe(processador.Nome), processador.Nome, cancellationToken);
-            return new EstadoDaAssinatura(
-                processador.Nome,
-                await ObterFiltrosAsync(processador.Nome, cancellationToken),
-                processador.Ativa,
-                propriedades.Value.ActiveMessageCount,
-                propriedades.Value.DeadLetterMessageCount);
-        });
+            var estado = ObterEstadoAsync(processador, cancellationToken);
+            estados.Add(estado);
+        }
         return await Task.WhenAll(estados);
     }
 
@@ -68,6 +63,19 @@ public sealed class AssinaturasController(GerenciadorDeAssinaturas gerenciador, 
         return NoContent();
     }
 
+    private async Task<EstadoDaAssinatura> ObterEstadoAsync(ProcessadorDeAssinatura processador, CancellationToken cancellationToken)
+    {
+        var topico = Assinaturas.TopicoDe(processador.Nome);
+        var propriedades = await admin.GetSubscriptionRuntimePropertiesAsync(topico, processador.Nome, cancellationToken);
+        var filtros = await ObterFiltrosAsync(processador.Nome, cancellationToken);
+        return new EstadoDaAssinatura(
+            processador.Nome,
+            filtros,
+            processador.Ativa,
+            propriedades.Value.ActiveMessageCount,
+            propriedades.Value.DeadLetterMessageCount);
+    }
+
     private async Task<string[]> ObterFiltrosAsync(string assinatura, CancellationToken cancellationToken)
     {
         if (FiltrosEmCache.TryGetValue(assinatura, out var emCache))
@@ -75,19 +83,26 @@ public sealed class AssinaturasController(GerenciadorDeAssinaturas gerenciador, 
             return emCache;
         }
 
+        var topico = Assinaturas.TopicoDe(assinatura);
+        var regras = admin.GetRulesAsync(topico, assinatura, cancellationToken);
         var filtros = new List<string>();
-        await foreach (var regra in admin.GetRulesAsync(Assinaturas.TopicoDe(assinatura), assinatura, cancellationToken))
+        await foreach (var regra in regras)
         {
+            var filtro = DescricaoDeRegras.DescreverFiltro(regra);
             var acao = DescricaoDeRegras.DescreverAcao(regra);
-            filtros.Add(acao is null
-                ? DescricaoDeRegras.DescreverFiltro(regra)
-                : $"{DescricaoDeRegras.DescreverFiltro(regra)} | action: {acao}");
+            var linha = acao is null ? filtro : $"{filtro} | action: {acao}";
+            filtros.Add(linha);
         }
+
         return FiltrosEmCache[assinatura] = [.. filtros];
     }
 
-    private ObjectResult AssinaturaDesconhecida(string nome) => Problem(
-        statusCode: StatusCodes.Status400BadRequest,
-        title: "Assinatura desconhecida",
-        detail: $"'{nome}' não existe. Válidas: {string.Join(", ", Assinaturas.Todas)}.");
+    private ObjectResult AssinaturaDesconhecida(string nome)
+    {
+        var validas = string.Join(", ", Assinaturas.Todas);
+        return Problem(
+            statusCode: StatusCodes.Status400BadRequest,
+            title: "Assinatura desconhecida",
+            detail: $"'{nome}' não existe. Válidas: {validas}.");
+    }
 }

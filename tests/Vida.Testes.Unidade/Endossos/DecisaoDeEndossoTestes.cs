@@ -11,8 +11,12 @@ public class DecisaoDeEndossoTestes
     [InlineData(5, 0, AcaoDoEndosso.Adiar)]
     [InlineData(2, 2, AcaoDoEndosso.IgnorarJaAplicado)] // reentrega da última aplicada
     [InlineData(1, 4, AcaoDoEndosso.IgnorarJaAplicado)] // reenvio antigo, fora da janela de duplicatas
-    public void Decide_pela_ultima_versao_aplicada(int versao, int ultima, AcaoDoEndosso esperado) =>
-        Assert.Equal(esperado, DecisaoDeEndosso.Decidir(versao, ultima));
+    public void Decide_pela_ultima_versao_aplicada(int versao, int ultima, AcaoDoEndosso esperado)
+    {
+        var acao = DecisaoDeEndosso.Decidir(versao, ultima);
+
+        Assert.Equal(esperado, acao);
+    }
 
     [Fact]
     public void Sequencia_embaralhada_termina_aplicada_em_ordem()
@@ -21,17 +25,21 @@ public class DecisaoDeEndossoTestes
         var aplicadas = new List<int>();
         var adiadas = new SortedSet<int>();
         var ultima = 0;
-        foreach (var versao in new[] { 2, 4, 1, 5, 3 })
+        int[] ordemDeChegada = [2, 4, 1, 5, 3];
+        foreach (var versao in ordemDeChegada)
         {
-            if (DecisaoDeEndosso.Decidir(versao, ultima) == AcaoDoEndosso.Adiar)
+            var acao = DecisaoDeEndosso.Decidir(versao, ultima);
+            if (acao == AcaoDoEndosso.Adiar)
             {
                 adiadas.Add(versao);
                 continue;
             }
-            aplicadas.Add(ultima = versao);
+            ultima = versao;
+            aplicadas.Add(ultima);
             while (adiadas.Remove(ultima + 1))
             {
-                aplicadas.Add(++ultima);
+                ultima++;
+                aplicadas.Add(ultima);
             }
         }
 

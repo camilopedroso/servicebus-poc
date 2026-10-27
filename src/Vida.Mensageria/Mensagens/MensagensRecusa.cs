@@ -15,7 +15,8 @@ public static class MensagensRecusa
     /// <returns>Mensagem do Service Bus pronta para envio.</returns>
     public static ServiceBusMessage Criar(PropostaRecusada recusa)
     {
-        var mensagem = new ServiceBusMessage(BinaryData.FromObjectAsJson(recusa))
+        var corpo = BinaryData.FromObjectAsJson(recusa);
+        var mensagem = new ServiceBusMessage(corpo)
         {
             // Uma recusa por proposta: o id da proposta serve de MessageId (base para detecção de duplicatas, fase 3).
             MessageId = recusa.PropostaId.ToString(),

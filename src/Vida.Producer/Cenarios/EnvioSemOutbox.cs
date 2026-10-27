@@ -27,9 +27,17 @@ public sealed class EnvioSemOutbox(ServiceBusClient client, ILogger<EnvioSemOutb
     public async Task<(PropostaRegistrada Proposta, bool Publicada)> EnviarAsync(
         BancoDePropostas banco, bool falharAntesDoEnvio, CancellationToken cancellationToken)
     {
+        var numeroDoCliente = Random.Shared.Next(1000, 9999);
+        var idade = Random.Shared.Next(18, 70);
+        var capitalSegurado = Random.Shared.Next(50, 2000) * 1_000m;
+        var plano = Planos.Sortear();
         var proposta = new PropostaSeguroVida(
-            Guid.NewGuid(), $"CLI-{Random.Shared.Next(1000, 9999)}", Random.Shared.Next(18, 70),
-            Random.Shared.Next(50, 2000) * 1_000m, Planos.Sortear(), DateTimeOffset.UtcNow);
+            PropostaId: Guid.NewGuid(),
+            ClienteId: $"CLI-{numeroDoCliente}",
+            Idade: idade,
+            CapitalSegurado: capitalSegurado,
+            Plano: plano,
+            CriadaEm: DateTimeOffset.UtcNow);
         var registro = new PropostaRegistrada
         {
             PropostaId = proposta.PropostaId,
@@ -56,7 +64,8 @@ public sealed class EnvioSemOutbox(ServiceBusClient client, ILogger<EnvioSemOutb
 
         // 2ª escrita: Service Bus. Na ordem inversa (publicar antes de gravar), a falha deixaria uma mensagem
         // de uma proposta que não existe no banco.
-        await _sender.SendMessageAsync(MensagensProposta.Criar(proposta), cancellationToken);
+        var mensagem = MensagensProposta.Criar(proposta);
+        await _sender.SendMessageAsync(mensagem, cancellationToken);
         registro.Status = StatusDaProposta.EnviadaParaAnalise;
         registro.EnviadaEm = DateTimeOffset.UtcNow;
         await banco.SaveChangesAsync(cancellationToken);

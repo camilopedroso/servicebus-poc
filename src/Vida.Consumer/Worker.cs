@@ -36,7 +36,7 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _processor = client.CreateProcessor(Filas.Propostas, new ServiceBusProcessorOptions
+        var opcoes = new ServiceBusProcessorOptions
         {
             // PeekLock: a mensagem fica travada (invisível) enquanto processamos; só sai da fila no Complete.
             // ≈ basic.consume com autoAck=false no RabbitMQ. O oposto é ReceiveAndDelete (at-most-once).
@@ -47,7 +47,8 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
             MaxConcurrentCalls = configuration.GetValue("Consumer:MaxConcurrentCalls", 4),
             // O SDK renova o lock (lockDuration=30s na fila) enquanto o handler roda, até este limite.
             MaxAutoLockRenewalDuration = TimeSpan.FromMinutes(5),
-        });
+        };
+        _processor = client.CreateProcessor(Filas.Propostas, opcoes);
 
         _processor.ProcessMessageAsync += ProcessarMensagem;
         _processor.ProcessErrorAsync += TratarErro;
@@ -164,7 +165,8 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
             using (var transacao = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
             {
                 await args.CompleteMessageAsync(mensagem, args.CancellationToken);
-                await _senderRecusas.SendMessageAsync(MensagensRecusa.Criar(recusa), args.CancellationToken);
+                var mensagemDeRecusa = MensagensRecusa.Criar(recusa);
+                await _senderRecusas.SendMessageAsync(mensagemDeRecusa, args.CancellationToken);
                 transacao.Complete();
             }
 
@@ -182,15 +184,17 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
         // 4) Caminho feliz: simula a análise de risco, emite a apólice e publica o evento.
         await Task.Delay(TimeSpan.FromMilliseconds(500), args.CancellationToken);
 
+        var premioMensal = CalculadoraDePremio.CalcularMensal(proposta.CapitalSegurado, proposta.Idade);
+        var requerRevisao = PoliticaDeRevisao.RequerRevisao(proposta.CapitalSegurado);
         var apolice = new ApoliceEmitida(
             ApoliceId: Guid.NewGuid(),
             PropostaId: proposta.PropostaId,
             ClienteId: proposta.ClienteId,
             Plano: proposta.Plano,
             CapitalSegurado: proposta.CapitalSegurado,
-            PremioMensal: CalculadoraDePremio.CalcularMensal(proposta.CapitalSegurado, proposta.Idade),
+            PremioMensal: premioMensal,
             EmitidaEm: DateTimeOffset.UtcNow,
-            RequerRevisao: PoliticaDeRevisao.RequerRevisao(proposta.CapitalSegurado));
+            RequerRevisao: requerRevisao);
 
         // Complete na fila + Send no tópico na MESMA transação do broker: ou os dois acontecem, ou nenhum.
         // Sem isso: publicar e cair antes do Complete → evento duplicado; completar e cair antes do Send → evento perdido.
@@ -199,7 +203,8 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
         {
             // A primeira operação define a entidade "via" (a fila): o envio para o tópico é roteado por ela.
             await args.CompleteMessageAsync(mensagem, args.CancellationToken);
-            await _senderApolices.SendMessageAsync(MensagensApolice.Criar(apolice), args.CancellationToken);
+            var mensagemDaApolice = MensagensApolice.Criar(apolice);
+            await _senderApolices.SendMessageAsync(mensagemDaApolice, args.CancellationToken);
             transacao.Complete();
         }
 
@@ -209,12 +214,13 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
             1,
             new KeyValuePair<string, object?>("resultado", "aprovada"));
 
+        var capital = proposta.CapitalSegurado.ToString("C0", PtBr);
         logger.LogInformation(
             "[{Instancia}] Proposta {PropostaId} aprovada: {Plano}, capital {Capital}, idade {Idade} (#{Seq}) → apólice {ApoliceId} publicada.",
             _instancia,
             proposta.PropostaId,
             proposta.Plano,
-            proposta.CapitalSegurado.ToString("C0", PtBr),
+            capital,
             proposta.Idade,
             mensagem.SequenceNumber,
             apolice.ApoliceId);
@@ -245,7 +251,8 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
             return;
         }
 
-        var espera = TimeSpan.FromSeconds(Math.Pow(2, tentativa));
+        var segundosDeEspera = Math.Pow(2, tentativa);
+        var espera = TimeSpan.FromSeconds(segundosDeEspera);
         // Cópia da recebida (corpo e propriedades). É uma mensagem nova: DeliveryCount recomeça,
         // por isso a tentativa vai numa propriedade.
         var copia = new ServiceBusMessage(mensagem)
@@ -293,9 +300,11 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
             await _processor.StopProcessingAsync(cancellationToken);
             await _processor.DisposeAsync();
         }
+
         await _senderApolices.DisposeAsync();
         await _senderRecusas.DisposeAsync();
         await _senderPropostas.DisposeAsync();
+
         await base.StopAsync(cancellationToken);
     }
 }
