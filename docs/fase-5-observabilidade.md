@@ -47,8 +47,13 @@ Com amostragem desligada, todo span é cobrado. Três fontes de ruído aparecera
 
 - **Polling do outbox**: uma consulta por segundo viraria 86 mil traces por dia. A consulta de pendentes roda dentro
   de `SuppressInstrumentationScope`; o span `PublicarOutbox` só nasce quando há o que publicar.
-- **Rotas do painel**: o SSE de `/logs` e o polling de `GET /assinaturas` são filtrados na instrumentação do
-  ASP.NET Core. Filtrada a requisição, os spans filhos (chamadas do administration client) também não são gravados.
+- **Rotas do painel**: o SSE de `/logs` e o polling de `GET /assinaturas` (a cada 15 s, ou 3 s com a lista
+  aberta) passam por duas peças. O filtro da instrumentação do ASP.NET Core descarta o span da requisição.
+  `SupressaoNasRotasDoPainel` (um `IStartupFilter`) roda essas rotas dentro de `SuppressInstrumentationScope`.
+  O filtro sozinho não bastava: no workspace, 432 das 549 dependências do Assinantes eram
+  `GetSubscriptionRuntimeProperties` e o `GET` HTTP por baixo, em operações sem o span pai. O filtro só marca a
+  requisição como não gravada; o sampler da distro (`ApplicationInsightsSampler`) decide pelo `TraceId`, não herda
+  a decisão do pai, e grava os filhos.
 - **Migração na partida**: as consultas do EF (`__EFMigrationsHistory`, `CREATE TABLE`) ficam fora.
 
 Sobram, por design do SDK, os spans `ServiceBusReceiver.Receive` (um por lote recebido, ligados à mensagem por
@@ -65,16 +70,62 @@ Sobram, por design do SDK, os spans `ServiceBusReceiver.Receive` (um por lote re
 - Os logs do `ILogger` vão junto, com `TraceId`/`SpanId`: no App Insights, a linha de log aparece dentro do trace.
   Os logs ao vivo do painel também ganharam o `TraceId`.
 
+### Os nomes não batem
+
+| OpenTelemetry | App Insights (clássico) | Log Analytics (workspace-based, o da POC) |
+|---|---|---|
+| span de entrada (HTTP, `ProcessMessage`) | `requests` | `AppRequests` |
+| span de saída (SQL, `Send`, `Complete`, spans de negócio) | `dependencies` | `AppDependencies` |
+| **log do `ILogger`** | **`traces`** | **`AppTraces`** |
+| métrica | `customMetrics` | `AppMetrics` |
+| `TraceId` / `SpanId` | `operation_Id` / `id` | `OperationId` / `Id` (e `ParentId`) |
+| `service.name` | `cloud_RoleName` | `AppRoleName` |
+
+No App Insights, "trace" é **log**; a árvore de spans é a **operation**.
+
+### Como um log chega (conferido no workspace)
+
+- `Message`: o texto **já formatado** (a distro liga `IncludeFormattedMessage` e `ParseStateValues`).
+- `SeverityLevel`: 0 Verbose, 1 Information, 2 Warning, 3 Error, 4 Critical.
+- `Properties`: `CategoryName` (a classe que logou) e uma chave por placeholder (`PropostaId`, `ApoliceId`,
+  `Plano`, `Idade`...). **Todos os valores chegam como texto**: `toint(Properties.Idade)` para comparar número.
+- Tags dos spans de negócio também vão para `Properties`, com ponto no nome: `Properties['vida.apolice.id']`.
+- Log sem span ativo (ex.: "Ouvindo a fila..." na partida) fica com `OperationId` vazio: existe, mas nunca aparece
+  dentro de uma transação.
+- `BeginScope` não é exportado pela distro (a POC não usa).
+
+No portal: **Transaction search** (filtro *Trace* = logs; busca por id de negócio) → clicar abre o
+**End-to-end transaction details**; o painel *Traces & events* mostra os logs intercalados com os spans dos três
+apps. A ingestão leva 2 a 5 min; para ver na hora, `iniciar.ps1 -ComAspire`. `TimeGenerated` é UTC.
+
 ### Consultando (KQL)
 
-Workspace-based: as tabelas do Log Analytics são `AppRequests`, `AppDependencies`, `AppTraces`, `AppMetrics`.
-
 ```kusto
-// Tudo de um fluxo, nos três apps
+// Logs recentes, legíveis
+AppTraces
+| where TimeGenerated > ago(30m)
+| extend Nivel = case(SeverityLevel == 0, "Verbose", SeverityLevel == 1, "Info",
+                      SeverityLevel == 2, "Warning", SeverityLevel == 3, "Error", "Critical"),
+         Classe = tostring(Properties.CategoryName)
+| project TimeGenerated, AppRoleName, Nivel, Classe, Message, OperationId
+| order by TimeGenerated desc
+
+// O fluxo de uma proposta nos três apps: acha o trace pelo id de negócio
+let id = '<propostaId>';
+let operacoes = AppTraces | where tostring(Properties.PropostaId) == id | distinct OperationId;
 union AppRequests, AppDependencies, AppTraces
-| where OperationId == "<traceId>"
-| project TimeGenerated, AppRoleName, Type, Name, DurationMs
+| where OperationId in (operacoes)
+| where Name !in ('Message', 'ServiceBusReceiver.Receive')   // spans do SDK sem valor para leitura
+| extend O_que = coalesce(Message, Name)
+| project TimeGenerated, AppRoleName, Type, O_que, DurationMs
 | order by TimeGenerated asc
+// Um POST em lote é um trace só: a consulta traz as outras propostas do lote junto
+// (o mesmo motivo de a trilha do painel não puxar, pelo TraceId, linhas que têm id).
+
+// Avisos e erros por app e classe
+AppTraces
+| where SeverityLevel >= 2
+| summarize Quantidade = count() by AppRoleName, Classe = tostring(Properties.CategoryName)
 
 // Atraso do outbox, por minuto
 AppMetrics | where Name == "vida.outbox.atraso"

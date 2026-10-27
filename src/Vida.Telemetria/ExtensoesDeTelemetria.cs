@@ -1,6 +1,6 @@
 using Azure.Identity;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Hosting;
 using OpenTelemetry.Instrumentation.AspNetCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -63,17 +63,14 @@ public static class ExtensoesDeTelemetria
         });
 
         // Rotas que o painel chama o tempo todo (SSE de logs, polling das assinaturas) não viram trace: só ruído e custo.
-        // Filtrada a requisição, os spans filhos (ex.: chamadas do administration client) também não são gravados.
+        // São duas peças: o filtro descarta o span da requisição; a supressão impede os spans filhos
+        // (ex.: chamadas do administration client), que o filtro sozinho deixava passar, órfãos.
         builder.Services.Configure<AspNetCoreTraceInstrumentationOptions>(opcoes =>
-            opcoes.Filter = contexto => !EhRotaDoPainel(contexto.Request));
+            opcoes.Filter = contexto => !RotasDoPainel.Contem(contexto.Request));
+        builder.Services.AddSingleton<IStartupFilter, SupressaoNasRotasDoPainel>();
 
         // Os logs (ILogger) vão junto, já com TraceId/SpanId: no App Insights, a linha de log aparece dentro do trace.
         builder.Logging.AddFilter<OpenTelemetry.Logs.OpenTelemetryLoggerProvider>("Azure", LogLevel.Warning);
         return builder;
     }
-
-    private static bool EhRotaDoPainel(HttpRequest requisicao) =>
-        requisicao.Path.StartsWithSegments("/logs")
-        || requisicao.Path.StartsWithSegments("/namespace")
-        || (HttpMethods.IsGet(requisicao.Method) && requisicao.Path.Equals("/assinaturas"));
 }
