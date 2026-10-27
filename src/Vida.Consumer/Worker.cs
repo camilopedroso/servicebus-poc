@@ -9,7 +9,7 @@ using Vida.Telemetria;
 namespace Vida.Consumer;
 
 /// <summary>
-/// Consumer de subscrição: lê propostas da fila, decide o destino de cada mensagem e,
+/// Consumer da fila de propostas: lê propostas da fila, decide o destino de cada mensagem e,
 /// quando aprova, publica ApoliceEmitida; quando recusa por regra de negócio, publica PropostaRecusada.
 /// Rode duas instâncias para ver "competing consumers": cada mensagem vai para só uma delas.
 /// </summary>
@@ -77,16 +77,27 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
         catch (System.Text.Json.JsonException ex)
         {
             proposta = null;
-            logger.LogWarning(ex, "Corpo inválido na mensagem {MessageId}", mensagem.MessageId);
+            logger.LogWarning(
+                ex,
+                "Corpo inválido na mensagem {MessageId}",
+                mensagem.MessageId);
         }
 
         // 1) Mensagem "venenosa" (não dá para ler): tentar de novo não resolve → DLQ direto.
         if (proposta is null)
         {
-            await args.DeadLetterMessageAsync(mensagem, MotivosDeDeadLetter.PayloadInvalido, "Corpo não é uma PropostaSeguroVida válida.");
+            await args.DeadLetterMessageAsync(
+                mensagem,
+                MotivosDeDeadLetter.PayloadInvalido,
+                "Corpo não é uma PropostaSeguroVida válida.");
+
             logger.LogError(
                 "[{Instancia}] Mensagem {MessageId} enviada para a DLQ na entrega {Entrega}: {Motivo}. Sem retry, porque repetir dá o mesmo erro.",
-                _instancia, mensagem.MessageId, mensagem.DeliveryCount, MotivosDeDeadLetter.PayloadInvalido);
+                _instancia,
+                mensagem.MessageId,
+                mensagem.DeliveryCount,
+                MotivosDeDeadLetter.PayloadInvalido);
+
             return;
         }
 
@@ -105,7 +116,9 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
         {
             logger.LogInformation(
                 "[{Instancia}] Dependência de volta: proposta {PropostaId} processada na tentativa {Tentativa}.",
-                _instancia, proposta.PropostaId, tentativa);
+                _instancia,
+                proposta.PropostaId,
+                tentativa);
         }
 
         // 2b) Falha transitória (ex.: serviço de score fora do ar): Abandon libera o lock e a mensagem
@@ -113,9 +126,13 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
         if (simularFalha && !comBackoff)
         {
             logger.LogWarning(
-                "[{Instancia}] Falha transitória simulada na proposta {PropostaId} (entrega {Entrega}/5). Abandonando.",
-                _instancia, proposta.PropostaId, mensagem.DeliveryCount);
+                "[{Instancia}] Falha transitória simulada na proposta {PropostaId} (entrega {Entrega}). Abandonando; após maxDeliveryCount entregas, o broker manda para a DLQ.",
+                _instancia,
+                proposta.PropostaId,
+                mensagem.DeliveryCount);
+
             await args.AbandonMessageAsync(mensagem);
+
             return;
         }
 
@@ -131,7 +148,10 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
         if (proposta.Idade > IdadeMaximaAceita)
         {
             atividade?.SetTag("vida.proposta.resultado", "recusada");
-            MetricasDeNegocio.PropostasDecididas.Add(1, new KeyValuePair<string, object?>("resultado", "recusada"));
+            MetricasDeNegocio.PropostasDecididas.Add(
+                1,
+                new KeyValuePair<string, object?>("resultado", "recusada"));
+
             var recusa = new PropostaRecusada(
                 PropostaId: proposta.PropostaId,
                 ClienteId: proposta.ClienteId,
@@ -150,7 +170,12 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
 
             logger.LogWarning(
                 "[{Instancia}] Proposta {PropostaId} recusada: idade {Idade} acima de {Maxima}. Recusa publicada em '{Topico}'.",
-                _instancia, proposta.PropostaId, proposta.Idade, IdadeMaximaAceita, Topicos.PropostaRecusada);
+                _instancia,
+                proposta.PropostaId,
+                proposta.Idade,
+                IdadeMaximaAceita,
+                Topicos.PropostaRecusada);
+
             return;
         }
 
@@ -180,11 +205,19 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
 
         atividade?.SetTag("vida.proposta.resultado", "aprovada");
         atividade?.SetTag("vida.apolice.id", apolice.ApoliceId);
-        MetricasDeNegocio.PropostasDecididas.Add(1, new KeyValuePair<string, object?>("resultado", "aprovada"));
+        MetricasDeNegocio.PropostasDecididas.Add(
+            1,
+            new KeyValuePair<string, object?>("resultado", "aprovada"));
+
         logger.LogInformation(
             "[{Instancia}] Proposta {PropostaId} aprovada: {Plano}, capital {Capital}, idade {Idade} (#{Seq}) → apólice {ApoliceId} publicada.",
-            _instancia, proposta.PropostaId, proposta.Plano, proposta.CapitalSegurado.ToString("C0", PtBr), proposta.Idade,
-            mensagem.SequenceNumber, apolice.ApoliceId);
+            _instancia,
+            proposta.PropostaId,
+            proposta.Plano,
+            proposta.CapitalSegurado.ToString("C0", PtBr),
+            proposta.Idade,
+            mensagem.SequenceNumber,
+            apolice.ApoliceId);
     }
 
     /// <summary>
@@ -197,10 +230,18 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
         var mensagem = args.Message;
         if (tentativa >= MaximoDeTentativas)
         {
-            await args.DeadLetterMessageAsync(mensagem, MotivosDeDeadLetter.TentativasEsgotadas,
-                $"{tentativa} tentativas com backoff.", args.CancellationToken);
-            logger.LogError("[{Instancia}] Proposta {PropostaId}: {Tentativa} tentativas esgotadas. DLQ.",
-                _instancia, proposta.PropostaId, tentativa);
+            await args.DeadLetterMessageAsync(
+                mensagem,
+                MotivosDeDeadLetter.TentativasEsgotadas,
+                $"{tentativa} tentativas com backoff.",
+                args.CancellationToken);
+
+            logger.LogError(
+                "[{Instancia}] Proposta {PropostaId}: {Tentativa} tentativas esgotadas. DLQ.",
+                _instancia,
+                proposta.PropostaId,
+                tentativa);
+
             return;
         }
 
@@ -224,16 +265,23 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
 
         logger.LogWarning(
             "[{Instancia}] Falha transitória na proposta {PropostaId} (tentativa {Tentativa}). Nova tentativa agendada para daqui a {Espera} s.",
-            _instancia, proposta.PropostaId, tentativa, espera.TotalSeconds);
+            _instancia,
+            proposta.PropostaId,
+            tentativa,
+            espera.TotalSeconds);
     }
 
     private Task TratarErro(ProcessErrorEventArgs args)
     {
         // Chamado para erros de infraestrutura (rede, lock perdido, permissão) e exceções não tratadas no handler.
         // O processor segue rodando e tenta de novo; aqui só registramos.
-        logger.LogError(args.Exception,
+        logger.LogError(
+            args.Exception,
             "[{Instancia}] Erro no processor ({Origem}) em {Entidade}.",
-            _instancia, args.ErrorSource, args.EntityPath);
+            _instancia,
+            args.ErrorSource,
+            args.EntityPath);
+
         return Task.CompletedTask;
     }
 

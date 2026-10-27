@@ -62,8 +62,7 @@ public sealed class DespachanteDoOutbox(
         await using var escopo = escopos.CreateAsyncScope();
         var banco = escopo.ServiceProvider.GetRequiredService<BancoDePropostas>();
 
-        // A transação segura o lock das linhas lidas até marcar. UPDLOCK: ninguém mais pega as mesmas;
-        // READPAST: outra instância do despachante pula as travadas em vez de esperar, e pega as próximas.
+        // A transação segura o lock das linhas lidas até marcar (table hints no SELECT abaixo).
         // Custo: a transação fica aberta durante o envio ao Service Bus. Com lotes pequenos, aceitável.
         await using var transacao = await banco.Database.BeginTransactionAsync(cancellationToken);
         var agora = DateTimeOffset.UtcNow;
@@ -71,10 +70,10 @@ public sealed class DespachanteDoOutbox(
         // Polling a cada segundo: sem isto, cada consulta vazia viraria um trace no App Insights (86 mil por dia).
         using (SuppressInstrumentationScope.Begin())
         {
-            // no select: 
-            // o UPDLOCK reserva as linhas que você leu até o commit na linha 120", 
-            // o ROWLOCK faz essa reserva valer linha por linha, 
-            // e o READPAST faz as outras instâncias pularem as linhas reservadas.
+            // Nos table hints do SELECT:
+            // o UPDLOCK reserva as linhas lidas até o CommitAsync da transação (ninguém mais pega as mesmas),
+            // o ROWLOCK faz essa reserva valer linha por linha (sem travar a página inteira),
+            // e o READPAST faz as outras instâncias do despachante pularem as linhas reservadas em vez de esperar.
             pendentes = await banco.OutboxMensagens
                 .FromSql($"""
                     SELECT TOP ({TamanhoDoLote}) * FROM Propostas.OutboxMensagens WITH (UPDLOCK, READPAST, ROWLOCK)
