@@ -17,6 +17,24 @@ public static class Assinaturas
     public static readonly string[] Todas = [Cobranca, Notificacao, AltoValor, NotificacaoRecusa];
 
     /// <summary>
+    /// Converte o nome que veio de fora (rota HTTP, argumento de linha de comando) no nome da topologia,
+    /// sem diferenciar maiúsculas de minúsculas e ignorando espaços nas pontas. Devolve null se não existir.
+    /// </summary>
+    /// <param name="texto">Nome como o cliente mandou: "Cobranca", "ALTO-VALOR"...</param>
+    public static string? Interpretar(string? texto)
+    {
+        var semEspacos = texto?.Trim();
+        foreach (var assinatura in Todas)
+        {
+            if (string.Equals(assinatura, semEspacos, StringComparison.OrdinalIgnoreCase))
+            {
+                return assinatura;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
     /// Tópico ao qual a assinatura pertence. No broker o endereço de uma assinatura é sempre (tópico, assinatura).
     /// </summary>
     /// <param name="assinatura">Nome da assinatura.</param>

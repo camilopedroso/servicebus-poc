@@ -48,6 +48,27 @@ public class NovaPropostaTestes
     }
 
     [Fact]
+    public void ClienteId_so_com_espacos_e_invalido()
+    {
+        var corpo = new NovaProposta("   ", 40, 1m, "Familiar");
+
+        var erros = corpo.Validar();
+
+        Assert.True(erros.ContainsKey("ClienteId"));
+    }
+
+    [Fact]
+    public void Espacos_nas_pontas_nao_contam_no_limite_do_ClienteId()
+    {
+        var vinteCaracteres = new string('C', 20);
+        var corpo = new NovaProposta($"  {vinteCaracteres}  ", 40, 1m, "Familiar");
+
+        var erros = corpo.Validar();
+
+        Assert.Empty(erros);
+    }
+
+    [Fact]
     public void Plano_desconhecido_e_invalido()
     {
         var corpo = new NovaProposta("CLI-1", 40, 1m, "Ouro");

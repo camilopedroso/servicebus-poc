@@ -58,3 +58,6 @@ Content-Type: application/json
 
 ### Contrato OpenAPI do Producer
 GET {{producer}}/openapi/v1.json
+
+### Contrato OpenAPI da demonstração (cenários do painel)
+GET {{producer}}/openapi/demo.json

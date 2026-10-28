@@ -1,20 +1,21 @@
 using Microsoft.AspNetCore.Mvc;
 using Vida.Producer.Cenarios;
-using Vida.Producer.Contratos;
+using Vida.Producer.Contratos.Demonstracao;
 
-namespace Vida.Producer.Controllers;
+namespace Vida.Producer.Controllers.Demonstracao;
 
 /// <summary>
 /// Fase 3: cenários da fila "endossos" (sessions e detecção de duplicatas).
 /// </summary>
 /// <param name="envio">Envio de endossos.</param>
 [ApiController]
-[Route("endossos")]
-[Tags("Cenários")]
+[Route("demo/endossos")]
+[Tags("Demonstração")]
+[ApiExplorerSettings(GroupName = "demo")]
 public sealed class EndossosController(EnvioDeEndossos envio) : ControllerBase
 {
     /// <summary>
-    /// POST /endossos/em-ordem: v1..vN intercaladas entre apólices (sessões em paralelo).
+    /// POST /demo/endossos/em-ordem: v1..vN intercaladas entre apólices (sessões em paralelo).
     /// </summary>
     [HttpPost("em-ordem")]
     public async Task<IActionResult> EnviarEmOrdemAsync(SequenciaDeEndossos corpo, CancellationToken cancellationToken)
@@ -28,7 +29,7 @@ public sealed class EndossosController(EnvioDeEndossos envio) : ControllerBase
     }
 
     /// <summary>
-    /// POST /endossos/fora-de-ordem: 5 versões de uma apólice embaralhadas → deferral.
+    /// POST /demo/endossos/fora-de-ordem: 5 versões de uma apólice embaralhadas → deferral.
     /// </summary>
     [HttpPost("fora-de-ordem")]
     public async Task<IActionResult> EnviarForaDeOrdemAsync(CancellationToken cancellationToken)
@@ -38,7 +39,7 @@ public sealed class EndossosController(EnvioDeEndossos envio) : ControllerBase
     }
 
     /// <summary>
-    /// POST /endossos/duplicado: v1, v1 de novo (mesmo MessageId) e v2 → o broker descarta a cópia.
+    /// POST /demo/endossos/duplicado: v1, v1 de novo (mesmo MessageId) e v2 → o broker descarta a cópia.
     /// </summary>
     [HttpPost("duplicado")]
     public async Task<IActionResult> EnviarDuplicadoAsync(CancellationToken cancellationToken)

@@ -1,9 +1,9 @@
 using Vida.Mensageria.Dominio;
 
-namespace Vida.Producer.Contratos;
+namespace Vida.Producer.Contratos.Demonstracao;
 
 /// <summary>
-/// Corpo de POST /propostas. Campos nulos são sorteados.
+/// Corpo de POST /demo/propostas. Campos nulos são sorteados.
 /// </summary>
 /// <param name="Idade">
 ///     Idade do proponente. Acima de 80 o consumer recusa e publica 

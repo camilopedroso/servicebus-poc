@@ -6,7 +6,7 @@ using Vida.Mensageria.Mensagens;
 using Vida.Mensageria.Topologia;
 using Vida.Producer.Contratos;
 
-namespace Vida.Producer.Cenarios;
+namespace Vida.Producer.Operacao;
 
 /// <summary>
 /// Ferramentas de operação: peek na fila, nas assinaturas e nas DLQs, e leitura das regras aplicadas pelo broker.

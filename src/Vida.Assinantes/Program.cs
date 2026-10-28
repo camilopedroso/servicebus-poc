@@ -11,11 +11,23 @@ using Vida.Mensageria.Topologia;
 //      dotnet run -- cobranca alto-valor  → só as informadas começam ligadas
 // Depois da partida, o painel (web/painel) liga e desliga cada uma por HTTP.
 var nomesInformados = args.Where(a => !a.StartsWith('-'));
-var escolhidas = nomesInformados.ToArray();
-var assinaturas = escolhidas.Length > 0 ? escolhidas : Assinaturas.Todas;
-var foraDaTopologia = assinaturas.Except(Assinaturas.Todas);
-var desconhecidas = foraDaTopologia.ToArray();
-if (desconhecidas.Length > 0)
+// Aceita qualquer grafia ("Cobranca", "ALTO-VALOR") e guarda o nome da topologia.
+var escolhidas = new List<string>();
+var desconhecidas = new List<string>();
+foreach (var nome in nomesInformados)
+{
+    var assinatura = Assinaturas.Interpretar(nome);
+    if (assinatura is null)
+    {
+        desconhecidas.Add(nome);
+    }
+    else
+    {
+        escolhidas.Add(assinatura);
+    }
+}
+var assinaturas = escolhidas.Count > 0 ? [.. escolhidas] : Assinaturas.Todas;
+if (desconhecidas.Count > 0)
 {
     var listaDeDesconhecidas = string.Join(", ", desconhecidas);
     var listaDeValidas = string.Join(", ", Assinaturas.Todas);

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Vida.Mensageria.Dominio;
 using Vida.Mensageria.Topologia;
 using Vida.Producer.Controllers;
 using Vida.Producer.Contratos;
@@ -134,6 +135,43 @@ public sealed class ApiDePropostasTestes(FabricaDaApi fabrica)
         var banco = escopo.ServiceProvider.GetRequiredService<BancoDePropostas>();
         var gravadas = await banco.Propostas.CountAsync(p => p.ChaveDeIdempotencia == chave, TestContext.Current.CancellationToken);
         Assert.Equal(1, gravadas);
+    }
+
+    [Fact]
+    public async Task Entrada_tolerante_sai_canonica()
+    {
+        // Lei de Postel: aceita grafia e espaços soltos, mas grava e devolve a forma canônica.
+        var corpo = new NovaProposta("  CLI-7  ", 40, 300_000m, " FAMILIAR ");
+
+        var resposta = await _http.PostAsJsonAsync("/api/propostas", corpo, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, resposta.StatusCode);
+        var criada = await resposta.Content.ReadFromJsonAsync<PropostaResposta>(TestContext.Current.CancellationToken);
+        Assert.Equal("CLI-7", criada!.ClienteId);
+        Assert.Equal(Plano.Familiar, criada.Plano);
+    }
+
+    [Fact]
+    public async Task Idempotency_Key_maior_que_a_coluna_e_400_e_nao_500()
+    {
+        var chave = new string('x', PropostaRegistrada.TamanhoMaximoDaChave + 1);
+
+        var resposta = await PostComChave(chave);
+
+        Assert.Equal(HttpStatusCode.BadRequest, resposta.StatusCode);
+    }
+
+    [Fact]
+    public async Task Idempotency_Key_com_espacos_e_a_mesma_chave()
+    {
+        var guid = Guid.NewGuid();
+        var chave = guid.ToString();
+
+        var primeira = await PostComChave(chave);
+        var segunda = await PostComChave($"  {chave}  ");
+
+        Assert.Equal(HttpStatusCode.Created, primeira.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, segunda.StatusCode);
     }
 
     private Task<HttpResponseMessage> PostComChave(string chave)

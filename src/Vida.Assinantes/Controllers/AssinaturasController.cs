@@ -41,11 +41,12 @@ public sealed class AssinaturasController(GerenciadorDeAssinaturas gerenciador, 
     [HttpPost("{nome}/iniciar")]
     public async Task<IActionResult> IniciarAsync(string nome, CancellationToken cancellationToken)
     {
-        if (!gerenciador.Existe(nome))
+        var assinatura = Assinaturas.Interpretar(nome);
+        if (assinatura is null)
         {
             return AssinaturaDesconhecida(nome);
         }
-        await gerenciador.IniciarAsync(nome, cancellationToken);
+        await gerenciador.IniciarAsync(assinatura, cancellationToken);
         return NoContent();
     }
 
@@ -55,11 +56,12 @@ public sealed class AssinaturasController(GerenciadorDeAssinaturas gerenciador, 
     [HttpPost("{nome}/parar")]
     public async Task<IActionResult> PararAsync(string nome, CancellationToken cancellationToken)
     {
-        if (!gerenciador.Existe(nome))
+        var assinatura = Assinaturas.Interpretar(nome);
+        if (assinatura is null)
         {
             return AssinaturaDesconhecida(nome);
         }
-        await gerenciador.PararAsync(nome, cancellationToken);
+        await gerenciador.PararAsync(assinatura, cancellationToken);
         return NoContent();
     }
 

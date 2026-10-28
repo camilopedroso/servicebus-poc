@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using Vida.Producer.Cenarios;
+using Vida.Producer.Operacao;
 using Vida.Producer.Contratos;
 
 namespace Vida.Producer.Controllers;

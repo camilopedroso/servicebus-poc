@@ -3,7 +3,7 @@ using Vida.Mensageria.Contratos;
 using Vida.Mensageria.Dominio;
 using Vida.Mensageria.Mensagens;
 using Vida.Mensageria.Topologia;
-using Vida.Producer.Contratos;
+using Vida.Producer.Contratos.Demonstracao;
 
 namespace Vida.Producer.Cenarios;
 

@@ -30,4 +30,7 @@ public sealed class PropostaRegistrada
     /// (timeout, retry do cliente) devolve a proposta já criada em vez de criar outra.
     /// </summary>
     public string? ChaveDeIdempotencia { get; set; }
+
+    /// <summary>Tamanho da coluna ChaveDeIdempotencia; a API valida antes de gravar.</summary>
+    public const int TamanhoMaximoDaChave = 100;
 }

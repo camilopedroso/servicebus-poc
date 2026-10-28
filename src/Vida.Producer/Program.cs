@@ -5,36 +5,38 @@ using Vida.Mensageria.Conexao;
 using Vida.Telemetria;
 using Microsoft.EntityFrameworkCore;
 using Vida.Producer.Cenarios;
+using Vida.Producer.Operacao;
 using Vida.Producer.Dados;
 using Vida.Producer.Erros;
 using Vida.Producer.Outbox;
 
 // Producer + ferramentas de operação, como API HTTP em http://localhost:5180 (controllers em Controllers/).
 // O painel (web/painel) chama estes endpoints; também dá para usar curl. Exemplos:
-//   curl -X POST localhost:5180/propostas/lote -H "Content-Type: application/json" -d '{"quantidade":5}'
-//   curl -X POST localhost:5180/propostas -H "Content-Type: application/json" -d '{"idade":85}'
+//   curl -X POST localhost:5180/demo/propostas/lote -H "Content-Type: application/json" -d '{"quantidade":5}'
+//   curl -X POST localhost:5180/demo/propostas -H "Content-Type: application/json" -d '{"idade":85}'
 //   curl localhost:5180/filas/propostas/mensagens?dlq=true
-// Fase 1 (fila "propostas"):
-//   POST /propostas/lote                    propostas válidas, enviadas em lote
-//   POST /propostas                         uma proposta: idade > 80 → recusa publicada em proposta-recusada; simularFalha → retry até maxDeliveryCount → DLQ
-//   POST /propostas/invalida                corpo ilegível → falha irrecuperável: DLQ na primeira entrega (PayloadInvalido)
-//   GET  /filas/propostas/mensagens?dlq=    peek na fila (ou na DLQ, com o motivo)
-//   POST /filas/propostas/dlq/reprocessar   devolve a DLQ para a fila (payload inválido fica na DLQ)
-// Fase 2 (tópico "apolice-emitida"):
-//   POST /apolices                          publica uma ApoliceEmitida direto no tópico (sem passar pela fila)
-//   GET  /assinaturas/{nome}/mensagens?dlq= peek em uma assinatura (ou na DLQ dela)
-//   GET  /assinaturas/regras                lista as regras (filtros/actions) de cada assinatura
-// Fase 3 (fila "endossos", com sessions e detecção de duplicatas; retry agendado na fila "propostas"):
-//   POST /endossos/em-ordem                 {apolices, versoes}: v1..vN intercaladas entre apólices (sessões em paralelo)
-//   POST /endossos/fora-de-ordem            5 versões de uma apólice embaralhadas → deferral
-//   POST /endossos/duplicado                v1, v1 de novo (mesmo MessageId) e v2 → o broker descarta a cópia
-//   POST /propostas com retryComBackoff     falha transitória com novas tentativas agendadas (2 s, 4 s...)
-// Fase 4 (API REST + outbox no SQL Server local; contrato em /openapi/v1.json):
+//
+// Prontos para produção (contrato em /openapi/v1.json):
 //   POST /api/propostas                     grava proposta + outbox numa transação → 201 Created (Idempotency-Key opcional)
 //   GET  /api/propostas/{id}                status: Recebida (no outbox) ou EnviadaParaAnalise (publicada)
+//   GET  /filas/propostas/mensagens?dlq=    peek na fila (ou na DLQ, com o motivo)
+//   POST /filas/propostas/dlq/reprocessar   devolve a DLQ para a fila (payload inválido fica na DLQ)
+//   GET  /assinaturas/{nome}/mensagens?dlq= peek em uma assinatura (ou na DLQ dela)
+//   GET  /assinaturas/regras                lista as regras (filtros/actions) de cada assinatura
 //   GET  /outbox                            pendentes e publicadas
-//   POST /outbox/simulacao                  {indisponivel}: derruba/restabelece o envio do despachante
-//   POST /propostas/sem-outbox              {falharAntesDoEnvio}: dual write, o problema que o outbox resolve
+//
+// Demonstração (Controllers/Demonstracao, contrato em /openapi/demo.json): geram dados de teste
+// (campos nulos são sorteados) ou simulam falhas, para rodar os cenários do painel.
+//   POST /demo/propostas/lote               fase 1: propostas válidas, enviadas em lote
+//   POST /demo/propostas                    fase 1: uma proposta: idade > 80 → recusa; simularFalha → retry até maxDeliveryCount → DLQ
+//                                           fase 3: com retryComBackoff, novas tentativas agendadas (2 s, 4 s...)
+//   POST /demo/propostas/invalida           fase 1: corpo ilegível → DLQ na primeira entrega (PayloadInvalido)
+//   POST /demo/apolices                     fase 2: publica uma ApoliceEmitida direto no tópico (sem passar pela fila)
+//   POST /demo/endossos/em-ordem            fase 3: {apolices, versoes}: v1..vN intercaladas entre apólices (sessões em paralelo)
+//   POST /demo/endossos/fora-de-ordem       fase 3: 5 versões de uma apólice embaralhadas → deferral
+//   POST /demo/endossos/duplicado           fase 3: v1, v1 de novo (mesmo MessageId) e v2 → o broker descarta a cópia
+//   POST /demo/outbox/simulacao             fase 4: {indisponivel}: derruba/restabelece o envio do despachante
+//   POST /demo/propostas/sem-outbox         fase 4: {falharAntesDoEnvio}: dual write, o problema que o outbox resolve
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -53,7 +55,11 @@ builder.AddTelemetria("Vida.Producer");
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<TratadorDeErros>();
 builder.Services.AddControllers();
+// Dois contratos: "v1" só com os endpoints prontos para produção (os de demonstração têm GroupName "demo" e ficam
+// fora por padrão), e "demo" só com os de demonstração.
 builder.Services.AddOpenApi();
+builder.Services.AddOpenApi("demo", opcoes =>
+    opcoes.ShouldInclude = descricao => descricao.GroupName == "demo");
 
 // DbContext por requisição (scoped). Sem a connection string, as fases 1 a 3 continuam funcionando:
 // o erro só aparece quando alguém usa o banco (503 com a instrução, pelo TratadorDeErros).

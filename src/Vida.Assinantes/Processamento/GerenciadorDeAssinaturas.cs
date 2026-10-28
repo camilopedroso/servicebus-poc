@@ -32,9 +32,6 @@ public sealed class GerenciadorDeAssinaturas : BackgroundService
     /// <summary>Processadores na ordem de Assinaturas.Todas.</summary>
     public IEnumerable<ProcessadorDeAssinatura> Processadores => Assinaturas.Todas.Select(nome => _processadores[nome]);
 
-    /// <summary>True se a assinatura existe na topologia.</summary>
-    public bool Existe(string nome) => _processadores.ContainsKey(nome);
-
     /// <summary>
     /// Liga uma assinatura.
     /// </summary>

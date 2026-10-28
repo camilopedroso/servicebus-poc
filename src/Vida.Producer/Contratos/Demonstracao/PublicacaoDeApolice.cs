@@ -1,9 +1,9 @@
 using Vida.Mensageria.Dominio;
 
-namespace Vida.Producer.Contratos;
+namespace Vida.Producer.Contratos.Demonstracao;
 
 /// <summary>
-/// Corpo de POST /apolices: publica uma ApoliceEmitida direto no tópico, sem passar pela fila. Campos nulos são sorteados.
+/// Corpo de POST /demo/apolices: publica uma ApoliceEmitida direto no tópico, sem passar pela fila. Campos nulos são sorteados.
 /// </summary>
 /// <param name="CapitalSegurado">Capital segurado em reais. Acima de 1.000.000 a apólice cai na assinatura alto-valor.</param>
 /// <param name="Plano">Individual, Familiar ou Empresarial.</param>

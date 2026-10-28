@@ -40,10 +40,19 @@ public sealed class PropostasController(
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<PropostaResposta>> CriarAsync(
         NovaProposta corpo,
-        [FromHeader(Name = CabecalhoDeIdempotencia)] string? chave,
+        [FromHeader(Name = CabecalhoDeIdempotencia)] string? chaveRecebida,
         CancellationToken cancellationToken)
     {
-        if (corpo.Validar() is { Count: > 0 } erros)
+        // Cabeçalho em branco vale como ausente; espaços nas pontas não fazem parte da chave.
+        var chave = string.IsNullOrWhiteSpace(chaveRecebida) ? null : chaveRecebida.Trim();
+
+        var erros = corpo.Validar();
+        // Sem esta checagem, uma chave maior que a coluna estourava no INSERT e virava 500.
+        if (chave is { Length: > PropostaRegistrada.TamanhoMaximoDaChave })
+        {
+            erros[CabecalhoDeIdempotencia] = [$"Use no máximo {PropostaRegistrada.TamanhoMaximoDaChave} caracteres."];
+        }
+        if (erros.Count > 0)
         {
             return this.ProblemaDeValidacao(erros);
         }
@@ -60,7 +69,7 @@ public sealed class PropostasController(
 
         var proposta = new PropostaSeguroVida(
             PropostaId: Guid.NewGuid(),
-            ClienteId: corpo.ClienteId!,
+            ClienteId: corpo.ClienteId!.Trim(),
             Idade: corpo.Idade!.Value,
             CapitalSegurado: corpo.CapitalSegurado!.Value,
             // Validar já garantiu que o texto é um plano; aqui ele vira o enum ("familiar" → Plano.Familiar).

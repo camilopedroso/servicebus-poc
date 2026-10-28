@@ -1,10 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using Vida.Mensageria.Contratos;
 using Vida.Producer.Cenarios;
-using Vida.Producer.Contratos;
+using Vida.Producer.Contratos.Demonstracao;
 using Vida.Producer.Dados;
 
-namespace Vida.Producer.Controllers;
+namespace Vida.Producer.Controllers.Demonstracao;
 
 /// <summary>
 /// Cenários que enviam propostas direto para a fila "propostas" (fases 1 e 3) e o dual write sem outbox (fase 4).
@@ -12,14 +12,15 @@ namespace Vida.Producer.Controllers;
 /// </summary>
 /// <param name="envio">Envio direto para a fila.</param>
 [ApiController]
-[Route("propostas")]
-[Tags("Cenários")]
+[Route("demo/propostas")]
+[Tags("Demonstração")]
+[ApiExplorerSettings(GroupName = "demo")]
 public sealed class CenariosDePropostasController(
     EnvioDePropostas envio
     ) : ControllerBase
 {
     /// <summary>
-    /// POST /propostas/lote: propostas válidas, enviadas em lote.
+    /// POST /demo/propostas/lote: propostas válidas, enviadas em lote.
     /// </summary>
     /// <param name="corpo">Dados do lote de propostas a ser enviado.</param>
     /// <param name="cancellationToken">
@@ -49,7 +50,7 @@ public sealed class CenariosDePropostasController(
     }
 
     /// <summary>
-    /// POST /propostas: uma proposta. Idade > 80 → recusa; 
+    /// POST /demo/propostas: uma proposta. Idade > 80 → recusa; 
     /// simularFalha → retry até maxDeliveryCount → DLQ.
     /// </summary>
     /// <param name="corpo">Dados da proposta a ser enviada.</param>
@@ -77,7 +78,7 @@ public sealed class CenariosDePropostasController(
     }
 
     /// <summary>
-    /// POST /propostas/invalida: corpo ilegível → DLQ na primeira entrega (PayloadInvalido).
+    /// POST /demo/propostas/invalida: corpo ilegível → DLQ na primeira entrega (PayloadInvalido).
     /// </summary>
     [HttpPost("invalida")]
     public async Task<IActionResult> EnviarInvalidaAsync(CancellationToken cancellationToken)
@@ -87,7 +88,7 @@ public sealed class CenariosDePropostasController(
     }
 
     /// <summary>
-    /// POST /propostas/sem-outbox: grava no banco e publica, sem outbox. O problema que o outbox resolve.
+    /// POST /demo/propostas/sem-outbox: grava no banco e publica, sem outbox. O problema que o outbox resolve.
     /// </summary>
     /// <remarks>
     /// O banco vem por [FromServices], e não pelo construtor: sem a connection string, resolver o DbContext lança

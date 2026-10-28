@@ -7,12 +7,13 @@ using Vida.Producer.Outbox;
 namespace Vida.Producer.Controllers;
 
 /// <summary>
-/// Operação do outbox (fase 4): ver pendentes e simular o Service Bus fora do ar.
+/// Operação do outbox (fase 4): quantas mensagens estão pendentes e publicadas. A simulação de indisponibilidade fica em Demonstracao/SimulacaoDoOutboxController.
 /// </summary>
-/// <param name="simulacao">Chave liga/desliga que o despachante consulta antes de enviar.</param>
+/// <param name="simulacao">Para informar se a simulação de indisponibilidade está ligada.</param>
 /// <param name="logger">Logger; aparece com o selo "outbox" na coluna do Producer.</param>
 [ApiController]
 [Route("outbox")]
+[Tags("Operação")]
 public sealed class OutboxController(SimulacaoDeIndisponibilidade simulacao, ILogger<OutboxController> logger) : ControllerBase
 {
     /// <summary>
@@ -28,18 +29,5 @@ public sealed class OutboxController(SimulacaoDeIndisponibilidade simulacao, ILo
             "Outbox: {Pendentes} pendente(s), {Publicadas} publicada(s). Service Bus {Situacao}.",
             pendentes, publicadas, situacao);
         return new EstadoDoOutbox(simulacao.Ativa, pendentes, publicadas);
-    }
-
-    /// <summary>
-    /// POST /outbox/simulacao: derruba ou restabelece o envio do despachante.
-    /// </summary>
-    [HttpPost("simulacao")]
-    public IActionResult Simular(SimulacaoDoOutbox corpo)
-    {
-        simulacao.Ativa = corpo.Indisponivel;
-        logger.LogWarning(corpo.Indisponivel
-            ? "Simulação: Service Bus FORA DO AR para o despachante do outbox. A API continua aceitando propostas."
-            : "Simulação: Service Bus de volta. O despachante publica o que acumulou.");
-        return Ok(new { corpo.Indisponivel });
     }
 }

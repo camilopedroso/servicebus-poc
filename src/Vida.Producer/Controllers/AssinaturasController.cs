@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Vida.Mensageria.Topologia;
-using Vida.Producer.Cenarios;
+using Vida.Producer.Operacao;
 using Vida.Producer.Contratos;
 
 namespace Vida.Producer.Controllers;
@@ -27,13 +27,14 @@ public sealed class AssinaturasController(InspecaoDeEntidades inspecao) : Contro
     [HttpGet("{nome}/mensagens")]
     public async Task<ActionResult<MensagemEspiada[]>> EspiarAsync(string nome, [FromQuery] bool? dlq, CancellationToken cancellationToken)
     {
-        if (!Assinaturas.Todas.Contains(nome))
+        var assinatura = Assinaturas.Interpretar(nome);
+        if (assinatura is null)
         {
             return Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Assinatura desconhecida",
                 detail: $"'{nome}' não existe. Válidas: {string.Join(", ", Assinaturas.Todas)}.");
         }
-        return await inspecao.EspiarAssinaturaAsync(nome, dlq ?? false, cancellationToken);
+        return await inspecao.EspiarAssinaturaAsync(assinatura, dlq ?? false, cancellationToken);
     }
 }

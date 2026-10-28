@@ -3,7 +3,7 @@ using Vida.Mensageria.Dominio;
 namespace Vida.Producer.Contratos;
 
 /// <summary>
-/// Corpo de POST /api/propostas. Diferente do POST /propostas dos cenários, nada é sorteado:
+/// Corpo de POST /api/propostas. Diferente do POST /demo/propostas da demonstração, nada é sorteado:
 /// é a API "de verdade", e os campos de negócio são obrigatórios.
 /// </summary>
 /// <param name="ClienteId">Identificador do cliente.</param>
@@ -16,7 +16,9 @@ public sealed record NovaProposta(string? ClienteId, int? Idade, decimal? Capita
     public Dictionary<string, string[]> Validar()
     {
         var erros = new Dictionary<string, string[]>();
-        if (string.IsNullOrWhiteSpace(ClienteId) || ClienteId.Length > 20)
+        // O limite vale para o id sem os espaços das pontas, que o controller remove antes de gravar.
+        var clienteId = ClienteId?.Trim();
+        if (string.IsNullOrEmpty(clienteId) || clienteId.Length > 20)
         {
             erros[nameof(ClienteId)] = ["Informe o cliente (até 20 caracteres)."];
         }

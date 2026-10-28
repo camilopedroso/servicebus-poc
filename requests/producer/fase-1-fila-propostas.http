@@ -5,7 +5,7 @@
 @producer = http://localhost:5180
 
 # ### Lote de propostas válidas (envio em lote, um ServiceBusMessageBatch)
-# POST {{producer}}/propostas/lote
+# POST {{producer}}/demo/propostas/lote
 # Content-Type: application/json
 
 # {
@@ -13,14 +13,14 @@
 # }
 
 # ### Uma proposta com todos os campos sorteados
-# POST {{producer}}/propostas
+# POST {{producer}}/demo/propostas
 # Content-Type: application/json
 
 # {}
 
 ### Proposta escolhida: Familiar, capital alto (a apólice cai também na assinatura alto-valor)
-# envia direto pro PropostasController.cs. Não passa pela Outbox.
-POST {{producer}}/propostas
+# envia direto pela Demonstracao/CenariosDePropostasController.cs. Não passa pela Outbox.
+POST {{producer}}/demo/propostas
 Content-Type: application/json
 
 {
@@ -30,7 +30,7 @@ Content-Type: application/json
 }
 
 # ### Idade > 80: o consumer completa e publica PropostaRecusada no tópico proposta-recusada (não vai para a DLQ)
-# POST {{producer}}/propostas
+# POST {{producer}}/demo/propostas
 # Content-Type: application/json
 
 # {
@@ -38,7 +38,7 @@ Content-Type: application/json
 # }
 
 # ### Falha simulada: Abandon a cada entrega, sem backoff → DLQ com MaxDeliveryCountExceeded após 5 entregas
-# POST {{producer}}/propostas
+# POST {{producer}}/demo/propostas
 # Content-Type: application/json
 
 # {
@@ -46,10 +46,10 @@ Content-Type: application/json
 # }
 
 # ### Falha irrecuperável: corpo ilegível → DLQ na primeira entrega (PayloadInvalido)
-# POST {{producer}}/propostas/invalida
+# POST {{producer}}/demo/propostas/invalida
 
 # ### Validação: 400 com ValidationProblemDetails, nada é enviado
-# POST {{producer}}/propostas/lote
+# POST {{producer}}/demo/propostas/lote
 # Content-Type: application/json
 
 # {

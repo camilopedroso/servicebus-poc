@@ -1,7 +1,7 @@
-namespace Vida.Producer.Contratos;
+namespace Vida.Producer.Contratos.Demonstracao;
 
 /// <summary>
-/// Corpo de POST /endossos/em-ordem.
+/// Corpo de POST /demo/endossos/em-ordem.
 /// </summary>
 /// <param name="Apolices">Quantas apólices (sessões) recebem endossos.</param>
 /// <param name="Versoes">Quantos endossos por apólice.</param>

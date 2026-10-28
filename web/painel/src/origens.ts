@@ -20,7 +20,8 @@ const origens: Record<string, Origem> = {
   InspecaoDeEntidades: { rotulo: 'operação', descricao: 'Peek em filas, assinaturas e DLQs; leitura das regras' },
   ReprocessamentoDaDlq: { rotulo: 'operação', descricao: 'Reprocessamento da DLQ' },
   PropostasController: { rotulo: 'API', descricao: 'API REST /api/propostas: grava a proposta e o outbox numa transação (fase 4)' },
-  OutboxController: { rotulo: 'outbox', descricao: 'Operação do outbox: estado e simulação de indisponibilidade' },
+  OutboxController: { rotulo: 'outbox', descricao: 'Operação do outbox: pendentes e publicadas' },
+  SimulacaoDoOutboxController: { rotulo: 'outbox', descricao: 'Demonstração: simula o Service Bus fora do ar para o despachante (fase 4)' },
   DespachanteDoOutbox: { rotulo: 'outbox', descricao: 'Despachante: publica no Service Bus o que a API gravou (fase 4)' },
   MigracaoDoBanco: { rotulo: 'banco', descricao: 'Migrations do EF Core na partida' },
   // Consumer

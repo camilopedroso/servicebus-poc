@@ -43,7 +43,7 @@ const textoOuNulo = (texto: string) => (texto === '' ? null : texto);
 const plural = (n: number, singular: string, varias: string) => `${n} ${n === 1 ? singular : varias}`;
 
 const enviarProposta = async (v: Valores) => {
-  const proposta = await chamar<{ propostaId: string; idade: number }>('producer', 'POST', '/propostas', {
+  const proposta = await chamar<{ propostaId: string; idade: number }>('producer', 'POST', '/demo/propostas', {
     idade: numeroOuNulo(v.idade),
     capitalSegurado: numeroOuNulo(v.capitalSegurado),
     plano: textoOuNulo(v.plano),
@@ -53,7 +53,7 @@ const enviarProposta = async (v: Valores) => {
 };
 
 const publicarApolice = async (v: Valores) => {
-  const apolice = await chamar<{ apoliceId: string; capitalSegurado: number }>('producer', 'POST', '/apolices', {
+  const apolice = await chamar<{ apoliceId: string; capitalSegurado: number }>('producer', 'POST', '/demo/apolices', {
     capitalSegurado: numeroOuNulo(v.capitalSegurado),
     plano: textoOuNulo(v.plano),
   });
@@ -92,7 +92,7 @@ export const cenarios: Cenario[] = [
       'O Consumer aprova cada proposta e publica a apólice. Notificação recebe todas. Capital até 1 milhão vai para cobrança; acima disso, para alto-valor (revisão manual), e não é cobrada agora.',
     campos: ['quantidade'],
     executar: async (v) => {
-      const { propostas } = await chamar<{ propostas: string[] }>('producer', 'POST', '/propostas/lote', {
+      const { propostas } = await chamar<{ propostas: string[] }>('producer', 'POST', '/demo/propostas/lote', {
         quantidade: Number(v.quantidade),
       });
       return `${plural(propostas.length, 'proposta enviada', 'propostas enviadas')} para a fila.`;
@@ -140,7 +140,7 @@ export const cenarios: Cenario[] = [
       'O Consumer registra 1 entrega só e manda para a DLQ com PayloadInvalido. Em "Reprocessar a DLQ", ela fica lá: precisa de correção, não de reenvio.',
     campos: [],
     executar: async () => {
-      const { messageId } = await chamar<{ messageId: string }>('producer', 'POST', '/propostas/invalida');
+      const { messageId } = await chamar<{ messageId: string }>('producer', 'POST', '/demo/propostas/invalida');
       return `Mensagem ${messageId.slice(0, 8)} enviada com corpo inválido.`;
     },
   },
@@ -241,7 +241,7 @@ export const cenarios: Cenario[] = [
       'No Consumer, cada apólice abre sua sessão e aplica v1, v2, v3, v4 nessa ordem. As apólices se intercalam entre si, mas nunca uma versão passa outra da mesma apólice.',
     campos: [],
     executar: async () => {
-      const { apolices } = await chamar<{ apolices: string[] }>('producer', 'POST', '/endossos/em-ordem', {
+      const { apolices } = await chamar<{ apolices: string[] }>('producer', 'POST', '/demo/endossos/em-ordem', {
         apolices: 3,
         versoes: 4,
       });
@@ -258,7 +258,7 @@ export const cenarios: Cenario[] = [
       'O Consumer adia cada versão que chega antes da hora. Quando a que falta chega, aplica e retoma as adiadas em sequência, até a v5.',
     campos: [],
     executar: async () => {
-      const { ordem } = await chamar<{ ordem: number[] }>('producer', 'POST', '/endossos/fora-de-ordem');
+      const { ordem } = await chamar<{ ordem: number[] }>('producer', 'POST', '/demo/endossos/fora-de-ordem');
       return `Enviados na ordem ${ordem.map((v) => `v${v}`).join(', ')}.`;
     },
   },
@@ -271,7 +271,7 @@ export const cenarios: Cenario[] = [
     esperado: 'O Producer registra três envios aceitos; o Consumer aplica só v1 e v2, uma vez cada.',
     campos: [],
     executar: async () => {
-      const { apoliceId } = await chamar<{ apoliceId: string }>('producer', 'POST', '/endossos/duplicado');
+      const { apoliceId } = await chamar<{ apoliceId: string }>('producer', 'POST', '/demo/endossos/duplicado');
       return `Apólice ${apoliceId.slice(0, 8)}: 3 envios, 2 mensagens na fila.`;
     },
   },
@@ -285,7 +285,7 @@ export const cenarios: Cenario[] = [
       'Duas falhas com espera crescente e aprovação na tentativa 3. Compare com "Falha transitória até a DLQ" da fase 1: lá as 5 entregas acabam em segundos.',
     campos: ['idade', 'capitalSegurado', 'plano'],
     executar: async (v) => {
-      const proposta = await chamar<{ propostaId: string }>('producer', 'POST', '/propostas', {
+      const proposta = await chamar<{ propostaId: string }>('producer', 'POST', '/demo/propostas', {
         idade: numeroOuNulo(v.idade),
         capitalSegurado: numeroOuNulo(v.capitalSegurado),
         plano: textoOuNulo(v.plano),
@@ -348,7 +348,7 @@ export const cenarios: Cenario[] = [
       'Três 201. No Producer, o despachante avisa que não publicou e reagenda com espera crescente. O Consumer não recebe nada até "Restabelecer o Service Bus".',
     campos: [],
     executar: async (v) => {
-      await chamar('producer', 'POST', '/outbox/simulacao', { indisponivel: true });
+      await chamar('producer', 'POST', '/demo/outbox/simulacao', { indisponivel: true });
       const codigos: number[] = [];
       for (let i = 0; i < 3; i++) {
         codigos.push((await chamarDetalhado('producer', 'POST', '/api/propostas', novaProposta(v))).status);
@@ -366,7 +366,7 @@ export const cenarios: Cenario[] = [
       'Em até 10 s (o maior backoff), o Producer registra as publicações com o atraso de cada uma, e o Consumer aprova as propostas.',
     campos: [],
     executar: async () => {
-      await chamar('producer', 'POST', '/outbox/simulacao', { indisponivel: false });
+      await chamar('producer', 'POST', '/demo/outbox/simulacao', { indisponivel: false });
       const { pendentes } = await chamar<{ pendentes: number }>('producer', 'GET', '/outbox');
       return `Service Bus de volta. ${plural(pendentes, 'mensagem pendente', 'mensagens pendentes')} para publicar.`;
     },
@@ -381,7 +381,7 @@ export const cenarios: Cenario[] = [
       'O Producer registra a proposta gravada e nunca publicada. O Consumer não recebe nada, e o GET mostra a proposta parada em Recebida.',
     campos: [],
     executar: async () => {
-      const { propostaId } = await chamar<{ propostaId: string }>('producer', 'POST', '/propostas/sem-outbox', {
+      const { propostaId } = await chamar<{ propostaId: string }>('producer', 'POST', '/demo/propostas/sem-outbox', {
         falharAntesDoEnvio: true,
       });
       await esperar(2000);

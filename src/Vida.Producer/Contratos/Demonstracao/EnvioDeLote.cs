@@ -1,7 +1,7 @@
-namespace Vida.Producer.Contratos;
+namespace Vida.Producer.Contratos.Demonstracao;
 
 /// <summary>
-/// Corpo de POST /propostas/lote.
+/// Corpo de POST /demo/propostas/lote.
 /// </summary>
 /// <param name="Quantidade">Número de propostas válidas a enviar.</param>
 public sealed record EnvioDeLote(int Quantidade = 10)

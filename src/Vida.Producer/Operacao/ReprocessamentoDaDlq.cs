@@ -3,7 +3,7 @@ using Vida.Mensageria.Mensagens;
 using Vida.Mensageria.Topologia;
 using Vida.Producer.Contratos;
 
-namespace Vida.Producer.Cenarios;
+namespace Vida.Producer.Operacao;
 
 /// <summary>
 /// Move mensagens da DLQ da fila "propostas" de volta para a fila principal.

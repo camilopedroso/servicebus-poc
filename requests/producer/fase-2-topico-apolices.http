@@ -4,13 +4,13 @@
 @producer = http://localhost:5180
 
 ### Publicar uma ApoliceEmitida direto no tópico (campos sorteados)
-POST {{producer}}/apolices
+POST {{producer}}/demo/apolices
 Content-Type: application/json
 
 {}
 
 ### Capital normal: cobranca + notificacao
-POST {{producer}}/apolices
+POST {{producer}}/demo/apolices
 Content-Type: application/json
 
 {
@@ -19,7 +19,7 @@ Content-Type: application/json
 }
 
 ### Capital > 1.000.000: requerRevisao = true → alto-valor (com prioridade = 'alta' pela action) + notificacao, sem cobranca
-POST {{producer}}/apolices
+POST {{producer}}/demo/apolices
 Content-Type: application/json
 
 {
@@ -28,7 +28,7 @@ Content-Type: application/json
 }
 
 ### Validação: plano inexistente → 400
-POST {{producer}}/apolices
+POST {{producer}}/demo/apolices
 Content-Type: application/json
 
 {

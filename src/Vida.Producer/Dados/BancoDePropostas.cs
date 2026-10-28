@@ -28,7 +28,7 @@ public sealed class BancoDePropostas(DbContextOptions<BancoDePropostas> options)
             proposta.Property(p => p.Plano).HasConversion<string>().HasMaxLength(20);
             proposta.Property(p => p.CapitalSegurado).HasPrecision(18, 2);
             proposta.Property(p => p.Status).HasConversion<string>().HasMaxLength(30);
-            proposta.Property(p => p.ChaveDeIdempotencia).HasMaxLength(100);
+            proposta.Property(p => p.ChaveDeIdempotencia).HasMaxLength(PropostaRegistrada.TamanhoMaximoDaChave);
             // Único só entre quem mandou a chave (filtro): várias propostas sem chave continuam permitidas.
             proposta.HasIndex(p => p.ChaveDeIdempotencia).IsUnique().HasFilter("[ChaveDeIdempotencia] IS NOT NULL");
         });
