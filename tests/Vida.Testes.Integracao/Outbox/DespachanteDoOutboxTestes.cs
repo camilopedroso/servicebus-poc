@@ -121,4 +121,26 @@ public sealed class DespachanteDoOutboxTestes(FabricaDaApi fabrica)
         var (_, linha) = await Ler(id);
         Assert.Null(linha.PublicadaEm);
     }
+
+    [Fact]
+    public async Task Desfecho_que_chega_antes_da_marcacao_nao_e_sobrescrito()
+    {
+        // A recusa é rápida: o evento pode voltar entre o envio do despachante e o UPDATE que marca a proposta.
+        // Simula isso gravando o desfecho antes de rodar o lote.
+        var id = await CriarProposta();
+        await using (var escopo = fabrica.Services.CreateAsyncScope())
+        {
+            var banco = escopo.ServiceProvider.GetRequiredService<BancoDePropostas>();
+            var proposta = await banco.Propostas.SingleAsync(p => p.PropostaId == id, TestContext.Current.CancellationToken);
+            proposta.Status = StatusDaProposta.Recusada;
+            await banco.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+        var despachante = NovoDespachante();
+
+        await despachante.DespacharLoteAsync(TestContext.Current.CancellationToken);
+
+        var (depois, linha) = await Ler(id);
+        Assert.NotNull(linha.PublicadaEm);
+        Assert.Equal(StatusDaProposta.Recusada, depois.Status);
+    }
 }

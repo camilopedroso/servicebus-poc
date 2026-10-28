@@ -23,6 +23,10 @@ const origens: Record<string, Origem> = {
   OutboxController: { rotulo: 'outbox', descricao: 'Operação do outbox: pendentes e publicadas' },
   SimulacaoDoOutboxController: { rotulo: 'outbox', descricao: 'Demonstração: simula o Service Bus fora do ar para o despachante (fase 4)' },
   DespachanteDoOutbox: { rotulo: 'outbox', descricao: 'Despachante: publica no Service Bus o que a API gravou (fase 4)' },
+  ProcessadorDeDesfechos: {
+    rotulo: 'desfecho',
+    descricao: 'Assinaturas status-aprovada e status-recusada: grava Aprovada ou Recusada na proposta da API',
+  },
   MigracaoDoBanco: { rotulo: 'banco', descricao: 'Migrations do EF Core na partida' },
   // Consumer
   Worker: { rotulo: 'propostas', descricao: 'Fila propostas: análise, emissão da apólice ou recusa' },

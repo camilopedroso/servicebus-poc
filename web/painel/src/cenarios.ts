@@ -63,7 +63,20 @@ const publicarApolice = async (v: Valores) => {
 interface PropostaDaApi {
   propostaId: string;
   status: string;
+  apoliceId: string | null;
+  motivoDaRecusa: string | null;
 }
+
+/** Status do GET com o detalhe do desfecho, quando já houver. */
+const descreverStatus = (p: PropostaDaApi) => {
+  if (p.apoliceId) {
+    return `${p.status} (apólice ${p.apoliceId.slice(0, 8)})`;
+  }
+  if (p.motivoDaRecusa) {
+    return `${p.status} (${p.motivoDaRecusa})`;
+  }
+  return p.status;
+};
 
 /** Corpo do POST /api/propostas: a API exige todos os campos, então o painel sorteia os que ficarem vazios. */
 const novaProposta = (v: Valores) => ({
@@ -302,7 +315,7 @@ export const cenarios: Cenario[] = [
     mostra:
       'POST /api/propostas grava a proposta e a mensagem do outbox numa única transação do SQL Server e responde 201 sem falar com o Service Bus. O despachante publica em seguida.',
     esperado:
-      'Producer: "gravada com a mensagem no outbox", depois "Outbox: mensagem publicada" com o atraso em ms. O Consumer aprova como sempre. O GET 2 s depois mostra EnviadaParaAnalise.',
+      'Producer: "gravada com a mensagem no outbox", depois "Outbox: mensagem publicada" com o atraso em ms. O Consumer aprova como sempre, e o Producer recebe a apólice de volta ("Desfecho: ... aprovada"). O GET 3 s depois mostra Aprovada.',
     campos: ['idade', 'capitalSegurado', 'plano'],
     executar: async (v) => {
       const { status, cabecalhos, dados } = await chamarDetalhado<PropostaDaApi>(
@@ -311,9 +324,26 @@ export const cenarios: Cenario[] = [
         '/api/propostas',
         novaProposta(v),
       );
-      await esperar(2000);
+      await esperar(3000);
       const depois = await consultarProposta(dados.propostaId);
-      return `${status} Created, Location: ${cabecalhos.get('Location')}. Status logo após o POST: ${dados.status}; 2 s depois: ${depois.status}.`;
+      return `${status} Created, Location: ${cabecalhos.get('Location')}. Status logo após o POST: ${dados.status}; 3 s depois: ${descreverStatus(depois)}.`;
+    },
+  },
+  {
+    id: 'api-recusada',
+    fase: 4,
+    titulo: 'Proposta recusada pela API REST (desfecho de volta)',
+    mostra:
+      'A API aceita a proposta (201: dado válido) e quem recusa é a subscrição, depois. O evento PropostaRecusada volta para o Producer pela assinatura status-recusada, e o GET passa a mostrar a recusa.',
+    esperado:
+      'Consumer: recusada por idade. Assinantes: notificacao-recusa avisa o cliente. Producer: "Desfecho: ... recusada". O GET 3 s depois mostra Recusada com o motivo.',
+    campos: ['idade', 'capitalSegurado', 'plano'],
+    padroes: { idade: '93' },
+    executar: async (v) => {
+      const { status, dados } = await chamarDetalhado<PropostaDaApi>('producer', 'POST', '/api/propostas', novaProposta(v));
+      await esperar(3000);
+      const depois = await consultarProposta(dados.propostaId);
+      return `POST: ${status}. 3 s depois: ${descreverStatus(depois)}.`;
     },
   },
   {

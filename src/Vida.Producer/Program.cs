@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Vida.Producer.Cenarios;
 using Vida.Producer.Operacao;
 using Vida.Producer.Dados;
+using Vida.Producer.Desfechos;
 using Vida.Producer.Erros;
 using Vida.Producer.Outbox;
 
@@ -18,12 +19,13 @@ using Vida.Producer.Outbox;
 //
 // Prontos para produção (contrato em /openapi/v1.json):
 //   POST /api/propostas                     grava proposta + outbox numa transação → 201 Created (Idempotency-Key opcional)
-//   GET  /api/propostas/{id}                status: Recebida (no outbox) ou EnviadaParaAnalise (publicada)
+//   GET  /api/propostas/{id}                status: Recebida (no outbox), EnviadaParaAnalise (publicada), Aprovada ou Recusada
 //   GET  /filas/propostas/mensagens?dlq=    peek na fila (ou na DLQ, com o motivo)
 //   POST /filas/propostas/dlq/reprocessar   devolve a DLQ para a fila (payload inválido fica na DLQ)
 //   GET  /assinaturas/{nome}/mensagens?dlq= peek em uma assinatura (ou na DLQ dela)
 //   GET  /assinaturas/regras                lista as regras (filtros/actions) de cada assinatura
 //   GET  /outbox                            pendentes e publicadas
+//   (sem endpoint) assinaturas status-aprovada e status-recusada: o desfecho da subscrição vira Aprovada/Recusada no GET
 //
 // Demonstração (Controllers/Demonstracao, contrato em /openapi/demo.json): geram dados de teste
 // (campos nulos são sorteados) ou simulam falhas, para rodar os cenários do painel.
@@ -70,6 +72,12 @@ builder.Services.AddDbContext<BancoDePropostas>(opcoes =>
 builder.Services.AddHostedService<MigracaoDoBanco>();
 builder.Services.AddSingleton<SimulacaoDeIndisponibilidade>();
 builder.Services.AddHostedService<DespachanteDoOutbox>();
+// Desfecho da subscrição de volta para a API (Aprovada/Recusada). Sem SQL não há onde gravar: sem o processor,
+// os eventos ficam guardados nas assinaturas (TTL de 14 dias) em vez de falhar 5 vezes e ir para a DLQ.
+if (conexaoSql is not null)
+{
+    builder.Services.AddHostedService<ProcessadorDeDesfechos>();
+}
 
 var fqdn = ServiceBusClientFactory.ObterNamespace(builder.Configuration);
 

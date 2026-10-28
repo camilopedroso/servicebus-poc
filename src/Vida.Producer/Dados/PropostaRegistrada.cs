@@ -25,6 +25,15 @@ public sealed class PropostaRegistrada
     /// <summary>Quando o despachante do outbox publicou a mensagem (null enquanto não publicou).</summary>
     public DateTimeOffset? EnviadaEm { get; set; }
 
+    /// <summary>Quando a subscrição decidiu (aprovou ou recusou); null enquanto a análise não terminou.</summary>
+    public DateTimeOffset? DecididaEm { get; set; }
+
+    /// <summary>Apólice emitida, se a proposta foi aprovada.</summary>
+    public Guid? ApoliceId { get; set; }
+
+    /// <summary>Explicação da recusa para o cliente, se a proposta foi recusada.</summary>
+    public string? MotivoDaRecusa { get; set; }
+
     /// <summary>
     /// Valor do cabeçalho Idempotency-Key do POST, se o cliente mandou. Índice único: o mesmo POST repetido
     /// (timeout, retry do cliente) devolve a proposta já criada em vez de criar outra.

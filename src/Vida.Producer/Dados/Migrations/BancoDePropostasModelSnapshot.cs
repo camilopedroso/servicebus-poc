@@ -29,6 +29,9 @@ namespace Vida.Producer.Dados.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("ApoliceId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<decimal>("CapitalSegurado")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
@@ -42,11 +45,18 @@ namespace Vida.Producer.Dados.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<DateTimeOffset?>("DecididaEm")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<DateTimeOffset?>("EnviadaEm")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<int>("Idade")
                         .HasColumnType("int");
+
+                    b.Property<string>("MotivoDaRecusa")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("Plano")
                         .IsRequired()

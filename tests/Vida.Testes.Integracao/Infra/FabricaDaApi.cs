@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Hosting;
 using Testcontainers.MsSql;
+using Vida.Producer.Desfechos;
 using Vida.Producer.Outbox;
 
 namespace Vida.Testes.Integracao.Infra;
@@ -57,6 +58,11 @@ public sealed class FabricaDaApi : WebApplicationFactory<Program>, IAsyncLifetim
             var despachante = servicos.Single(s =>
                 s.ServiceType == typeof(IHostedService) && s.ImplementationType == typeof(DespachanteDoOutbox));
             servicos.Remove(despachante);
+            // O processor de desfechos tentaria conectar no namespace fictício; os testes aplicam os eventos
+            // direto pelo RegistroDeDesfechos.
+            var desfechos = servicos.Single(s =>
+                s.ServiceType == typeof(IHostedService) && s.ImplementationType == typeof(ProcessadorDeDesfechos));
+            servicos.Remove(desfechos);
         });
     }
 

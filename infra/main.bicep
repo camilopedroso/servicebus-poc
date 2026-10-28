@@ -164,6 +164,21 @@ resource notificacaoRecusa 'Microsoft.ServiceBus/namespaces/topics/subscriptions
   properties: propriedadesAssinatura
 }
 
+// Assinaturas do Vida.Producer: o desfecho da subscrição volta para a API, que atualiza o status da proposta
+// (Aprovada ou Recusada). Sem filtro: eventos de propostas que não vieram da API (demonstração) são descartados
+// pelo Producer, que não as encontra no banco. Uma assinatura por consumidor: cada um recebe a sua cópia.
+resource statusAprovada 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
+  parent: apoliceEmitida
+  name: 'status-aprovada'
+  properties: propriedadesAssinatura
+}
+
+resource statusRecusada 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
+  parent: propostaRecusada
+  name: 'status-recusada'
+  properties: propriedadesAssinatura
+}
+
 // Atribuição de função para o desenvolvedor como Data Owner no namespace Service Bus.
 resource developerDataOwner 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(namespace.id, developerPrincipalId, serviceBusDataOwnerRoleId)

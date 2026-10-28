@@ -147,10 +147,14 @@ public sealed class DespachanteDoOutbox(
         if (propostas.Count > 0)
         {
             var enviadas = banco.Propostas.Where(p => propostas.Contains(p.PropostaId));
+            // Só sai de Recebida: o desfecho (Aprovada/Recusada) pode chegar entre o envio acima e este UPDATE,
+            // porque a recusa é rápida, e não pode ser sobrescrito por um status anterior.
             await enviadas.ExecuteUpdateAsync(
                 colunas =>
                 {
-                    colunas.SetProperty(p => p.Status, StatusDaProposta.EnviadaParaAnalise);
+                    colunas.SetProperty(
+                        p => p.Status,
+                        p => p.Status == StatusDaProposta.Recebida ? StatusDaProposta.EnviadaParaAnalise : p.Status);
                     colunas.SetProperty(p => p.EnviadaEm, agora);
                 },
                 cancellationToken);

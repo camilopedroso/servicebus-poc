@@ -82,8 +82,9 @@ Capture do SQL Server, ou bibliotecas que já trazem o outbox (MassTransit, NSer
 | Endpoint | Resposta |
 |---|---|
 | `POST /api/propostas` | `201 Created` + `Location: /api/propostas/{id}`; `400` com erros por campo (ProblemDetails); `200` se a `Idempotency-Key` já foi usada |
-| `GET /api/propostas/{id}` | `200` com `status` (`Recebida` → `EnviadaParaAnalise`); `404` ProblemDetails |
+| `GET /api/propostas/{id}` | `200` com `status` (`Recebida` → `EnviadaParaAnalise` → `Aprovada` ou `Recusada`), `apoliceId` ou `motivoDaRecusa`; `404` ProblemDetails |
 | `/openapi/v1.json` | Contrato OpenAPI gerado pelo ASP.NET Core |
+| `/openapi/demo.json` | Contrato dos endpoints de demonstração (`/demo/...`), separado do v1 |
 
 ### Idempotency-Key
 O cliente que não recebeu a resposta (timeout) não sabe se a proposta foi criada. Com o cabeçalho
@@ -102,6 +103,27 @@ O cliente que não recebeu a resposta (timeout) não sabe se a proposta foi cria
 A API **criou** o recurso (está no banco e pode ser consultado no `Location`); o que é assíncrono é a análise.
 `202 Accepted` seria mais adequado se nada fosse gravado antes de responder. Os dois são defensáveis; o importante é
 ter o `Location` para o cliente acompanhar o status.
+
+### O desfecho volta por eventos
+A API responde 201 para uma proposta de 93 anos: o dado é válido, e recusar por idade é decisão da subscrição
+(análise de risco), não validação de formato. A decisão acontece depois, no `Vida.Consumer`, que publica
+`ApoliceEmitida` ou `PropostaRecusada`. O Consumer não conhece o banco da API, e nem deve: o dono do dado é o
+Producer.
+
+Por isso o Producer é mais um assinante dos dois tópicos, com assinaturas próprias (`status-aprovada` e
+`status-recusada`, sem filtro). O `ProcessadorDeDesfechos` grava `Aprovada` (com a apólice) ou `Recusada` (com o
+motivo), e o `GET` passa a contar a história completa. Detalhes:
+
+- **Evento repetido** (at-least-once): se a proposta já tem desfecho, a mensagem só é concluída.
+- **Proposta desconhecida**: os endpoints de demonstração mandam direto para a fila, sem gravar no banco. O evento
+  volta, o Producer não acha a proposta e conclui a mensagem sem fazer nada.
+- **Corrida com o despachante**: a recusa é rápida, e o evento pode voltar entre o envio e o UPDATE que marca
+  `EnviadaParaAnalise`. O UPDATE só tira a proposta de `Recebida`, então não sobrescreve o desfecho.
+- Sem SQL configurado o processor nem sobe: os eventos ficam guardados nas assinaturas (TTL de 14 dias) em vez de
+  falhar até a DLQ.
+
+No Kafka seria o mesmo desenho: um consumer group a mais nos tópicos de resultado. No RabbitMQ, uma fila a mais
+ligada ao exchange.
 
 ## Decisões da POC
 

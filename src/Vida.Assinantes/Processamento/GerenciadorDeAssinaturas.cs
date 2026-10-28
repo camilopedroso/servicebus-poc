@@ -24,13 +24,13 @@ public sealed class GerenciadorDeAssinaturas : BackgroundService
     public GerenciadorDeAssinaturas(string[] iniciais, ServiceBusClient client, ILogger<ProcessadorDeAssinatura> logger)
     {
         _iniciais = iniciais;
-        _processadores = Assinaturas.Todas.ToDictionary(
+        _processadores = Assinaturas.DoAssinantes.ToDictionary(
             nome => nome,
             nome => new ProcessadorDeAssinatura(nome, client, logger));
     }
 
-    /// <summary>Processadores na ordem de Assinaturas.Todas.</summary>
-    public IEnumerable<ProcessadorDeAssinatura> Processadores => Assinaturas.Todas.Select(nome => _processadores[nome]);
+    /// <summary>Processadores na ordem de Assinaturas.DoAssinantes.</summary>
+    public IEnumerable<ProcessadorDeAssinatura> Processadores => Assinaturas.DoAssinantes.Select(nome => _processadores[nome]);
 
     /// <summary>
     /// Liga uma assinatura.

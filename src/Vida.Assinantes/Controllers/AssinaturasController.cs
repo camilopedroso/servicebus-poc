@@ -41,7 +41,7 @@ public sealed class AssinaturasController(GerenciadorDeAssinaturas gerenciador, 
     [HttpPost("{nome}/iniciar")]
     public async Task<IActionResult> IniciarAsync(string nome, CancellationToken cancellationToken)
     {
-        var assinatura = Assinaturas.Interpretar(nome);
+        var assinatura = Assinaturas.Interpretar(nome, Assinaturas.DoAssinantes);
         if (assinatura is null)
         {
             return AssinaturaDesconhecida(nome);
@@ -56,7 +56,7 @@ public sealed class AssinaturasController(GerenciadorDeAssinaturas gerenciador, 
     [HttpPost("{nome}/parar")]
     public async Task<IActionResult> PararAsync(string nome, CancellationToken cancellationToken)
     {
-        var assinatura = Assinaturas.Interpretar(nome);
+        var assinatura = Assinaturas.Interpretar(nome, Assinaturas.DoAssinantes);
         if (assinatura is null)
         {
             return AssinaturaDesconhecida(nome);
@@ -101,7 +101,7 @@ public sealed class AssinaturasController(GerenciadorDeAssinaturas gerenciador, 
 
     private ObjectResult AssinaturaDesconhecida(string nome)
     {
-        var validas = string.Join(", ", Assinaturas.Todas);
+        var validas = string.Join(", ", Assinaturas.DoAssinantes);
         return Problem(
             statusCode: StatusCodes.Status400BadRequest,
             title: "Assinatura desconhecida",

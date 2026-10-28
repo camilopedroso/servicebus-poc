@@ -16,7 +16,7 @@ var escolhidas = new List<string>();
 var desconhecidas = new List<string>();
 foreach (var nome in nomesInformados)
 {
-    var assinatura = Assinaturas.Interpretar(nome);
+    var assinatura = Assinaturas.Interpretar(nome, Assinaturas.DoAssinantes);
     if (assinatura is null)
     {
         desconhecidas.Add(nome);
@@ -26,11 +26,11 @@ foreach (var nome in nomesInformados)
         escolhidas.Add(assinatura);
     }
 }
-var assinaturas = escolhidas.Count > 0 ? [.. escolhidas] : Assinaturas.Todas;
+var assinaturas = escolhidas.Count > 0 ? [.. escolhidas] : Assinaturas.DoAssinantes;
 if (desconhecidas.Count > 0)
 {
     var listaDeDesconhecidas = string.Join(", ", desconhecidas);
-    var listaDeValidas = string.Join(", ", Assinaturas.Todas);
+    var listaDeValidas = string.Join(", ", Assinaturas.DoAssinantes);
     Console.Error.WriteLine($"Assinatura(s) desconhecida(s): {listaDeDesconhecidas}. Válidas: {listaDeValidas}.");
     return 1;
 }
