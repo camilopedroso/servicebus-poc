@@ -1,3 +1,5 @@
+using Vida.Mensageria.Dominio;
+
 namespace Vida.Mensageria.Contratos;
 
 /// <summary>
@@ -16,7 +18,7 @@ public sealed record ApoliceEmitida(
     Guid ApoliceId,
     Guid PropostaId,
     string ClienteId,
-    string Plano,
+    Plano Plano,
     decimal CapitalSegurado,
     decimal PremioMensal,
     DateTimeOffset EmitidaEm,

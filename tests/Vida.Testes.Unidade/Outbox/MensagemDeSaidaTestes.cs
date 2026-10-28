@@ -1,3 +1,4 @@
+using Vida.Mensageria.Dominio;
 using System.Diagnostics;
 using Vida.Mensageria.Contratos;
 using Vida.Mensageria.Mensagens;
@@ -9,7 +10,7 @@ namespace Vida.Testes.Unidade.Outbox;
 public class MensagemDeSaidaTestes
 {
     private static readonly PropostaSeguroVida Proposta =
-        new(Guid.NewGuid(), "CLI-1", 40, 300_000m, "Familiar", DateTimeOffset.UtcNow);
+        new(Guid.NewGuid(), "CLI-1", 40, 300_000m, Plano.Familiar, DateTimeOffset.UtcNow);
 
     [Fact]
     public void Ida_e_volta_preserva_ids_corpo_e_tipos_das_propriedades()

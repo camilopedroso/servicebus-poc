@@ -141,7 +141,7 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
         // "custom dimensions" no App Insights: dá para buscar o trace de uma proposta pelo id.
         using var atividade = FonteDeAtividades.Fonte.StartActivity("AnalisarProposta");
         atividade?.SetTag("vida.proposta.id", proposta.PropostaId);
-        atividade?.SetTag("vida.proposta.plano", proposta.Plano);
+        atividade?.SetTag("vida.proposta.plano", proposta.Plano.ToString());
 
         // 3) Regra de negócio violada: a proposta FOI analisada, e o resultado é "recusada". Não é falha,
         //    então não vai para a DLQ (lá ninguém avisaria o cliente, e reprocessar daria a mesma recusa).

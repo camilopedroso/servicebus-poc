@@ -28,7 +28,7 @@ public sealed class PublicacaoDeApolices(ServiceBusClient client, ILogger<Public
     {
         var capitalSegurado = parametros.CapitalSegurado ?? Random.Shared.Next(50, 2000) * 1_000m;
         var numeroDoCliente = Random.Shared.Next(1000, 9999);
-        var plano = parametros.Plano ?? Planos.Sortear();
+        var plano = Planos.Interpretar(parametros.Plano) ?? Planos.Sortear();
         var premioMensal = CalculadoraDePremio.CalcularMensal(capitalSegurado, idade: 40);
         var requerRevisao = PoliticaDeRevisao.RequerRevisao(capitalSegurado);
         var apolice = new ApoliceEmitida(

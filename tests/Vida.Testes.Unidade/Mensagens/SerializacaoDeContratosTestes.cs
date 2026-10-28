@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Vida.Mensageria.Contratos;
+using Vida.Mensageria.Dominio;
 using Vida.Mensageria.Mensagens;
 
 namespace Vida.Testes.Unidade.Mensagens;
@@ -27,7 +28,7 @@ public class SerializacaoDeContratosTestes
     [Fact]
     public void Corpo_valido_e_lido()
     {
-        var original = new PropostaSeguroVida(Guid.NewGuid(), "CLI-1", 30, 100_000m, "Familiar", DateTimeOffset.UtcNow);
+        var original = new PropostaSeguroVida(Guid.NewGuid(), "CLI-1", 30, 100_000m, Plano.Familiar, DateTimeOffset.UtcNow);
 
         var corpo = BinaryData.FromObjectAsJson(original);
         var json = corpo.ToString();

@@ -1,3 +1,5 @@
+using Vida.Mensageria.Dominio;
+
 namespace Vida.Producer.Dados;
 
 /// <summary>
@@ -14,7 +16,7 @@ public sealed class PropostaRegistrada
 
     public decimal CapitalSegurado { get; set; }
 
-    public required string Plano { get; set; }
+    public required Plano Plano { get; set; }
 
     public StatusDaProposta Status { get; set; }
 

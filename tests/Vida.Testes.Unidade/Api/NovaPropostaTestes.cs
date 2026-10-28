@@ -38,6 +38,16 @@ public class NovaPropostaTestes
     }
 
     [Fact]
+    public void Plano_em_minusculas_e_valido()
+    {
+        var corpo = new NovaProposta("CLI-1", 40, 1m, "familiar");
+
+        var erros = corpo.Validar();
+
+        Assert.Empty(erros);
+    }
+
+    [Fact]
     public void Plano_desconhecido_e_invalido()
     {
         var corpo = new NovaProposta("CLI-1", 40, 1m, "Ouro");

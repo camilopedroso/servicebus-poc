@@ -1,3 +1,5 @@
+using Vida.Mensageria.Dominio;
+
 namespace Vida.Mensageria.Contratos;
 
 /// <summary>
@@ -14,7 +16,7 @@ namespace Vida.Mensageria.Contratos;
 public sealed record PropostaRecusada(
     Guid PropostaId,
     string ClienteId,
-    string Plano,
+    Plano Plano,
     decimal CapitalSegurado,
     int Idade,
     string Motivo,

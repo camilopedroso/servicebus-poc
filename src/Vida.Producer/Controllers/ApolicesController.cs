@@ -6,7 +6,7 @@ using Vida.Producer.Contratos;
 namespace Vida.Producer.Controllers;
 
 /// <summary>
-/// Fase 2: publica uma ApoliceEmitida direto no tópico "apolice-emitida", sem passar pela fila.
+/// Ppublica uma ApoliceEmitida direto no tópico "apolice-emitida", sem passar pela fila.
 /// </summary>
 /// <param name="publicacao">Publicação no tópico.</param>
 [ApiController]

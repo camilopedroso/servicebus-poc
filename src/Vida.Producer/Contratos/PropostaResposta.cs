@@ -1,3 +1,4 @@
+using Vida.Mensageria.Dominio;
 using Vida.Producer.Dados;
 
 namespace Vida.Producer.Contratos;
@@ -18,7 +19,7 @@ public sealed record PropostaResposta(
     string ClienteId,
     int Idade,
     decimal CapitalSegurado,
-    string Plano,
+    Plano Plano,
     string Status,
     DateTimeOffset RecebidaEm,
     DateTimeOffset? EnviadaEm)

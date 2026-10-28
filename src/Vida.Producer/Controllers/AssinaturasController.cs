@@ -6,7 +6,7 @@ using Vida.Producer.Contratos;
 namespace Vida.Producer.Controllers;
 
 /// <summary>
-/// Ferramentas de operação das assinaturas (fase 2): regras e peek.
+/// Ferramentas de operação das assinaturas: regras e peek.
 /// </summary>
 /// <param name="inspecao">Peek e leitura das regras.</param>
 [ApiController]

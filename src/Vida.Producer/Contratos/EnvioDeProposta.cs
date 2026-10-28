@@ -5,13 +5,29 @@ namespace Vida.Producer.Contratos;
 /// <summary>
 /// Corpo de POST /propostas. Campos nulos são sorteados.
 /// </summary>
-/// <param name="Idade">Idade do proponente. Acima de 80 o consumer recusa e publica PropostaRecusada.</param>
-/// <param name="CapitalSegurado">Capital segurado em reais. Acima de 1.000.000 a apólice cai na assinatura alto-valor.</param>
+/// <param name="Idade">
+///     Idade do proponente. Acima de 80 o consumer recusa e publica 
+///     PropostaRecusada.
+/// </param>
+/// <param name="CapitalSegurado">
+///     Capital segurado em reais. 
+///     Acima de 1.000.000 a apólice cai na assinatura alto-valor.
+/// </param>
 /// <param name="Plano">Individual, Familiar ou Empresarial.</param>
-/// <param name="SimularFalha">Se true, o consumer abandona até maxDeliveryCount e o broker manda para a DLQ.</param>
-/// <param name="RetryComBackoff">Com SimularFalha, o consumer agenda novas tentativas com espera crescente em vez de abandonar.</param>
+/// <param name="SimularFalha">
+///     Se true, o consumer abandona até maxDeliveryCount e o broker manda 
+///     para a DLQ.
+/// </param>
+/// <param name="RetryComBackoff">
+///     Com SimularFalha, o consumer agenda novas tentativas com espera 
+///     crescente em vez de abandonar.
+/// </param>
 public sealed record EnvioDeProposta(
-    int? Idade, decimal? CapitalSegurado, string? Plano, bool SimularFalha, bool RetryComBackoff = false)
+    int? Idade,
+    decimal? CapitalSegurado,
+    string? Plano,
+    bool SimularFalha,
+    bool RetryComBackoff = false)
 {
     /// <summary>Erros de validação por campo; vazio se o corpo for válido.</summary>
     public Dictionary<string, string[]> Validar()
@@ -25,7 +41,7 @@ public sealed record EnvioDeProposta(
         {
             erros[nameof(CapitalSegurado)] = ["O capital segurado precisa ser maior que zero."];
         }
-        if (Plano is not null && !Planos.Todos.Contains(Plano))
+        if (Plano is not null && Planos.Interpretar(Plano) is null)
         {
             erros[nameof(Plano)] = [$"Planos válidos: {string.Join(", ", Planos.Todos)}."];
         }

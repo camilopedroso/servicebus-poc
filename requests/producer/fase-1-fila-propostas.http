@@ -1,23 +1,25 @@
-# Fase 1: envio direto para a fila "propostas" (Vida.Producer → Vida.Consumer).
-# Acompanhe o resultado na coluna do Consumer do painel ou em GET /logs (requests/logs-e-namespace.http).
+# Envio direto para a fila "propostas" (Vida.Producer → Vida.Consumer).
+# Acompanhe o resultado na coluna do Consumer do painel ou em GET /logs 
+# (requests/logs-e-namespace.http).
 
 @producer = http://localhost:5180
 
-### Lote de propostas válidas (envio em lote, um ServiceBusMessageBatch)
-POST {{producer}}/propostas/lote
-Content-Type: application/json
+# ### Lote de propostas válidas (envio em lote, um ServiceBusMessageBatch)
+# POST {{producer}}/propostas/lote
+# Content-Type: application/json
 
-{
-  "quantidade": 5
-}
+# {
+#   "quantidade": 5
+# }
 
-### Uma proposta com todos os campos sorteados
-POST {{producer}}/propostas
-Content-Type: application/json
+# ### Uma proposta com todos os campos sorteados
+# POST {{producer}}/propostas
+# Content-Type: application/json
 
-{}
+# {}
 
 ### Proposta escolhida: Familiar, capital alto (a apólice cai também na assinatura alto-valor)
+# envia direto pro PropostasController.cs. Não passa pela Outbox.
 POST {{producer}}/propostas
 Content-Type: application/json
 
@@ -27,29 +29,29 @@ Content-Type: application/json
   "plano": "Familiar"
 }
 
-### Idade > 80: o consumer completa e publica PropostaRecusada no tópico proposta-recusada (não vai para a DLQ)
-POST {{producer}}/propostas
-Content-Type: application/json
+# ### Idade > 80: o consumer completa e publica PropostaRecusada no tópico proposta-recusada (não vai para a DLQ)
+# POST {{producer}}/propostas
+# Content-Type: application/json
 
-{
-  "idade": 85
-}
+# {
+#   "idade": 85
+# }
 
-### Falha simulada: Abandon a cada entrega, sem backoff → DLQ com MaxDeliveryCountExceeded após 5 entregas
-POST {{producer}}/propostas
-Content-Type: application/json
+# ### Falha simulada: Abandon a cada entrega, sem backoff → DLQ com MaxDeliveryCountExceeded após 5 entregas
+# POST {{producer}}/propostas
+# Content-Type: application/json
 
-{
-  "simularFalha": true
-}
+# {
+#   "simularFalha": true
+# }
 
-### Falha irrecuperável: corpo ilegível → DLQ na primeira entrega (PayloadInvalido)
-POST {{producer}}/propostas/invalida
+# ### Falha irrecuperável: corpo ilegível → DLQ na primeira entrega (PayloadInvalido)
+# POST {{producer}}/propostas/invalida
 
-### Validação: 400 com ValidationProblemDetails, nada é enviado
-POST {{producer}}/propostas/lote
-Content-Type: application/json
+# ### Validação: 400 com ValidationProblemDetails, nada é enviado
+# POST {{producer}}/propostas/lote
+# Content-Type: application/json
 
-{
-  "quantidade": 0
-}
+# {
+#   "quantidade": 0
+# }

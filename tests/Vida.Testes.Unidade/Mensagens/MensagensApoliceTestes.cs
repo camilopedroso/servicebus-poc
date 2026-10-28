@@ -1,4 +1,5 @@
 using Vida.Mensageria.Contratos;
+using Vida.Mensageria.Dominio;
 using Vida.Mensageria.Mensagens;
 
 namespace Vida.Testes.Unidade.Mensagens;
@@ -10,7 +11,7 @@ namespace Vida.Testes.Unidade.Mensagens;
 public class MensagensApoliceTestes
 {
     private static ApoliceEmitida Apolice(decimal capital, bool revisao) =>
-        new(Guid.NewGuid(), Guid.NewGuid(), "CLI-1", "Familiar", capital, 100m, DateTimeOffset.UtcNow, revisao);
+        new(Guid.NewGuid(), Guid.NewGuid(), "CLI-1", Plano.Familiar, capital, 100m, DateTimeOffset.UtcNow, revisao);
 
     [Fact]
     public void Propriedades_de_roteamento_tem_o_tipo_que_o_filtro_espera()

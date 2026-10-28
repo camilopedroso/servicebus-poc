@@ -32,12 +32,12 @@ public sealed class EnvioDePropostas(ServiceBusClient client, ILogger<EnvioDePro
         var enviadas = new List<Guid>(quantidade);
         while (enviadas.Count < quantidade)
         {
-            using var lote = await _sender.CreateMessageBatchAsync(cancellationToken);
+            using ServiceBusMessageBatch lote = await _sender.CreateMessageBatchAsync(cancellationToken);
             var noLote = new List<PropostaSeguroVida>();
             while (enviadas.Count + noLote.Count < quantidade)
             {
-                var proposta = NovaProposta();
-                var mensagem = MensagensProposta.Criar(proposta);
+                PropostaSeguroVida proposta = NovaProposta();
+                ServiceBusMessage mensagem = MensagensProposta.Criar(proposta);
                 if (!lote.TryAddMessage(mensagem))
                 {
                     break;
@@ -46,9 +46,9 @@ public sealed class EnvioDePropostas(ServiceBusClient client, ILogger<EnvioDePro
             }
             await _sender.SendMessagesAsync(lote, cancellationToken);
             logger.LogInformation("Lote enviado com {Quantidade} mensagem(ns).", lote.Count);
-            foreach (var proposta in noLote)
+            foreach (PropostaSeguroVida proposta in noLote)
             {
-                var capital = proposta.CapitalSegurado.ToString("C0", PtBr);
+                string capital = proposta.CapitalSegurado.ToString("C0", PtBr);
                 logger.LogInformation(
                     "  proposta {PropostaId}: {Plano}, idade {Idade}, capital {Capital}.",
                     proposta.PropostaId, proposta.Plano, proposta.Idade, capital);
@@ -65,16 +65,33 @@ public sealed class EnvioDePropostas(ServiceBusClient client, ILogger<EnvioDePro
     /// <param name="parametros">Idade, capital, plano e falha simulada; campos nulos são sorteados.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <returns>A proposta enviada.</returns>
-    public async Task<PropostaSeguroVida> EnviarUmaAsync(EnvioDeProposta parametros, CancellationToken cancellationToken)
+    public async Task<PropostaSeguroVida> EnviarUmaAsync(
+        EnvioDeProposta parametros,
+        CancellationToken cancellationToken)
     {
-        var proposta = NovaProposta(parametros.Idade, parametros.CapitalSegurado, parametros.Plano);
-        var mensagem = MensagensProposta.Criar(proposta, parametros.SimularFalha, parametros.RetryComBackoff);
+        PropostaSeguroVida proposta = NovaProposta(
+            idade: parametros.Idade,
+            capital: parametros.CapitalSegurado,
+            plano: Planos.Interpretar(parametros.Plano));
+
+        ServiceBusMessage mensagem = MensagensProposta.Criar(
+            proposta: proposta,
+            simularFalha: parametros.SimularFalha,
+            retryComBackoff: parametros.RetryComBackoff);
+
         await _sender.SendMessageAsync(mensagem, cancellationToken);
-        var capital = proposta.CapitalSegurado.ToString("C0", PtBr);
+
+        string capital = proposta.CapitalSegurado.ToString("C0", PtBr);
+
         logger.LogInformation(
             "Enviada proposta {PropostaId} ({Plano}, idade {Idade}, capital {Capital}, simularFalha={SimularFalha}, retryComBackoff={RetryComBackoff}).",
-            proposta.PropostaId, proposta.Plano, proposta.Idade, capital,
-            parametros.SimularFalha, parametros.RetryComBackoff);
+            proposta.PropostaId,
+            proposta.Plano,
+            proposta.Idade,
+            capital,
+            parametros.SimularFalha,
+            parametros.RetryComBackoff);
+
         return proposta;
     }
 
@@ -87,10 +104,10 @@ public sealed class EnvioDePropostas(ServiceBusClient client, ILogger<EnvioDePro
     public async Task<string> EnviarInvalidaAsync(CancellationToken cancellationToken)
     {
         var propostaId = Guid.NewGuid();
-        var messageId = propostaId.ToString();
-        var numeroDoCliente = Random.Shared.Next(1000, 9999);
-        var plano = Planos.Sortear();
-        var corpo = $$"""
+        string messageId = propostaId.ToString();
+        int numeroDoCliente = Random.Shared.Next(1000, 9999);
+        Plano plano = Planos.Sortear();
+        string corpo = $$"""
             {"PropostaId":"{{messageId}}","ClienteId":"CLI-{{numeroDoCliente}}","Idade":"trinta e dois","CapitalSegurado":500000,"Plano":"{{plano}}","CriadaEm":"{{DateTimeOffset.UtcNow:O}}"}
             """;
         var bytes = BinaryData.FromString(corpo);
@@ -113,7 +130,10 @@ public sealed class EnvioDePropostas(ServiceBusClient client, ILogger<EnvioDePro
     /// <param name="capital">Capital segurado (opcional; se não informado, será gerado aleatoriamente).</param>
     /// <param name="plano">Plano (opcional; se não informado, será sorteado).</param>
     /// <returns>Nova instância de PropostaSeguroVida.</returns>
-    private static PropostaSeguroVida NovaProposta(int? idade = null, decimal? capital = null, string? plano = null) => new(
+    private static PropostaSeguroVida NovaProposta(
+        int? idade = null,
+        decimal? capital = null,
+        Plano? plano = null) => new(
         PropostaId: Guid.NewGuid(),
         ClienteId: $"CLI-{Random.Shared.Next(1000, 9999)}",
         Idade: idade ?? Random.Shared.Next(18, 70),

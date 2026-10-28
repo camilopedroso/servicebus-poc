@@ -17,7 +17,7 @@ public sealed record PublicacaoDeApolice(decimal? CapitalSegurado, string? Plano
         {
             erros[nameof(CapitalSegurado)] = ["O capital segurado precisa ser maior que zero."];
         }
-        if (Plano is not null && !Planos.Todos.Contains(Plano))
+        if (Plano is not null && Planos.Interpretar(Plano) is null)
         {
             erros[nameof(Plano)] = [$"Planos válidos: {string.Join(", ", Planos.Todos)}."];
         }

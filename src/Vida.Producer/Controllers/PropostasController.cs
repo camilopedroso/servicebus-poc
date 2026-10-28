@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Vida.Mensageria.Contratos;
+using Vida.Mensageria.Dominio;
 using Vida.Mensageria.Mensagens;
 using Vida.Mensageria.Topologia;
 using Vida.Producer.Contratos;
@@ -11,7 +12,8 @@ using Vida.Producer.Outbox;
 namespace Vida.Producer.Controllers;
 
 /// <summary>
-/// Fase 4: API REST de propostas. O POST grava a proposta e a mensagem no outbox numa única transação
+/// API REST de propostas. 
+/// O POST grava a proposta e a mensagem no outbox numa única transação
 /// do SQL Server e responde 201 sem falar com o Service Bus: quem publica é o DespachanteDoOutbox.
 /// </summary>
 /// <param name="banco">DbContext da requisição (scoped).</param>
@@ -61,7 +63,8 @@ public sealed class PropostasController(
             ClienteId: corpo.ClienteId!,
             Idade: corpo.Idade!.Value,
             CapitalSegurado: corpo.CapitalSegurado!.Value,
-            Plano: corpo.Plano!,
+            // Validar já garantiu que o texto é um plano; aqui ele vira o enum ("familiar" → Plano.Familiar).
+            Plano: Planos.Interpretar(corpo.Plano)!.Value,
             CriadaEm: DateTimeOffset.UtcNow);
 
         var registro = new PropostaRegistrada

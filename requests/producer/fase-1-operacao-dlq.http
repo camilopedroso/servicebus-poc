@@ -1,4 +1,5 @@
 # Fase 1: ferramentas de operação da fila "propostas". Peek não consome: só olha.
+# Faz o request na FilaDePropostasController.cs para olhar o que está na DLQ.
 
 @producer = http://localhost:5180
 

@@ -28,7 +28,7 @@ public static class MensagensProposta
             Subject = TiposDeMensagem.PropostaRecebida,
             CorrelationId = proposta.ClienteId,
         };
-        mensagem.ApplicationProperties[Propriedades.Plano] = proposta.Plano;
+        mensagem.ApplicationProperties[Propriedades.Plano] = proposta.Plano.ToString();
         if (simularFalha)
         {
             mensagem.ApplicationProperties[Propriedades.SimularFalha] = true;

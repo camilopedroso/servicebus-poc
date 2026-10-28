@@ -25,7 +25,7 @@ public sealed class BancoDePropostas(DbContextOptions<BancoDePropostas> options)
             proposta.ToTable("Registradas");
             proposta.HasKey(p => p.PropostaId);
             proposta.Property(p => p.ClienteId).HasMaxLength(20);
-            proposta.Property(p => p.Plano).HasMaxLength(20);
+            proposta.Property(p => p.Plano).HasConversion<string>().HasMaxLength(20);
             proposta.Property(p => p.CapitalSegurado).HasPrecision(18, 2);
             proposta.Property(p => p.Status).HasConversion<string>().HasMaxLength(30);
             proposta.Property(p => p.ChaveDeIdempotencia).HasMaxLength(100);

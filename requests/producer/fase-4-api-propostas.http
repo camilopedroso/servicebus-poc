@@ -1,25 +1,26 @@
 # Fase 4: API REST de propostas com transactional outbox (precisa do SQL Server local: infra\sql-up.ps1).
 # O POST grava proposta + mensagem do outbox numa transação e responde 201 sem falar com o Service Bus.
+# PropostasController.cs
 
 @producer = http://localhost:5180
 
-### Criar proposta → 201 Created + Location
-# @name criada
-POST {{producer}}/api/propostas
-Content-Type: application/json
+# ### Criar proposta → 201 Created + Location
+# # @name criada
+# POST {{producer}}/api/propostas
+# Content-Type: application/json
 
-{
-  "clienteId": "CLI-1001",
-  "idade": 42,
-  "capitalSegurado": 350000,
-  "plano": "Familiar"
-}
+# {
+#   "clienteId": "CLI-1001",
+#   "idade": 42,
+#   "capitalSegurado": 350000,
+#   "plano": "Familiar"
+# }
 
-### Consultar a proposta criada acima: Recebida (no outbox) → EnviadaParaAnalise (publicada)
-GET {{producer}}/api/propostas/{{criada.response.body.$.propostaId}}
+# ### Consultar a proposta criada acima: Recebida (no outbox) → EnviadaParaAnalise (publicada)
+# GET {{producer}}/api/propostas/{{criada.response.body.$.propostaId}}
 
-### Proposta inexistente → 404
-GET {{producer}}/api/propostas/00000000-0000-0000-0000-000000000000
+# ### Proposta inexistente → 404
+# GET {{producer}}/api/propostas/00000000-0000-0000-0000-000000000000
 
 ### Idempotency-Key: primeira chamada → 201
 # @name primeira

@@ -1,3 +1,5 @@
+using Vida.Mensageria.Dominio;
+
 namespace Vida.Mensageria.Contratos;
 
 /// <summary>
@@ -9,5 +11,5 @@ public sealed record PropostaSeguroVida(
     string ClienteId,
     int Idade,
     decimal CapitalSegurado,
-    string Plano,
+    Plano Plano,
     DateTimeOffset CriadaEm);

@@ -24,7 +24,7 @@ public static class MensagensRecusa
             Subject = TiposDeMensagem.PropostaRecusada,
             CorrelationId = recusa.PropostaId.ToString(),
         };
-        mensagem.ApplicationProperties[Propriedades.Plano] = recusa.Plano;
+        mensagem.ApplicationProperties[Propriedades.Plano] = recusa.Plano.ToString();
         return mensagem;
     }
 }

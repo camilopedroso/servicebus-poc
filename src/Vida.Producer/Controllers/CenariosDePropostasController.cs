@@ -14,32 +14,65 @@ namespace Vida.Producer.Controllers;
 [ApiController]
 [Route("propostas")]
 [Tags("Cenários")]
-public sealed class CenariosDePropostasController(EnvioDePropostas envio) : ControllerBase
+public sealed class CenariosDePropostasController(
+    EnvioDePropostas envio
+    ) : ControllerBase
 {
     /// <summary>
     /// POST /propostas/lote: propostas válidas, enviadas em lote.
     /// </summary>
+    /// <param name="corpo">Dados do lote de propostas a ser enviado.</param>
+    /// <param name="cancellationToken">
+    ///     Token de cancelamento da requisição.
+    /// </param>
     [HttpPost("lote")]
-    public async Task<IActionResult> EnviarLoteAsync(EnvioDeLote corpo, CancellationToken cancellationToken)
+    public async Task<IActionResult> EnviarLoteAsync(
+        EnvioDeLote corpo,
+        CancellationToken cancellationToken)
     {
+        // Pattern matching: "is { Count: > 0 } erros" é um property pattern.
+        // Testa se o resultado de Validar() não é nulo e se a propriedade
+        // Count do dicionário é maior que zero; se for, atribui o resultado
+        // à variável "erros" (só tem valor garantido dentro do if). Equivale a:
+        //   var erros = corpo.Validar();
+        //   if (erros is not null && erros.Count > 0) { ... }
         if (corpo.Validar() is { Count: > 0 } erros)
         {
             return this.ProblemaDeValidacao(erros);
         }
-        var propostas = await envio.EnviarLoteAsync(corpo.Quantidade, cancellationToken);
+
+        var propostas = await envio.EnviarLoteAsync(
+            corpo.Quantidade,
+            cancellationToken);
+
         return Ok(new { Propostas = propostas });
     }
 
     /// <summary>
-    /// POST /propostas: uma proposta. Idade > 80 → recusa; simularFalha → retry até maxDeliveryCount → DLQ.
+    /// POST /propostas: uma proposta. Idade > 80 → recusa; 
+    /// simularFalha → retry até maxDeliveryCount → DLQ.
+    /// </summary>
+    /// <param name="corpo">Dados da proposta a ser enviada.</param>
+    /// <param name="cancellationToken">
+    ///     Token de cancelamento da requisição.
+    /// </param>
     /// </summary>
     [HttpPost]
-    public async Task<ActionResult<PropostaSeguroVida>> EnviarUmaAsync(EnvioDeProposta corpo, CancellationToken cancellationToken)
+    public async Task<ActionResult<PropostaSeguroVida>> EnviarUmaAsync(
+        EnvioDeProposta corpo,
+        CancellationToken cancellationToken)
     {
+        // Pattern matching: "is { Count: > 0 } erros" é um property pattern.
+        // Testa se o resultado de Validar() não é nulo e se a propriedade
+        // Count do dicionário é maior que zero; se for, atribui o resultado
+        // à variável "erros" (só tem valor garantido dentro do if). Equivale a:
+        //   var erros = corpo.Validar();
+        //   if (erros is not null && erros.Count > 0) { ... }
         if (corpo.Validar() is { Count: > 0 } erros)
         {
             return this.ProblemaDeValidacao(erros);
         }
+
         return await envio.EnviarUmaAsync(corpo, cancellationToken);
     }
 

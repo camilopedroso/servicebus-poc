@@ -23,7 +23,7 @@ public static class MensagensApolice
             Subject = TiposDeMensagem.ApoliceEmitida,
             CorrelationId = apolice.PropostaId.ToString(),
         };
-        mensagem.ApplicationProperties[Propriedades.Plano] = apolice.Plano;
+        mensagem.ApplicationProperties[Propriedades.Plano] = apolice.Plano.ToString();
         mensagem.ApplicationProperties[Propriedades.CapitalSegurado] = (long)apolice.CapitalSegurado;
         mensagem.ApplicationProperties[Propriedades.RequerRevisao] = apolice.RequerRevisao;
         return mensagem;

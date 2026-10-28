@@ -28,7 +28,7 @@ public sealed record NovaProposta(string? ClienteId, int? Idade, decimal? Capita
         {
             erros[nameof(CapitalSegurado)] = ["Informe um capital segurado maior que zero."];
         }
-        if (Plano is null || !Planos.Todos.Contains(Plano))
+        if (Planos.Interpretar(Plano) is null)
         {
             erros[nameof(Plano)] = [$"Planos válidos: {string.Join(", ", Planos.Todos)}."];
         }
