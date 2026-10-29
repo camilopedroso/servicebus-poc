@@ -1,8 +1,13 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/Vida.Assinantes/Vida.Assinantes.csproj" />
     <Project Path="src/Vida.Consumer/Vida.Consumer.csproj" />
     <Project Path="src/Vida.Producer/Vida.Producer.csproj" />
+  </Folder>
+  <Folder Name="/src/Cobranca/">
+    <Project Path="src/Cobranca/Vida.Cobranca/Vida.Cobranca.csproj" />
+  </Folder>
+  <Folder Name="/src/Notificacao/">
+    <Project Path="src/Notificacao/Vida.Notificacao/Vida.Notificacao.csproj" />
   </Folder>
   <Folder Name="/src/Plataforma/">
     <Project Path="src/Plataforma/Vida.LogsAoVivo/Vida.LogsAoVivo.csproj" />

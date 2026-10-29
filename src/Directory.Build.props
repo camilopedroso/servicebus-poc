@@ -1,5 +1,14 @@
 <Project>
 
+  <PropertyGroup>
+    <!--
+      Sem isto, o SDK gera no app um [assembly: ApplicationPart] para cada biblioteca que referencia o ASP.NET Core,
+      e o MVC expõe os controllers dela sozinho: o Producer ganhava /processadores (500, sem gerenciador) e as
+      rotas apareciam no contrato OpenAPI. Assim, controller de biblioteca só entra pelo AddXxx() que o registra.
+    -->
+    <GenerateMvcApplicationPartsAssemblyAttributes>false</GenerateMvcApplicationPartsAssemblyAttributes>
+  </PropertyGroup>
+
   <!--
     Arquivos de configuração local gerados pelos scripts de infra, copiados para a saída de cada app
     (os apps os leem de AppContext.BaseDirectory). Ficam aqui, e não em cada csproj, para o caminho não

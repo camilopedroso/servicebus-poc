@@ -1,6 +1,6 @@
-# Sobe tudo para estudar: SQL Server local (Docker), Producer, Consumer, Assinantes e o painel, e abre o navegador.
+# Sobe tudo para estudar: SQL Server local (Docker), Producer, Consumer, Cobrança, Notificação e o painel, e abre o navegador.
 # O container do SQL Server continua de pé depois do Ctrl+C e do -Parar (é local, não custa); para removê-lo: infra\sql-down.ps1.
-# Uso: .\iniciar.ps1                  compila, sobe os 4 processos e abre http://localhost:5173
+# Uso: .\iniciar.ps1                  compila, sobe os 5 processos e abre http://localhost:5173
 #      .\iniciar.ps1 -ComInfra        antes, cria/atualiza a infra no Azure (infra\up.ps1)
 #      .\iniciar.ps1 -ComInfra -ModoDebug   idem, com lock de 5 min (máximo) para parar em breakpoints sem perder a mensagem
 #      .\iniciar.ps1 -SemNavegador    não abre o navegador
@@ -19,9 +19,10 @@ param(
 $ErrorActionPreference = 'Stop'
 $raiz = $PSScriptRoot
 $apps = @(
-    @{ Nome = 'Producer'; Porta = 5180 },
-    @{ Nome = 'Consumer'; Porta = 5181 },
-    @{ Nome = 'Assinantes'; Porta = 5182 }
+    @{ Nome = 'Producer'; Porta = 5180; Pasta = 'src\Vida.Producer' },
+    @{ Nome = 'Consumer'; Porta = 5181; Pasta = 'src\Vida.Consumer' },
+    @{ Nome = 'Cobranca'; Porta = 5182; Pasta = 'src\Cobranca\Vida.Cobranca' },
+    @{ Nome = 'Notificacao'; Porta = 5183; Pasta = 'src\Notificacao\Vida.Notificacao' }
 )
 $portaDoPainel = 5173
 $todasAsPortas = @($apps.Porta) + $portaDoPainel
@@ -119,7 +120,7 @@ if ($ComAspire) {
 try {
     foreach ($app in $apps) {
         # Sobe o executável direto (não "dotnet run"): assim o PID guardado é o do app, e o Ctrl+C o encerra de fato.
-        $pastaDoBinario = "$raiz\src\Vida.$($app.Nome)\bin\Debug\net10.0"
+        $pastaDoBinario = "$raiz\$($app.Pasta)\bin\Debug\net10.0"
         $processos += Start-Process -FilePath "$pastaDoBinario\Vida.$($app.Nome).exe" `
             -WorkingDirectory $pastaDoBinario -NoNewWindow -PassThru `
             -RedirectStandardOutput "$pastaDeLogs\$($app.Nome).log" -RedirectStandardError "$pastaDeLogs\$($app.Nome).erro.log"
@@ -129,7 +130,7 @@ try {
         -RedirectStandardOutput "$pastaDeLogs\Painel.log" -RedirectStandardError "$pastaDeLogs\Painel.erro.log"
 
     # 5) Espera todos responderem
-    Write-Host 'Subindo Producer (:5180), Consumer (:5181), Assinantes (:5182) e painel (:5173)...'
+    Write-Host 'Subindo Producer (:5180), Consumer (:5181), Cobranca (:5182), Notificacao (:5183) e painel (:5173)...'
     $limite = (Get-Date).AddSeconds(60)
     while (($todasAsPortas | Where-Object { -not (Porta-Em-Uso $_) }) -and (Get-Date) -lt $limite) {
         if ($processos | Where-Object HasExited) { break }

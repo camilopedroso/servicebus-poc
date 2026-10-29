@@ -16,13 +16,14 @@ type Resultado = { tipo: 'executando' } | { tipo: 'ok'; texto: string } | { tipo
 const colunas: { app: NomeDoApp; papel: string; comando: string }[] = [
   { app: 'producer', papel: 'Cenários, API REST e outbox', comando: 'dotnet run --project src\\Vida.Producer' },
   { app: 'consumer', papel: 'Filas subscricao-entrada e endossos; publica nos tópicos', comando: 'dotnet run --project src\\Vida.Consumer' },
-  { app: 'assinantes', papel: 'Assinaturas dos tópicos', comando: 'dotnet run --project src\\Vida.Assinantes' },
+  { app: 'cobranca', papel: 'Assinatura cobranca: boleto do 1º prêmio', comando: 'dotnet run --project src\\Cobranca\\Vida.Cobranca' },
+  { app: 'notificacao', papel: 'Boas-vindas e aviso de recusa', comando: 'dotnet run --project src\\Notificacao\\Vida.Notificacao' },
 ];
 
-/** Liga/desliga no cabeçalho da coluna: processors no Consumer, assinaturas (com filtros e contagens) no Assinantes. */
+/** Liga/desliga no cabeçalho da coluna: processors no Consumer, assinaturas (com filtros e contagens) nos que assinam tópicos. */
 function controlesDaColuna(app: NomeDoApp, versao: number) {
   if (app === 'consumer') return <ControleDeProcessadores app="consumer" versao={versao} />;
-  if (app === 'assinantes') return <ControleDeAssinaturas versao={versao} />;
+  if (app === 'cobranca' || app === 'notificacao') return <ControleDeAssinaturas app={app} versao={versao} />;
   return undefined;
 }
 
@@ -39,7 +40,8 @@ export function App() {
   const logs = {
     producer: useLogsAoVivo('producer'),
     consumer: useLogsAoVivo('consumer'),
-    assinantes: useLogsAoVivo('assinantes'),
+    cobranca: useLogsAoVivo('cobranca'),
+    notificacao: useLogsAoVivo('notificacao'),
   };
 
   useEffect(() => {
@@ -48,14 +50,15 @@ export function App() {
       .catch(() => setNamespace(null));
   }, [logs.producer.estado]);
 
-  const [linhasProducer, linhasConsumer, linhasAssinantes] = [
+  const [linhasProducer, linhasConsumer, linhasCobranca, linhasNotificacao] = [
     logs.producer.linhas,
     logs.consumer.linhas,
-    logs.assinantes.linhas,
+    logs.cobranca.linhas,
+    logs.notificacao.linhas,
   ];
   const trilha = useMemo(
-    () => (idFixado ? montarTrilha(idFixado, [...linhasProducer, ...linhasConsumer, ...linhasAssinantes]) : null),
-    [idFixado, linhasProducer, linhasConsumer, linhasAssinantes],
+    () => (idFixado ? montarTrilha(idFixado, [...linhasProducer, ...linhasConsumer, ...linhasCobranca, ...linhasNotificacao]) : null),
+    [idFixado, linhasProducer, linhasConsumer, linhasCobranca, linhasNotificacao],
   );
 
   const escolher = (novo: Cenario) => {
@@ -131,7 +134,7 @@ export function App() {
             </button>
           </>
         ) : (
-          <p className="trilha__dica">Clique em um id em qualquer coluna para seguir a mensagem pelos três processos.</p>
+          <p className="trilha__dica">Clique em um id em qualquer coluna para seguir a mensagem por todos os processos.</p>
         )}
       </div>
 

@@ -1,15 +1,21 @@
+using Azure.Identity;
+using Azure.Messaging.ServiceBus.Administration;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Vida.Plataforma.Conexao;
 
 namespace Vida.Plataforma.Processamento;
 
 /// <summary>
-/// Liga/desliga dos processors: registra o gerenciador, o controller de /processadores e cada processador.
+/// Liga/desliga dos processors: registra o gerenciador, os controllers de /processadores e /assinaturas e cada processador.
 /// </summary>
 public static class ExtensoesDeProcessadores
 {
     /// <summary>
-    /// Registra o GerenciadorDeProcessadores (hosted service) e o ProcessadoresController. O app precisa chamar app.MapControllers().
+    /// Registra o GerenciadorDeProcessadores (hosted service), o ProcessadoresController e o AssinaturasController.
+    /// O app precisa chamar app.MapControllers().
     /// </summary>
     /// <param name="builder">Builder do app.</param>
     /// <returns>O mesmo builder, para encadear.</returns>
@@ -18,6 +24,15 @@ public static class ExtensoesDeProcessadores
         // Singleton e hosted service na mesma instância: o controller usa a que o host ligou.
         builder.Services.AddSingleton<GerenciadorDeProcessadores>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<GerenciadorDeProcessadores>());
+        // Só para ler contagens e regras das assinaturas (GET /assinaturas). Criado na primeira requisição:
+        // num app sem assinaturas (só filas), nunca chega a ser criado.
+        builder.Services.TryAddSingleton(sp =>
+        {
+            var configuracao = sp.GetRequiredService<IConfiguration>();
+            var fqdn = ServiceBusClientFactory.ObterNamespace(configuracao);
+            var credencial = new DefaultAzureCredential();
+            return new ServiceBusAdministrationClient(fqdn, credencial);
+        });
         // O controller mora nesta biblioteca, não no app: o application part explícito garante que o MVC o encontre.
         var mvc = builder.Services.AddControllers();
         var estaBiblioteca = typeof(ProcessadoresController).Assembly;

@@ -1,5 +1,5 @@
-/** Os três processos .NET que o painel acompanha. */
-export type App = 'producer' | 'consumer' | 'assinantes';
+/** Os processos .NET que o painel acompanha. */
+export type App = 'producer' | 'consumer' | 'cobranca' | 'notificacao';
 
 /** Uma linha de log como chega do GET /logs (Vida.LogsAoVivo.Logs.RegistroDeLog). */
 export interface RegistroDeLog {
@@ -22,16 +22,17 @@ export type LinhaDeLog =
 
 export type EstadoDaConexao = 'conectando' | 'ao-vivo' | 'reconectando';
 
-/** GET /assinaturas do Vida.Assinantes. */
+/** GET /assinaturas de um serviço que assina tópicos (Cobrança, Notificação): só as assinaturas dele. */
 export interface EstadoDaAssinatura {
   nome: string;
+  topico: string;
   filtros: string[];
   ativa: boolean;
   pendentes: number;
   naDlq: number;
 }
 
-/** GET /processadores (Consumer e Assinantes): liga/desliga de cada processor do app. */
+/** GET /processadores (Consumer, Cobrança, Notificação): liga/desliga de cada processor do app. */
 export interface EstadoDoProcessador {
   nome: string;
   /** Fila ou assinatura que ele lê. */

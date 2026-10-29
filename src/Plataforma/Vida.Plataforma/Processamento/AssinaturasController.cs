@@ -1,18 +1,17 @@
 using System.Collections.Concurrent;
 using Azure.Messaging.ServiceBus.Administration;
 using Microsoft.AspNetCore.Mvc;
-using Vida.Assinantes.Contratos;
-using Vida.Plataforma.Processamento;
 using Vida.Plataforma.Topologia;
-using Vida.Subscricao.Contratos.Topologia;
 
-namespace Vida.Assinantes.Controllers;
+namespace Vida.Plataforma.Processamento;
 
 /// <summary>
-/// Endpoint que o painel usa para ver as assinaturas deste app: filtros, contagens e se estão ligadas.
-/// Ligar e desligar é pelo ProcessadoresController (POST /processadores/{nome}/iniciar|parar), igual nos outros apps.
+/// GET /assinaturas: as assinaturas que ESTE app lê, com filtros, contagens e se estão ligadas. Cada serviço só
+/// mostra as suas: a lista sai dos processors registrados, não de uma topologia global.
+/// Ligar e desligar é pelo ProcessadoresController (POST /processadores/{nome}/iniciar|parar).
+/// Registrado por AddProcessadoresControlaveis().
 /// </summary>
-/// <param name="gerenciador">Dono dos processors, um por assinatura.</param>
+/// <param name="gerenciador">Dono dos processors do app.</param>
 /// <param name="admin">Lê contagens e regras das assinaturas.</param>
 [ApiController]
 [Route("assinaturas")]
@@ -22,7 +21,7 @@ public sealed class AssinaturasController(GerenciadorDeProcessadores gerenciador
     private static readonly ConcurrentDictionary<string, string[]> FiltrosEmCache = new();
 
     /// <summary>
-    /// GET /assinaturas: estado, filtros e contagens de cada assinatura.
+    /// GET /assinaturas: estado, filtros e contagens de cada assinatura lida por este app.
     /// </summary>
     [HttpGet]
     public async Task<EstadoDaAssinatura[]> ListarAsync(CancellationToken cancellationToken)
@@ -31,33 +30,39 @@ public sealed class AssinaturasController(GerenciadorDeProcessadores gerenciador
         var estados = new List<Task<EstadoDaAssinatura>>();
         foreach (var processador in gerenciador.Processadores)
         {
-            var estado = ObterEstadoAsync(processador, cancellationToken);
+            if (processador.Topico is null || processador.Assinatura is null)
+            {
+                // Processor de fila: não é assinatura.
+                continue;
+            }
+            var estado = ObterEstadoAsync(processador, processador.Topico, processador.Assinatura, cancellationToken);
             estados.Add(estado);
         }
         return await Task.WhenAll(estados);
     }
 
-    private async Task<EstadoDaAssinatura> ObterEstadoAsync(ProcessadorControlavel processador, CancellationToken cancellationToken)
+    private async Task<EstadoDaAssinatura> ObterEstadoAsync(
+        ProcessadorControlavel processador, string topico, string assinatura, CancellationToken cancellationToken)
     {
-        var topico = Assinaturas.TopicoDe(processador.Nome);
-        var propriedades = await admin.GetSubscriptionRuntimePropertiesAsync(topico, processador.Nome, cancellationToken);
-        var filtros = await ObterFiltrosAsync(processador.Nome, cancellationToken);
+        var propriedades = await admin.GetSubscriptionRuntimePropertiesAsync(topico, assinatura, cancellationToken);
+        var filtros = await ObterFiltrosAsync(topico, assinatura, cancellationToken);
         return new EstadoDaAssinatura(
-            processador.Nome,
+            assinatura,
+            topico,
             filtros,
             processador.Ativo,
             propriedades.Value.ActiveMessageCount,
             propriedades.Value.DeadLetterMessageCount);
     }
 
-    private async Task<string[]> ObterFiltrosAsync(string assinatura, CancellationToken cancellationToken)
+    private async Task<string[]> ObterFiltrosAsync(string topico, string assinatura, CancellationToken cancellationToken)
     {
-        if (FiltrosEmCache.TryGetValue(assinatura, out var emCache))
+        var chave = $"{topico}/{assinatura}";
+        if (FiltrosEmCache.TryGetValue(chave, out var emCache))
         {
             return emCache;
         }
 
-        var topico = Assinaturas.TopicoDe(assinatura);
         var regras = admin.GetRulesAsync(topico, assinatura, cancellationToken);
         var filtros = new List<string>();
         await foreach (var regra in regras)
@@ -68,6 +73,6 @@ public sealed class AssinaturasController(GerenciadorDeProcessadores gerenciador
             filtros.Add(linha);
         }
 
-        return FiltrosEmCache[assinatura] = [.. filtros];
+        return FiltrosEmCache[chave] = [.. filtros];
     }
 }

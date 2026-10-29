@@ -199,7 +199,8 @@ export const cenarios: Cenario[] = [
     fase: 2,
     titulo: 'Publicar apólice direto no tópico',
     mostra: 'Testa só os filtros das assinaturas, sem passar pela fila nem pelo Consumer.',
-    esperado: 'Notificação sempre recebe. Até 1 milhão, cobrança também; acima disso, alto-valor no lugar da cobrança.',
+    esperado:
+      'Notificação sempre recebe. Até 1 milhão, Cobrança também; acima disso, a cópia vai para alto-valor no lugar da cobrança e fica esperando: a squad de Resseguro ainda não tem serviço.',
     campos: ['capitalSegurado', 'plano'],
     executar: publicarApolice,
   },
@@ -208,7 +209,8 @@ export const cenarios: Cenario[] = [
     fase: 2,
     titulo: 'Publicar apólice de alto valor',
     mostra: 'Filtros complementares: requerRevisao = TRUE em alto-valor, = FALSE em cobrança. A action acrescenta uma propriedade.',
-    esperado: 'Notificação e alto-valor recebem; cobrança não. Em alto-valor a prioridade chega como "alta", colocada pela action da regra.',
+    esperado:
+      'Notificação recebe; Cobrança não. A cópia de alto-valor fica pendente (Resseguro ainda não tem serviço): espie a assinatura alto-valor para ver a prioridade "alta", colocada pela action da regra.',
     campos: ['capitalSegurado', 'plano'],
     padroes: { capitalSegurado: '1500000' },
     executar: publicarApolice,
@@ -218,7 +220,8 @@ export const cenarios: Cenario[] = [
     fase: 2,
     titulo: 'Espiar uma assinatura',
     mostra: 'Cada assinatura é uma fila própria com a sua cópia das mensagens.',
-    esperado: 'Desligue a assinatura no seletor da coluna Assinantes e publique apólices para vê-las acumuladas aqui.',
+    esperado:
+      'Em alto-valor, que não tem serviço, as apólices de alto valor acumulam sozinhas. Nas outras, desligue a assinatura no seletor da coluna Cobrança ou Notificação e publique apólices.',
     campos: ['assinatura'],
     executar: (v) => espiar(`/assinaturas/${v.assinatura}/mensagens?dlq=false`, v.assinatura)(),
   },
@@ -227,7 +230,7 @@ export const cenarios: Cenario[] = [
     fase: 2,
     titulo: 'Espiar a DLQ de uma assinatura',
     mostra: 'Cada assinatura tem a sua própria dead-letter queue.',
-    esperado: 'Normalmente vazia: os assinantes só mandam para a DLQ quando o corpo não pode ser lido.',
+    esperado: 'Normalmente vazia: os serviços só mandam para a DLQ quando o corpo não pode ser lido.',
     campos: ['assinatura'],
     executar: (v) => espiar(`/assinaturas/${v.assinatura}/mensagens?dlq=true`, `${v.assinatura}/$DeadLetterQueue`)(),
   },
@@ -336,7 +339,7 @@ export const cenarios: Cenario[] = [
     mostra:
       'A API aceita a proposta (201: dado válido) e quem recusa é a subscrição, depois. O evento PropostaRecusada volta para o Producer pela assinatura status-recusada, e o GET passa a mostrar a recusa.',
     esperado:
-      'Consumer: recusada por idade. Assinantes: notificacao-recusa avisa o cliente. Producer: "Desfecho: ... recusada". O GET 3 s depois mostra Recusada com o motivo.',
+      'Consumer: recusada por idade. Notificação: notificacao-recusa avisa o cliente. Producer: "Desfecho: ... recusada". O GET 3 s depois mostra Recusada com o motivo.',
     campos: ['idade', 'capitalSegurado', 'plano'],
     padroes: { idade: '93' },
     executar: async (v) => {

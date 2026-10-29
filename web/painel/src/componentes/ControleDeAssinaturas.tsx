@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { chamar, ErroDaApi } from '../api';
 import { useFecharAoSair } from '../hooks/useFecharAoSair';
-import type { EstadoDaAssinatura } from '../tipos';
+import type { App, EstadoDaAssinatura } from '../tipos';
 
 interface Props {
+  /** Serviço cujas assinaturas o controle mostra (GET /assinaturas dele). */
+  app: App;
   /** Muda depois de cada cenário executado, para atualizar as contagens. */
   versao: number;
 }
@@ -12,10 +14,10 @@ const INTERVALO_COM_LISTA_ABERTA = 3_000;
 const INTERVALO_COM_LISTA_FECHADA = 15_000;
 
 /**
- * Liga e desliga as assinaturas do Vida.Assinantes em tempo de execução.
+ * Liga e desliga as assinaturas de um serviço (Cobrança, Notificação) em tempo de execução.
  * Uma assinatura desligada continua recebendo cópias do tópico: o número de pendentes sobe até ela ser religada.
  */
-export function ControleDeAssinaturas({ versao }: Props) {
+export function ControleDeAssinaturas({ app, versao }: Props) {
   const [aberto, setAberto] = useState(false);
   const [estados, setEstados] = useState<EstadoDaAssinatura[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -27,12 +29,12 @@ export function ControleDeAssinaturas({ versao }: Props) {
 
   const atualizar = useCallback(async () => {
     try {
-      setEstados(await chamar<EstadoDaAssinatura[]>('assinantes', 'GET', '/assinaturas'));
+      setEstados(await chamar<EstadoDaAssinatura[]>(app, 'GET', '/assinaturas'));
       setErro(null);
     } catch (e) {
       setErro(e instanceof ErroDaApi ? e.message : 'Não foi possível ler as assinaturas.');
     }
-  }, []);
+  }, [app]);
 
   // Contagens mudam sozinhas (mensagens chegando): atualiza mais rápido enquanto a lista está aberta.
   useEffect(() => {
@@ -45,7 +47,7 @@ export function ControleDeAssinaturas({ versao }: Props) {
     setAlterando(assinatura.nome);
     try {
       // Ligar e desligar é o mesmo mecanismo dos outros apps (ProcessadoresController); o nome do processor é o da assinatura.
-      await chamar('assinantes', 'POST', `/processadores/${assinatura.nome}/${assinatura.ativa ? 'parar' : 'iniciar'}`);
+      await chamar(app, 'POST', `/processadores/${assinatura.nome}/${assinatura.ativa ? 'parar' : 'iniciar'}`);
       await atualizar();
     } catch (e) {
       setErro(e instanceof ErroDaApi ? e.message : 'Não foi possível alterar a assinatura.');

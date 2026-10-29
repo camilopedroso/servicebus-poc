@@ -14,7 +14,7 @@ painel funcionando, e marca o checkbox aqui (é assim que a próxima sessão sab
 - [x] Etapa 2 — Quebrar `Vida.Mensageria` em plataforma + contratos por serviço
 - [x] Etapa 3 — Fila `propostas` vira tópico `proposta-recebida` + caixa de entrada da Subscrição
 - [x] Etapa 4 — Bicep por serviço (quem publica cria o tópico, quem consome cria a assinatura)
-- [ ] Etapa 5 — `Vida.Assinantes` vira `Vida.Cobranca` e `Vida.Notificacao`; `alto-valor` fica sem serviço
+- [x] Etapa 5 — `Vida.Assinantes` vira `Vida.Cobranca` e `Vida.Notificacao`; `alto-valor` fica sem serviço
 - [ ] Etapa 6 — `Vida.Operacao` (ferramentas de operação) e endpoints de demonstração no dono certo
 - [ ] Etapa 7 — Painel, `iniciar.ps1`, `launch.json`
 - [ ] Etapa 8 — Documentação (nota da fase, README, dicas, CLAUDE.md)
@@ -449,6 +449,18 @@ A mudança de comportamento principal.
 - `alto-valor` fica só no Bicep (`resseguro.assina.bicep`, comentário: "squad de Resseguro, serviço ainda não
   existe"). Apagar `Vida.Assinantes`.
 - **Pronto quando:** apólice de alto valor aparece pendente na `alto-valor` e não na `cobranca` (diagrama 5.3).
+- **Resultado (2026-10-29):** `src/Cobranca/Vida.Cobranca` (`ProcessadorDeCobranca`) e `src/Notificacao/Vida.Notificacao`
+  (`ProcessadorDeBoasVindas`, `ProcessadorDeAvisoDeRecusa`). Cada classe declara a sua assinatura (`const Assinatura`);
+  `Assinaturas` (lista global) ficou só para a operação do Producer. Na plataforma: `GET /assinaturas` genérico
+  (lista as assinaturas dos processors do próprio app, via `ProcessadorControlavel.Topico/Assinatura`), admin client
+  registrado por `AddProcessadoresControlaveis()` e `LeituraDeContratos.Ler<T>`. Sem os argumentos de linha de comando
+  do antigo Assinantes (liga/desliga é pelo painel). Painel com 4 colunas; `iniciar.ps1` e `launch.json` com os dois
+  serviços (o mínimo para funcionar; a generalização é da etapa 7).
+  Bug corrigido: desde a etapa 1, o SDK gerava `[assembly: ApplicationPart("Vida.Plataforma")]` no Producer, que
+  expunha `/processadores` (500) e as rotas no `/openapi/v1.json`. `src/Directory.Build.props` desliga isso
+  (`GenerateMvcApplicationPartsAssemblyAttributes=false`): controller de biblioteca só por `AddXxx()`.
+  Testado ao vivo: apólice de 2,5 mi pendente em `alto-valor` com `prioridade=alta` (peek), boleto só da comum,
+  boas-vindas das duas, aviso de recusa; Producer `/processadores` → 404.
 
 ### Etapa 6 — Operação e demonstrações no dono certo
 

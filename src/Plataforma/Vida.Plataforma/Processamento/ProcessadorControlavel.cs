@@ -17,6 +17,8 @@ public sealed class ProcessadorControlavel : IAsyncDisposable
     private readonly Func<ValueTask> _liberar;
     private readonly ILogger _logger;
 
+    private const string SeparadorDeAssinatura = "/Subscriptions/";
+
     // Identifica a instância nos logs para comparar quando houver mais de um consumer (competing consumers).
     private readonly string _instancia = $"{Environment.MachineName}-{Environment.ProcessId}";
 
@@ -31,6 +33,13 @@ public sealed class ProcessadorControlavel : IAsyncDisposable
     {
         Nome = nome;
         Entidade = processor.EntityPath;
+        // Processor de assinatura tem EntityPath "topico/Subscriptions/assinatura"; o de fila, só o nome da fila.
+        var partes = processor.EntityPath.Split(SeparadorDeAssinatura);
+        if (partes.Length == 2)
+        {
+            Topico = partes[0];
+            Assinatura = partes[1];
+        }
         LigarNaPartida = ligarNaPartida;
         _iniciar = processor.StartProcessingAsync;
         _parar = processor.StopProcessingAsync;
@@ -63,6 +72,12 @@ public sealed class ProcessadorControlavel : IAsyncDisposable
 
     /// <summary>Fila ou assinatura lida (para assinatura: "topico/Subscriptions/assinatura").</summary>
     public string Entidade { get; }
+
+    /// <summary>Tópico, quando o processor lê uma assinatura; null para fila.</summary>
+    public string? Topico { get; }
+
+    /// <summary>Assinatura, quando o processor lê uma; null para fila.</summary>
+    public string? Assinatura { get; }
 
     /// <summary>Se o processor é ligado quando o app sobe.</summary>
     public bool LigarNaPartida { get; }

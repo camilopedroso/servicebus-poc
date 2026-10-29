@@ -25,21 +25,41 @@
       "console": "integratedTerminal"
     },
     {
-      "name": "Assinantes",
+      "name": "Cobrança",
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build",
-      "program": "${workspaceFolder}/src/Vida.Assinantes/bin/Debug/net10.0/Vida.Assinantes.dll",
-      "cwd": "${workspaceFolder}/src/Vida.Assinantes",
+      "program": "${workspaceFolder}/src/Cobranca/Vida.Cobranca/bin/Debug/net10.0/Vida.Cobranca.dll",
+      "cwd": "${workspaceFolder}/src/Cobranca/Vida.Cobranca",
       "console": "integratedTerminal",
       "env": { "DOTNET_ENVIRONMENT": "Development" }
     },
     {
-      "name": "Assinantes (sem build)",
+      "name": "Notificação",
       "type": "coreclr",
       "request": "launch",
-      "program": "${workspaceFolder}/src/Vida.Assinantes/bin/Debug/net10.0/Vida.Assinantes.dll",
-      "cwd": "${workspaceFolder}/src/Vida.Assinantes",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/src/Notificacao/Vida.Notificacao/bin/Debug/net10.0/Vida.Notificacao.dll",
+      "cwd": "${workspaceFolder}/src/Notificacao/Vida.Notificacao",
+      "console": "integratedTerminal",
+      "env": { "DOTNET_ENVIRONMENT": "Development" }
+    },
+    {
+      "name": "Cobrança (sem build)",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/Cobranca/Vida.Cobranca/bin/Debug/net10.0/Vida.Cobranca.dll",
+      "cwd": "${workspaceFolder}/src/Cobranca/Vida.Cobranca",
+      "console": "integratedTerminal",
+      "env": { "DOTNET_ENVIRONMENT": "Development" },
+      "presentation": { "hidden": true }
+    },
+    {
+      "name": "Notificação (sem build)",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/Notificacao/Vida.Notificacao/bin/Debug/net10.0/Vida.Notificacao.dll",
+      "cwd": "${workspaceFolder}/src/Notificacao/Vida.Notificacao",
       "console": "integratedTerminal",
       "env": { "DOTNET_ENVIRONMENT": "Development" },
       "presentation": { "hidden": true }
@@ -76,9 +96,9 @@
       "stopAll": true
     },
     {
-      "name": "Fluxo completo (Consumer + Assinantes + Producer)",
+      "name": "Fluxo completo (Consumer + Cobrança + Notificação + Producer)",
       "preLaunchTask": "build",
-      "configurations": ["Consumer (sem build)", "Assinantes (sem build)", "Producer (sem build)"],
+      "configurations": ["Consumer (sem build)", "Cobrança (sem build)", "Notificação (sem build)", "Producer (sem build)"],
       "stopAll": true
     }
   ]
