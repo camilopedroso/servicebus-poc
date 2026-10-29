@@ -16,11 +16,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Plataforma\Vida.Plataforma\Vida.Plataforma.csproj" />
-    <ProjectReference Include="..\..\Propostas\Vida.Propostas.Contratos\Vida.Propostas.Contratos.csproj" />
+    <PackageReference Include="Vida.Plataforma" Version="1.0.0" />
+    <PackageReference Include="Vida.Propostas.Contratos" Version="1.0.0" />
     <ProjectReference Include="..\..\Subscricao\Vida.Subscricao.Contratos\Vida.Subscricao.Contratos.csproj" />
-    <ProjectReference Include="..\..\Plataforma\Vida.LogsAoVivo\Vida.LogsAoVivo.csproj" />
-    <ProjectReference Include="..\..\Plataforma\Vida.Telemetria\Vida.Telemetria.csproj" />
+    <PackageReference Include="Vida.LogsAoVivo" Version="1.0.0" />
+    <PackageReference Include="Vida.Telemetria" Version="1.0.0" />
   </ItemGroup>
 
 </Project>

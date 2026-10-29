@@ -22,7 +22,9 @@
     <Project Path="src/Subscricao/Vida.Subscricao.Contratos/Vida.Subscricao.Contratos.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/Vida.Testes.Integracao/Vida.Testes.Integracao.csproj" />
-    <Project Path="tests/Vida.Testes.Unidade/Vida.Testes.Unidade.csproj" />
+    <Project Path="tests/Plataforma/Vida.Plataforma.Testes/Vida.Plataforma.Testes.csproj" />
+    <Project Path="tests/Propostas/Vida.Propostas.Testes/Vida.Propostas.Testes.csproj" />
+    <Project Path="tests/Propostas/Vida.Propostas.Testes.Integracao/Vida.Propostas.Testes.Integracao.csproj" />
+    <Project Path="tests/Subscricao/Vida.Subscricao.Testes/Vida.Subscricao.Testes.csproj" />
   </Folder>
 </Solution>

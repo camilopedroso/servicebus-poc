@@ -19,6 +19,9 @@ painel funcionando, e marca o checkbox aqui (é assim que a próxima sessão sab
 - [x] Etapa 7 — Painel, `iniciar.ps1`, `launch.json`
 - [ ] Etapa 8 — Documentação (nota da fase, README, dicas, CLAUDE.md)
 - [ ] Etapa 9 — (Opcional) Banco próprio na Subscrição: outbox + inbox
+- [x] Etapa 10 — Uma solution por squad; contratos e plataforma como pacotes NuGet (feed local)
+
+Ordem de execução escolhida em 2026-10-29: **10 → 9 → 8** (a documentação por último, descrevendo o estado final).
 
 ---
 
@@ -541,6 +544,36 @@ flowchart LR
 - **Inbox:** tabela com o `MessageId` processado, na mesma transação da apólice. Repetição (at-least-once) = no-op.
 - **Outbox:** o mesmo padrão do Propostas, copiado e não compartilhado (cada squad tem o seu).
 - Só vale se sobrar tempo: é o melhor exemplo de "por que cada serviço precisa de idempotência na entrada".
+
+### Etapa 10 — Uma solution por squad
+
+Até a etapa 7, uma solution só: as squads estão separadas em projetos, mas cada serviço compila o código-fonte dos
+contratos e da plataforma das outras (`ProjectReference`). Mudar um contrato muda todo mundo no mesmo build.
+
+- **Regra:** dentro da squad, `ProjectReference`; entre squads, `PackageReference` com versão. Pacotes:
+  `Vida.Plataforma`, `Vida.LogsAoVivo`, `Vida.Telemetria` (squad de Plataforma), `Vida.Propostas.Contratos`,
+  `Vida.Subscricao.Contratos` (que depende do pacote de Propostas, por causa do `Plano`).
+- **Feed local:** pasta `pacotes/` (fora do git) + `nuget.config` na raiz. `publicar-pacotes.ps1` empacota na ordem
+  das dependências e recusa republicar uma versão existente: o NuGet guarda o pacote no cache global pela versão, então
+  "1.0.0 de novo, com outra coisa dentro" nunca chegaria a quem já restaurou. Mudou o contrato, sobe a `<Version>`.
+- **Soluções:** `src/<Squad>/<Squad>.slnx` só com os projetos da squad (Plataforma inclui o `Vida.Operacao`).
+  `ServiceBusPoc.slnx` continua com tudo, para estudar e para o `iniciar.ps1`.
+- **Testes por squad:** `tests/<Squad>/Vida.<Squad>.Testes` (e `...Testes.Integracao` em Propostas), no lugar dos dois
+  projetos que hoje referenciam vários serviços.
+- **Pronto quando:** cada `.slnx` de squad compila e testa sozinha (`dotnet test <squad>.slnx`) depois do
+  `publicar-pacotes.ps1`; alterar um contrato sem subir a versão não muda os consumidores; o `iniciar.ps1` funciona
+  num clone novo (publica os pacotes se o feed estiver vazio).
+- **Resultado (2026-10-29):** `nuget.config` com o feed `vida` (pasta `pacotes/`) e package source mapping (`Vida.*` só
+  do feed local: um homônimo no nuget.org não entra, o ataque de dependency confusion). `publicar-pacotes.ps1` publica
+  os cinco pacotes 1.0.0 e pula versão já publicada; `-Forcar` republica a mesma versão apagando também o cache global
+  desta máquina (só para desenvolvimento). `iniciar.ps1` chama o script antes do build. Soluções:
+  `src/Plataforma/Plataforma.slnx` (bibliotecas + Operação + testes), `src/Propostas/Propostas.slnx`,
+  `src/Subscricao/Subscricao.slnx`, `src/Cobranca/Cobranca.slnx`, `src/Notificacao/Notificacao.slnx`; testes em
+  `tests/<Squad>/` (Plataforma 6, Propostas 44 com integração, Subscrição 18; Cobrança e Notificação não têm testes).
+  Verificado: cada `.slnx` compila e testa sozinha; em Propostas o próprio contrato resolve como `project` e o da
+  Subscrição como `package` (`project.assets.json`); uma constante nova no contrato da Subscrição compila na Subscrição
+  e dá `CS0117` na Cobrança até sair uma versão nova; feed e cache apagados → `publicar-pacotes.ps1` + restore
+  funcionam do zero; ponta a ponta pela API (Aprovada, boleto e boas-vindas).
 
 ## 7. Decisões tomadas (e o que dá para mudar)
 

@@ -4,6 +4,9 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- Publicado como pacote (publicar-pacotes.ps1): mudou, sobe a versão. Quem consome atualiza quando quiser. -->
+    <Version>1.0.0</Version>
+    <Description>Chassis da squad de Plataforma: ServiceBusClient, liga/desliga de processors, leitura estrita de contratos.</Description>
   </PropertyGroup>
 
   <ItemGroup>

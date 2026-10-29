@@ -92,6 +92,9 @@ if ($ocupadas) {
 }
 
 # 3) Build (uma vez para a solução; os apps sobem a partir dos binários)
+# Entre squads, o código chega como pacote do feed local: num clone novo (ou depois de subir uma <Version>), publica antes.
+# Idempotente: o que já está no feed fica como está.
+& "$raiz\publicar-pacotes.ps1"
 Write-Host 'Compilando...'
 dotnet build "$raiz\ServiceBusPoc.slnx" --nologo -v quiet -clp:ErrorsOnly
 if ($LASTEXITCODE -ne 0) { throw 'Build falhou.' }

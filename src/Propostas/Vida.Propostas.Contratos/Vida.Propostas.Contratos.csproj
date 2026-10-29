@@ -2,13 +2,16 @@
 
   <!--
     Linguagem publicada da squad de Propostas: o evento da proposta e como a mensagem dele é montada.
-    Num cenário real seria um pacote NuGet versionado; aqui é ProjectReference, mas a regra vale:
-    quem consome referencia só os contratos, nunca o código interno do serviço.
+    Publicado como pacote NuGet versionado (feed local; num cenário real, Azure Artifacts). As outras squads
+    referenciam o pacote, nunca o código interno do serviço; dentro da squad de Propostas, é ProjectReference.
   -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- Publicado como pacote (publicar-pacotes.ps1): mudou, sobe a versão. Quem consome atualiza quando quiser. -->
+    <Version>1.0.0</Version>
+    <Description>Linguagem publicada da squad de Propostas: o evento PropostaRecebida e como a mensagem é montada.</Description>
   </PropertyGroup>
 
   <ItemGroup>

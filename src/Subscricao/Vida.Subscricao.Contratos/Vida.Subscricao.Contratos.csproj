@@ -3,12 +3,15 @@
   <!--
     Linguagem publicada da squad de Subscrição: os eventos que ela publica (apolice-emitida, proposta-recusada),
     o comando que ela aceita (endossos) e as propriedades que os filtros das assinaturas usam.
-    Referencia os contratos de Propostas porque ApoliceEmitida carrega o Plano (contrato que usa outro contrato).
+    Depende do PACOTE de contratos de Propostas porque ApoliceEmitida carrega o Plano (contrato que usa outro contrato).
   -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- Publicado como pacote (publicar-pacotes.ps1): mudou, sobe a versão. Quem consome atualiza quando quiser. -->
+    <Version>1.0.0</Version>
+    <Description>Linguagem publicada da squad de Subscrição: ApoliceEmitida, PropostaRecusada, EndossoSolicitado.</Description>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Propostas\Vida.Propostas.Contratos\Vida.Propostas.Contratos.csproj" />
+    <PackageReference Include="Vida.Propostas.Contratos" Version="1.0.0" />
   </ItemGroup>
 
 </Project>

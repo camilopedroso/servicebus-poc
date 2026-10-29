@@ -1,11 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Plataforma\Vida.Plataforma\Vida.Plataforma.csproj" />
+    <PackageReference Include="Vida.Plataforma" Version="1.0.0" />
     <ProjectReference Include="..\..\Propostas\Vida.Propostas.Contratos\Vida.Propostas.Contratos.csproj" />
-    <ProjectReference Include="..\..\Subscricao\Vida.Subscricao.Contratos\Vida.Subscricao.Contratos.csproj" />
-    <ProjectReference Include="..\..\Plataforma\Vida.LogsAoVivo\Vida.LogsAoVivo.csproj" />
-    <ProjectReference Include="..\..\Plataforma\Vida.Telemetria\Vida.Telemetria.csproj" />
+    <PackageReference Include="Vida.Subscricao.Contratos" Version="1.0.0" />
+    <PackageReference Include="Vida.LogsAoVivo" Version="1.0.0" />
+    <PackageReference Include="Vida.Telemetria" Version="1.0.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -22,7 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Vida.Testes.Integracao" />
+    <InternalsVisibleTo Include="Vida.Propostas.Testes.Integracao" />
   </ItemGroup>
 
   <PropertyGroup>

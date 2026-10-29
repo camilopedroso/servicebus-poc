@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="Vida.Subscricao/Vida.Subscricao.csproj" />
+    <Project Path="Vida.Subscricao.Contratos/Vida.Subscricao.Contratos.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="../../tests/Subscricao/Vida.Subscricao.Testes/Vida.Subscricao.Testes.csproj" />
+  </Folder>
+</Solution>
