@@ -60,18 +60,10 @@ builder.AddTelemetria("Vida.Producer");
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<TratadorDeErros>();
 builder.Services.AddControllers();
-
 // Esse trecho cria dois documentos:
-//
-// -v1: o documento padrão.Por convenção ele inclui os endpoints sem GroupName e 
-// deixa de fora os que têm GroupName = "demo". 
-// Aqui ficam as rotas prontas para produção: 
-//  -/api/propostas, 
-//  -/filas, 
-//  -/assinaturas e 
-//  -/outbox.
-//
-// - demo: o ShouldInclude filtra só os endpoints do grupo demo.
+// - v1: o documento padrão. Por convenção, ele inclui os endpoints sem GroupName e deixa de fora os que têm
+//   GroupName = "demo". Aqui ficam as rotas prontas para produção: /api/propostas, /filas, /assinaturas e /outbox.
+// - demo: o ShouldInclude filtra só os endpoints do grupo "demo".
 builder.Services.AddOpenApi();
 builder.Services.AddOpenApi("demo", opcoes =>
     opcoes.ShouldInclude = descricao => descricao.GroupName == "demo");
