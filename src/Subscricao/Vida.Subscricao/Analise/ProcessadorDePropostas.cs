@@ -13,12 +13,18 @@ namespace Vida.Subscricao.Analise;
 
 /// <summary>
 /// Lê a caixa de entrada da Subscrição (fila subscricao-entrada, alimentada pelo tópico proposta-recebida):
-/// lê as propostas, decide o destino de cada mensagem e,
-/// quando aprova, publica ApoliceEmitida; quando recusa por regra de negócio, publica PropostaRecusada.
+/// lê as propostas, decide o destino de cada mensagem e, quando aprova, grava a apólice e o evento ApoliceEmitida;
+/// quando recusa por regra de negócio, a recusa e o evento PropostaRecusada. Grava no banco da Subscrição
+/// (RegistroDaAnalise: inbox + negócio + outbox numa transação) e só depois conclui a mensagem; quem publica é o
+/// DespachanteDoOutbox. Etapa 9: antes era Complete + Send numa transação do broker, que não inclui o SQL Server.
 /// Rode duas instâncias para ver "competing consumers": cada mensagem vai para só uma delas.
 /// Quem liga e desliga o processor é o GerenciadorDeProcessadores (POST /processadores/propostas/parar).
 /// </summary>
-public sealed class ProcessadorDePropostas(ServiceBusClient client, IConfiguration configuration, ILogger<ProcessadorDePropostas> logger)
+public sealed class ProcessadorDePropostas(
+    ServiceBusClient client,
+    IServiceScopeFactory escopos,
+    IConfiguration configuration,
+    ILogger<ProcessadorDePropostas> logger)
     : IAsyncDisposable
 {
     /// <summary>Nome do processador na rota /processadores/{nome} e no painel.</summary>
@@ -41,18 +47,16 @@ public sealed class ProcessadorDePropostas(ServiceBusClient client, IConfigurati
     // Identifica a instância nos logs para comparar quando houver mais de um consumer.
     private readonly string _instancia = $"{Environment.MachineName}-{Environment.ProcessId}";
 
-    // Sender criado a partir do mesmo client do processor: exigência da transação entre entidades.
-    private readonly ServiceBusSender _senderApolices = client.CreateSender(MensagensApolice.Topico);
-    private readonly ServiceBusSender _senderRecusas = client.CreateSender(MensagensRecusa.Topico);
     // Para reagendar na própria fila (retry com backoff). Na fila, e não no tópico proposta-recebida: lá a cópia
     // chegaria a todas as assinaturas, e um interessado novo receberia cada tentativa.
     private readonly ServiceBusSender _senderEntrada = client.CreateSender(Fila);
 
     /// <summary>
-    /// Cria o processor da fila subscricao-entrada com os handlers deste Worker. Chamado uma vez, no registro (Program.cs).
+    /// Cria o processor da fila subscricao-entrada com os handlers desta classe. Chamado uma vez, no registro (Program.cs).
     /// </summary>
+    /// <param name="ligarNaPartida">False sem banco: as propostas esperam na fila em vez de falhar 5 vezes e ir para a DLQ.</param>
     /// <returns>O processor, pronto para o GerenciadorDeProcessadores ligar.</returns>
-    public ProcessadorControlavel CriarProcessador()
+    public ProcessadorControlavel CriarProcessador(bool ligarNaPartida)
     {
         var opcoes = new ServiceBusProcessorOptions
         {
@@ -71,7 +75,7 @@ public sealed class ProcessadorDePropostas(ServiceBusClient client, IConfigurati
         processor.ProcessMessageAsync += ProcessarMensagem;
         processor.ProcessErrorAsync += TratarErro;
 
-        return new ProcessadorControlavel(NomeDoProcessador, processor, logger);
+        return new ProcessadorControlavel(NomeDoProcessador, processor, logger, ligarNaPartida);
     }
 
     private async Task ProcessarMensagem(ProcessMessageEventArgs args)
@@ -113,6 +117,7 @@ public sealed class ProcessadorDePropostas(ServiceBusClient client, IConfigurati
         var simularFalha = mensagem.ApplicationProperties.TryGetValue(PropriedadesDaProposta.SimularFalha, out var falha) && falha is true;
         var comBackoff = mensagem.ApplicationProperties.TryGetValue(PropriedadesDaProposta.RetryComBackoff, out var backoff) && backoff is true;
         var tentativa = mensagem.ApplicationProperties.TryGetValue(PropriedadesDaProposta.Tentativa, out var t) && t is int n ? n : 1;
+        var simularQueda = mensagem.ApplicationProperties.TryGetValue(PropriedadesDaProposta.SimularQuedaAposGravar, out var queda) && queda is true;
 
         // 2a) Falha transitória com retry agendado (fase 3). A dependência simulada volta na 3ª tentativa:
         //     com backoff, ela teve tempo de se recuperar; com Abandon (2b), as 5 entregas acabam em segundos.
@@ -153,7 +158,7 @@ public sealed class ProcessadorDePropostas(ServiceBusClient client, IConfigurati
 
         // 3) Regra de negócio violada: a proposta FOI analisada, e o resultado é "recusada". Não é falha,
         //    então não vai para a DLQ (lá ninguém avisaria o cliente, e reprocessar daria a mesma recusa).
-        //    Conclui na fila e publica PropostaRecusada, na mesma transação do caminho feliz.
+        //    Grava a recusa e o evento PropostaRecusada no banco, como no caminho feliz, e conclui a mensagem.
         if (proposta.Idade > IdadeMaximaAceita)
         {
             atividade?.SetTag("vida.proposta.resultado", "recusada");
@@ -170,16 +175,14 @@ public sealed class ProcessadorDePropostas(ServiceBusClient client, IConfigurati
                 Motivo: $"Idade {proposta.Idade} acima do limite de {IdadeMaximaAceita} anos.",
                 RecusadaEm: DateTimeOffset.UtcNow);
 
-            using (var transacao = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+            var recusaNova = await RegistrarAsync(registro => registro.RegistrarRecusaAsync(mensagem.MessageId, recusa, args.CancellationToken));
+            if (await ConcluirAsync(args, proposta, recusaNova, simularQueda))
             {
-                await args.CompleteMessageAsync(mensagem, args.CancellationToken);
-                var mensagemDeRecusa = MensagensRecusa.Criar(recusa);
-                await _senderRecusas.SendMessageAsync(mensagemDeRecusa, args.CancellationToken);
-                transacao.Complete();
+                return;
             }
 
             logger.LogWarning(
-                "[{Instancia}] Proposta {PropostaId} recusada: idade {Idade} acima de {Maxima}. Recusa publicada em '{Topico}'.",
+                "[{Instancia}] Proposta {PropostaId} recusada: idade {Idade} acima de {Maxima}. Recusa gravada com o evento no outbox ('{Topico}').",
                 _instancia,
                 proposta.PropostaId,
                 proposta.Idade,
@@ -204,16 +207,13 @@ public sealed class ProcessadorDePropostas(ServiceBusClient client, IConfigurati
             EmitidaEm: DateTimeOffset.UtcNow,
             RequerRevisao: requerRevisao);
 
-        // Complete na fila + Send no tópico na MESMA transação do broker: ou os dois acontecem, ou nenhum.
-        // Sem isso: publicar e cair antes do Complete → evento duplicado; completar e cair antes do Send → evento perdido.
-        // Só vale para operações no Service Bus: um INSERT no SQL Server aqui dentro NÃO entraria na transação (fase 4: outbox).
-        using (var transacao = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+        // Até a etapa 8: Complete na fila + Send no tópico na mesma transação do broker. Com banco próprio isso não
+        // basta: um INSERT no SQL Server não entra na transação do Service Bus. Agora: grava tudo numa transação do
+        // SQL (inbox + apólice + outbox) e só então conclui. Se cair entre os dois, a reentrega cai na inbox.
+        var apoliceNova = await RegistrarAsync(registro => registro.RegistrarAprovacaoAsync(mensagem.MessageId, apolice, args.CancellationToken));
+        if (await ConcluirAsync(args, proposta, apoliceNova, simularQueda))
         {
-            // A primeira operação define a entidade "via" (a fila): o envio para o tópico é roteado por ela.
-            await args.CompleteMessageAsync(mensagem, args.CancellationToken);
-            var mensagemDaApolice = MensagensApolice.Criar(apolice);
-            await _senderApolices.SendMessageAsync(mensagemDaApolice, args.CancellationToken);
-            transacao.Complete();
+            return;
         }
 
         atividade?.SetTag("vida.proposta.resultado", "aprovada");
@@ -224,7 +224,7 @@ public sealed class ProcessadorDePropostas(ServiceBusClient client, IConfigurati
 
         var capital = proposta.CapitalSegurado.ToString("C0", PtBr);
         logger.LogInformation(
-            "[{Instancia}] Proposta {PropostaId} aprovada: {Plano}, capital {Capital}, idade {Idade} (#{Seq}) → apólice {ApoliceId} publicada.",
+            "[{Instancia}] Proposta {PropostaId} aprovada: {Plano}, capital {Capital}, idade {Idade} (#{Seq}) → apólice {ApoliceId} gravada com o evento no outbox.",
             _instancia,
             proposta.PropostaId,
             proposta.Plano,
@@ -232,6 +232,50 @@ public sealed class ProcessadorDePropostas(ServiceBusClient client, IConfigurati
             proposta.Idade,
             mensagem.SequenceNumber,
             apolice.ApoliceId);
+    }
+
+    /// <summary>
+    /// Grava a análise num escopo próprio (um DbContext por mensagem; o processor roda mensagens em paralelo).
+    /// </summary>
+    private async Task<bool> RegistrarAsync(Func<RegistroDaAnalise, Task<bool>> registrar)
+    {
+        await using var escopo = escopos.CreateAsyncScope();
+        var registro = escopo.ServiceProvider.GetRequiredService<RegistroDaAnalise>();
+        return await registrar(registro);
+    }
+
+    /// <summary>
+    /// Conclui a mensagem depois de gravar. Devolve true quando o chamador não deve seguir (nada a registrar no log
+    /// do caminho normal): reentrega já processada, ou a queda simulada.
+    /// </summary>
+    /// <param name="args">Mensagem em processamento.</param>
+    /// <param name="proposta">Proposta lida do corpo.</param>
+    /// <param name="gravouAgora">False se a inbox já tinha este MessageId (reentrega).</param>
+    /// <param name="simularQueda">Propriedade simularQuedaAposGravar da mensagem.</param>
+    private async Task<bool> ConcluirAsync(
+        ProcessMessageEventArgs args, PropostaSeguroVida proposta, bool gravouAgora, bool simularQueda)
+    {
+        var mensagem = args.Message;
+        if (!gravouAgora)
+        {
+            // At-least-once: a mesma mensagem voltou depois de já gravada. Conclui sem gravar nem publicar de novo.
+            await args.CompleteMessageAsync(mensagem, args.CancellationToken);
+            logger.LogWarning(
+                "[{Instancia}] Proposta {PropostaId} já processada (MessageId na inbox, entrega {Entrega}): concluída sem gravar nem publicar de novo.",
+                _instancia, proposta.PropostaId, mensagem.DeliveryCount);
+            return true;
+        }
+        if (simularQueda && mensagem.DeliveryCount == 1)
+        {
+            // Simula o processo caindo depois do commit e antes do Complete: o lock é devolvido e o broker reentrega.
+            await args.AbandonMessageAsync(mensagem, cancellationToken: args.CancellationToken);
+            logger.LogWarning(
+                "[{Instancia}] Proposta {PropostaId} gravada, mas o processo \"caiu\" antes de concluir (simulação). O broker vai reentregar.",
+                _instancia, proposta.PropostaId);
+            return true;
+        }
+        await args.CompleteMessageAsync(mensagem, args.CancellationToken);
+        return false;
     }
 
     /// <summary>
@@ -269,6 +313,7 @@ public sealed class ProcessadorDePropostas(ServiceBusClient client, IConfigurati
         };
         copia.ApplicationProperties[PropriedadesDaProposta.Tentativa] = tentativa + 1;
 
+        // Transação numa entidade só (Complete e Send na mesma fila): não precisa de EnableCrossEntityTransactions.
         using (var transacao = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
         {
             await args.CompleteMessageAsync(mensagem, args.CancellationToken);
@@ -306,8 +351,6 @@ public sealed class ProcessadorDePropostas(ServiceBusClient client, IConfigurati
     /// <returns>Tarefa representando a operação assíncrona.</returns>
     public async ValueTask DisposeAsync()
     {
-        await _senderApolices.DisposeAsync();
-        await _senderRecusas.DisposeAsync();
         await _senderEntrada.DisposeAsync();
     }
 }

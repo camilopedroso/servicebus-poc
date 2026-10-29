@@ -10,7 +10,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <!-- Publicado como pacote (publicar-pacotes.ps1): mudou, sobe a versão. Quem consome atualiza quando quiser. -->
-    <Version>1.0.0</Version>
+    <!-- 1.1.0: propriedade SimularQuedaAposGravar (etapa 9). Adição compatível: quem está na 1.0.0 segue funcionando. -->
+    <Version>1.1.0</Version>
     <Description>Linguagem publicada da squad de Propostas: o evento PropostaRecebida e como a mensagem é montada.</Description>
   </PropertyGroup>
 

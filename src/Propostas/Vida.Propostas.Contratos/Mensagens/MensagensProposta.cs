@@ -24,8 +24,10 @@ public static class MensagensProposta
     /// <param name="proposta">Proposta de seguro de vida.</param>
     /// <param name="simularFalha">Se true, adiciona a propriedade SimularFalha na mensagem.</param>
     /// <param name="retryComBackoff">Se true, adiciona a propriedade RetryComBackoff na mensagem.</param>
+    /// <param name="simularQuedaAposGravar">Se true, adiciona a propriedade SimularQuedaAposGravar (desde a 1.1.0).</param>
     /// <returns>Mensagem do Service Bus pronta para envio.</returns>
-    public static ServiceBusMessage Criar(PropostaSeguroVida proposta, bool simularFalha = false, bool retryComBackoff = false)
+    public static ServiceBusMessage Criar(
+        PropostaSeguroVida proposta, bool simularFalha = false, bool retryComBackoff = false, bool simularQuedaAposGravar = false)
     {
         var corpo = BinaryData.FromObjectAsJson(proposta);
         var mensagem = new ServiceBusMessage(corpo)
@@ -45,6 +47,10 @@ public static class MensagensProposta
         if (retryComBackoff)
         {
             mensagem.ApplicationProperties[PropriedadesDaProposta.RetryComBackoff] = true;
+        }
+        if (simularQuedaAposGravar)
+        {
+            mensagem.ApplicationProperties[PropriedadesDaProposta.SimularQuedaAposGravar] = true;
         }
         return mensagem;
     }

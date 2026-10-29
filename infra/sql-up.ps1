@@ -1,4 +1,5 @@
-# Sobe o SQL Server local (Docker) da fase 4 e grava a connection string para o Producer.
+# Sobe o SQL Server local (Docker) e grava as connection strings dos serviços que têm banco: Propostas (fase 4)
+# e Subscrição (etapa 9). Um SQL Server, um banco por serviço: cada um lê só o seu.
 # Uso: .\infra\sql-up.ps1
 # Roda local de propósito: só o Service Bus fica no Azure (custo). Os dados ficam no volume "vida-sql-dados"
 # e sobrevivem a reinícios; .\infra\sql-down.ps1 remove o container (com -ApagarDados, o volume também).
@@ -32,11 +33,21 @@ else {
         mcr.microsoft.com/mssql/server:2022-latest | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'docker run falhou.' }
 
-    # O Producer lê este arquivo (como o servicebus.local.json). TrustServerCertificate só porque é local.
+    # Os serviços leem este arquivo (como o servicebus.local.json). TrustServerCertificate só porque é local.
     $conexao = "Server=localhost,$porta;Database=VidaPropostas;User Id=sa;Password=$senha;TrustServerCertificate=True;Encrypt=True"
     @{ ConnectionStrings = @{ Propostas = $conexao } } |
         ConvertTo-Json -Depth 3 |
         Set-Content -Path $arquivo -Encoding utf8
+}
+
+# Etapa 9: a Subscrição tem o banco dela no mesmo SQL Server. Arquivos criados antes só têm a de Propostas: completa,
+# reaproveitando a senha (mesmo servidor, outro banco).
+$configuracao = Get-Content $arquivo -Raw | ConvertFrom-Json
+if (-not $configuracao.ConnectionStrings.Subscricao) {
+    $daSubscricao = $configuracao.ConnectionStrings.Propostas -replace 'Database=VidaPropostas', 'Database=VidaSubscricao'
+    $configuracao.ConnectionStrings | Add-Member -NotePropertyName Subscricao -NotePropertyValue $daSubscricao
+    $configuracao | ConvertTo-Json -Depth 3 | Set-Content -Path $arquivo -Encoding utf8
+    Write-Host 'Connection string da Subscrição acrescentada (recompile para copiar o arquivo).'
 }
 
 # O SQL Server leva alguns segundos para aceitar conexões depois que o container sobe.
@@ -48,4 +59,4 @@ do {
 } until ($pronto -or (Get-Date) -gt $limite)
 if (-not $pronto) { throw "O SQL Server não ficou pronto em 90 s. Veja: docker logs $container" }
 
-Write-Host "Pronto: localhost,$porta (banco VidaPropostas, criado pelo Producer na partida)."
+Write-Host "Pronto: localhost,$porta (bancos VidaPropostas e VidaSubscricao, criados pelos serviços na partida)."

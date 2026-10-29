@@ -21,4 +21,11 @@ public static class PropriedadesDaProposta
     /// então a contagem precisa viajar na própria mensagem.
     /// </summary>
     public const string Tentativa = "tentativa";
+
+    /// <summary>
+    /// Quando true, a Subscrição grava a análise no banco dela e "cai" antes de concluir a mensagem (etapa 9 do
+    /// plano). O broker reentrega, e a inbox (MessageId já processado) impede uma segunda apólice. Entrou na
+    /// versão 1.1.0 deste contrato.
+    /// </summary>
+    public const string SimularQuedaAposGravar = "simularQuedaAposGravar";
 }

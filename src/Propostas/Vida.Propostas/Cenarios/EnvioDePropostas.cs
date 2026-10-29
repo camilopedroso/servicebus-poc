@@ -77,20 +77,22 @@ public sealed class EnvioDePropostas(ServiceBusClient client, ILogger<EnvioDePro
         ServiceBusMessage mensagem = MensagensProposta.Criar(
             proposta: proposta,
             simularFalha: parametros.SimularFalha,
-            retryComBackoff: parametros.RetryComBackoff);
+            retryComBackoff: parametros.RetryComBackoff,
+            simularQuedaAposGravar: parametros.SimularQuedaAposGravar);
 
         await _sender.SendMessageAsync(mensagem, cancellationToken);
 
         string capital = proposta.CapitalSegurado.ToString("C0", PtBr);
 
         logger.LogInformation(
-            "Enviada proposta {PropostaId} ({Plano}, idade {Idade}, capital {Capital}, simularFalha={SimularFalha}, retryComBackoff={RetryComBackoff}).",
+            "Enviada proposta {PropostaId} ({Plano}, idade {Idade}, capital {Capital}, simularFalha={SimularFalha}, retryComBackoff={RetryComBackoff}, simularQuedaAposGravar={SimularQueda}).",
             proposta.PropostaId,
             proposta.Plano,
             proposta.Idade,
             capital,
             parametros.SimularFalha,
-            parametros.RetryComBackoff);
+            parametros.RetryComBackoff,
+            parametros.SimularQuedaAposGravar);
 
         return proposta;
     }

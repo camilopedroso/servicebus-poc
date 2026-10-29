@@ -128,7 +128,7 @@ export const cenarios: Cenario[] = [
     mostra:
       'Recusa por regra de negócio é um desfecho, não uma falha: a mensagem é concluída e o fato vira evento. A DLQ fica para o que não dá para processar.',
     esperado:
-      'A Subscrição conclui a proposta e publica PropostaRecusada no tópico proposta-recusada, na mesma transação. A assinatura notificacao-recusa avisa o cliente. Nada vai para a DLQ.',
+      'A Subscrição grava a recusa e o evento PropostaRecusada no banco dela (inbox + recusa + outbox, numa transação), conclui a mensagem, e o despachante publica no tópico proposta-recusada. A assinatura notificacao-recusa avisa o cliente. Nada vai para a DLQ.',
     campos: ['idade', 'capitalSegurado', 'plano'],
     padroes: { idade: '85' },
     executar: enviarProposta,
@@ -428,6 +428,26 @@ export const cenarios: Cenario[] = [
       const propostas = await Promise.all(consultas);
       const enviadas = propostas.filter((p) => p.status === 'EnviadaParaAnalise').length;
       return `Subscrição parada. 5 propostas aceitas; 3 s depois, ${enviadas} em EnviadaParaAnalise e ${plural(naFila.length, 'mensagem', 'mensagens')} esperando na fila subscricao-entrada. Religue "propostas" na coluna da Subscrição.`;
+    },
+  },
+  {
+    id: 'queda-apos-gravar',
+    fase: 4,
+    titulo: 'Queda entre gravar e concluir (inbox)',
+    mostra:
+      'A Subscrição grava a apólice no banco dela e "cai" antes de concluir a mensagem. O broker reentrega (at-least-once), e a inbox, com o MessageId já processado, impede a segunda apólice e o segundo evento.',
+    esperado:
+      'Na Subscrição: "gravada, mas o processo caiu antes de concluir", depois "já processada (MessageId na inbox, entrega 2)". Uma apólice só: Cobrança e Notificação recebem o evento uma vez.',
+    campos: ['idade', 'capitalSegurado', 'plano'],
+    executar: async (v) => {
+      const proposta = await chamar<{ propostaId: string }>('propostas', 'POST', '/demo/propostas', {
+        idade: numeroOuNulo(v.idade),
+        capitalSegurado: numeroOuNulo(v.capitalSegurado),
+        plano: textoOuNulo(v.plano),
+        simularFalha: false,
+        simularQuedaAposGravar: true,
+      });
+      return `Proposta ${proposta.propostaId.slice(0, 8)} enviada com a queda simulada depois da gravação.`;
     },
   },
   {

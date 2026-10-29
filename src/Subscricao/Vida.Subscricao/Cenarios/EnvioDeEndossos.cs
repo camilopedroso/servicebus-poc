@@ -1,7 +1,6 @@
 using Azure.Messaging.ServiceBus;
 using Vida.Subscricao.Contratos.Comandos;
 using Vida.Subscricao.Contratos.Mensagens;
-using Vida.Subscricao.Conexao;
 
 namespace Vida.Subscricao.Cenarios;
 
@@ -10,7 +9,7 @@ namespace Vida.Subscricao.Cenarios;
 /// </summary>
 /// <param name="client">ServiceBusClient singleton do app.</param>
 /// <param name="logger">Logger; o painel mostra estas linhas na coluna da Subscrição.</param>
-public sealed class EnvioDeEndossos([FromKeyedServices(ClientSemTransacao.Chave)] ServiceBusClient client, ILogger<EnvioDeEndossos> logger) : IAsyncDisposable
+public sealed class EnvioDeEndossos(ServiceBusClient client, ILogger<EnvioDeEndossos> logger) : IAsyncDisposable
 {
     private static readonly string[] Tipos =
     [

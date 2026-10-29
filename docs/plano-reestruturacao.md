@@ -18,7 +18,7 @@ painel funcionando, e marca o checkbox aqui (é assim que a próxima sessão sab
 - [x] Etapa 6 — `Vida.Operacao` (ferramentas de operação) e endpoints de demonstração no dono certo
 - [x] Etapa 7 — Painel, `iniciar.ps1`, `launch.json`
 - [ ] Etapa 8 — Documentação (nota da fase, README, dicas, CLAUDE.md)
-- [ ] Etapa 9 — (Opcional) Banco próprio na Subscrição: outbox + inbox
+- [x] Etapa 9 — (Opcional) Banco próprio na Subscrição: outbox + inbox
 - [x] Etapa 10 — Uma solution por squad; contratos e plataforma como pacotes NuGet (feed local)
 
 Ordem de execução escolhida em 2026-10-29: **10 → 9 → 8** (a documentação por último, descrevendo o estado final).
@@ -544,6 +544,20 @@ flowchart LR
 - **Inbox:** tabela com o `MessageId` processado, na mesma transação da apólice. Repetição (at-least-once) = no-op.
 - **Outbox:** o mesmo padrão do Propostas, copiado e não compartilhado (cada squad tem o seu).
 - Só vale se sobrar tempo: é o melhor exemplo de "por que cada serviço precisa de idempotência na entrada".
+- **Resultado (2026-10-29):** banco `VidaSubscricao` (mesmo SQL Server local; `sql-up.ps1` grava e completa
+  `ConnectionStrings:Subscricao`), schema `Subscricao`: `Apolices`, `Recusas`, `Inbox` (MessageId como chave
+  primária), `OutboxMensagens`. `Analise/RegistroDaAnalise` grava inbox + negócio + outbox num `SaveChanges`; a chave
+  primária da inbox decide a corrida entre duas instâncias. `ProcessadorDePropostas` grava e só depois conclui; a
+  reentrega de algo já gravado é concluída sem gravar nem publicar. `Outbox/` (despachante e `MensagemDeSaida`)
+  copiado do de Propostas, sem compartilhar código. Consequência: sem publicar dentro da transação do broker, o
+  `EnableCrossEntityTransactions` e o `ClientSemTransacao` saíram; o retry com backoff continua numa transação, mas de
+  uma entidade só (documentação conferida: dispensa a opção). Sem banco, o processador de propostas não liga (as
+  propostas esperam na fila). Simulação nova `simularQuedaAposGravar` (grava e abandona na 1ª entrega): **primeira
+  mudança real de contrato**, `Vida.Propostas.Contratos` 1.1.0, publicada ao lado da 1.0.0; a Subscrição referencia a
+  1.1.0, Cobrança e Notificação continuam na 1.0.0 sem mudar nada. Cenário do painel "Queda entre gravar e concluir
+  (inbox)". Testes de integração `tests/Subscricao/Vida.Subscricao.Testes.Integracao` (Testcontainers): aprovação,
+  reentrega (uma apólice, um evento) e recusa; 71 no total. Ao vivo: API aprovada e recusada, queda simulada (no
+  banco: 1 apólice, 1 inbox, 1 evento; Cobrança recebeu uma vez), backoff, endossos, demo de apólice.
 
 ### Etapa 10 — Uma solution por squad
 

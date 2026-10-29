@@ -8,19 +8,34 @@
     <!-- Comentários /// no contrato OpenAPI das demonstrações; o 1591 (membro público sem comentário) fica desligado. -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);1591</NoWarn>
+    <!-- Copia o src/sqlserver.local.json (infra/sql-up.ps1) para a saída: ver src/Directory.Build.props -->
+    <UsaSqlServerLocal>true</UsaSqlServerLocal>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.13" />
     <PackageReference Include="Scalar.AspNetCore" Version="2.18.5" />
+    <!-- Etapa 9: banco próprio (inbox + apólices + outbox). Mesmas versões do serviço de Propostas. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.13">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.13" />
+    <!-- Não é usado direto: sobe a versão transitiva vulnerável que o Microsoft.Data.SqlClient traz (ver o csproj de Propostas). -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Vida.Plataforma" Version="1.0.0" />
-    <PackageReference Include="Vida.Propostas.Contratos" Version="1.0.0" />
+    <!-- 1.1.0: lê SimularQuedaAposGravar. O Vida.Subscricao.Contratos pede >= 1.0.0, e a referência direta vence. -->
+    <PackageReference Include="Vida.Propostas.Contratos" Version="1.1.0" />
     <ProjectReference Include="..\..\Subscricao\Vida.Subscricao.Contratos\Vida.Subscricao.Contratos.csproj" />
     <PackageReference Include="Vida.LogsAoVivo" Version="1.0.0" />
     <PackageReference Include="Vida.Telemetria" Version="1.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Vida.Subscricao.Testes.Integracao" />
   </ItemGroup>
 
 </Project>

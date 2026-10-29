@@ -18,12 +18,13 @@ const origens: Record<string, Origem> = {
   PropostasController: { rotulo: 'API', descricao: 'API REST /api/propostas: grava a proposta e o outbox numa transação (fase 4)' },
   OutboxController: { rotulo: 'outbox', descricao: 'Operação do outbox: pendentes e publicadas' },
   SimulacaoDoOutboxController: { rotulo: 'outbox', descricao: 'Demonstração: simula o Service Bus fora do ar para o despachante (fase 4)' },
-  DespachanteDoOutbox: { rotulo: 'outbox', descricao: 'Despachante: publica no Service Bus o que a API gravou (fase 4)' },
+  // Propostas (fase 4) e Subscrição (etapa 9) têm cada uma o seu despachante: mesmo padrão, cópias separadas.
+  DespachanteDoOutbox: { rotulo: 'outbox', descricao: 'Despachante: publica no Service Bus o que o serviço gravou no outbox' },
   ProcessadorDeDesfechos: {
     rotulo: 'desfecho',
     descricao: 'Assinaturas status-aprovada e status-recusada: grava Aprovada ou Recusada na proposta da API',
   },
-  MigracaoDoBanco: { rotulo: 'banco', descricao: 'Migrations do EF Core na partida' },
+  MigracaoDoBanco: { rotulo: 'banco', descricao: 'Migrations do EF Core na partida (cada serviço com banco tem a sua)' },
   TratadorDeErrosDoBanco: { rotulo: 'erro', descricao: 'Falha do SQL Server convertida em ProblemDetails' },
   // Todos os serviços com API (Propostas, Subscrição, Operação)
   TratadorDeErrosDoServiceBus: { rotulo: 'erro', descricao: 'Falha do Service Bus ou de autenticação convertida em ProblemDetails' },

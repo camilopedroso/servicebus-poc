@@ -5,7 +5,6 @@ using Vida.Plataforma.Mensagens;
 using Vida.Subscricao.Contratos.Comandos;
 using Vida.Subscricao.Contratos.Mensagens;
 using Vida.Telemetria;
-using Vida.Subscricao.Conexao;
 
 namespace Vida.Subscricao.Endossos;
 
@@ -17,7 +16,7 @@ namespace Vida.Subscricao.Endossos;
 /// Quem liga e desliga o processor é o GerenciadorDeProcessadores (POST /processadores/endossos/parar).
 /// </summary>
 public sealed class ProcessadorDeEndossos(
-    [FromKeyedServices(ClientSemTransacao.Chave)] ServiceBusClient client, ILogger<ProcessadorDeEndossos> logger)
+    ServiceBusClient client, ILogger<ProcessadorDeEndossos> logger)
 {
     /// <summary>Nome do processador na rota /processadores/{nome} e no painel.</summary>
     public const string NomeDoProcessador = "endossos";

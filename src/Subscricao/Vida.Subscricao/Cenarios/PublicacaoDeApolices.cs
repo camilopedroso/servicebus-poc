@@ -4,7 +4,6 @@ using Vida.Subscricao.Contratos.Eventos;
 using Vida.Subscricao.Contratos.Mensagens;
 using Vida.Subscricao.Dominio;
 using Vida.Subscricao.Contratos.Demonstracao;
-using Vida.Subscricao.Conexao;
 
 namespace Vida.Subscricao.Cenarios;
 
@@ -14,7 +13,7 @@ namespace Vida.Subscricao.Cenarios;
 /// </summary>
 /// <param name="client">ServiceBusClient singleton do app.</param>
 /// <param name="logger">Logger; o painel mostra estas linhas na coluna da Subscrição.</param>
-public sealed class PublicacaoDeApolices([FromKeyedServices(ClientSemTransacao.Chave)] ServiceBusClient client, ILogger<PublicacaoDeApolices> logger) : IAsyncDisposable
+public sealed class PublicacaoDeApolices(ServiceBusClient client, ILogger<PublicacaoDeApolices> logger) : IAsyncDisposable
 {
     private static readonly System.Globalization.CultureInfo PtBr = new("pt-BR");
 

@@ -26,5 +26,6 @@
     <Project Path="tests/Propostas/Vida.Propostas.Testes/Vida.Propostas.Testes.csproj" />
     <Project Path="tests/Propostas/Vida.Propostas.Testes.Integracao/Vida.Propostas.Testes.Integracao.csproj" />
     <Project Path="tests/Subscricao/Vida.Subscricao.Testes/Vida.Subscricao.Testes.csproj" />
+    <Project Path="tests/Subscricao/Vida.Subscricao.Testes.Integracao/Vida.Subscricao.Testes.Integracao.csproj" />
   </Folder>
 </Solution>

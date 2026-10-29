@@ -22,12 +22,17 @@ namespace Vida.Propostas.Contratos.Demonstracao;
 ///     Com SimularFalha, o consumer agenda novas tentativas com espera 
 ///     crescente em vez de abandonar.
 /// </param>
+/// <param name="SimularQuedaAposGravar">
+///     Se true, a Subscrição grava a análise e "cai" antes de concluir a mensagem: o broker reentrega,
+///     e a inbox dela impede a segunda apólice.
+/// </param>
 public sealed record EnvioDeProposta(
     int? Idade,
     decimal? CapitalSegurado,
     string? Plano,
     bool SimularFalha,
-    bool RetryComBackoff = false)
+    bool RetryComBackoff = false,
+    bool SimularQuedaAposGravar = false)
 {
     /// <summary>Erros de validação por campo; vazio se o corpo for válido.</summary>
     public Dictionary<string, string[]> Validar()
