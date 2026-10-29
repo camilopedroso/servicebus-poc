@@ -13,7 +13,7 @@ painel funcionando, e marca o checkbox aqui (é assim que a próxima sessão sab
 - [x] Etapa 1 — Liga/desliga genérico (e o Consumer ganha botão no painel)
 - [x] Etapa 2 — Quebrar `Vida.Mensageria` em plataforma + contratos por serviço
 - [x] Etapa 3 — Fila `propostas` vira tópico `proposta-recebida` + caixa de entrada da Subscrição
-- [ ] Etapa 4 — Bicep por serviço (quem publica cria o tópico, quem consome cria a assinatura)
+- [x] Etapa 4 — Bicep por serviço (quem publica cria o tópico, quem consome cria a assinatura)
 - [ ] Etapa 5 — `Vida.Assinantes` vira `Vida.Cobranca` e `Vida.Notificacao`; `alto-valor` fica sem serviço
 - [ ] Etapa 6 — `Vida.Operacao` (ferramentas de operação) e endpoints de demonstração no dono certo
 - [ ] Etapa 7 — Painel, `iniciar.ps1`, `launch.json`
@@ -433,6 +433,14 @@ A mudança de comportamento principal.
 - Módulos da seção 4. `main.bicep` só orquestra. `az bicep lint -f infra\main.bicep`.
 - **Pronto quando:** `up.ps1` em grupo de recursos zerado cria tudo, `curl .../assinaturas/regras` igual ao da
   etapa 3 (em especial as regras de `cobranca` e `alto-valor`, que dão problema com `$Default`).
+- **Resultado (2026-10-29):** `infra/servicos/`: `plataforma.bicep`, `propostas.publica/assina`,
+  `subscricao.publica/assina`, `cobranca.assina`, `notificacao.assina`, `resseguro.assina`, e `padroes.bicep` com a
+  função exportada `propriedadesDeAssinatura(lockDuration)` (`@export()` + `import`), em vez de copiar o objeto.
+  A ordem sai das referências: cada "publica" devolve os nomes como output, e cada "assina" os recebe por parâmetro
+  (sem `dependsOn` manual). O what-if do template novo é idêntico ao do `main.bicep` antigo contra a mesma infra
+  (20 recursos; os "Modify" são ruído de propriedades com valor padrão do servidor, iguais nos dois). `down.ps1` +
+  `up.ps1` do zero: plataforma → os dois "publica" → os cinco "assina"; regras iguais às da etapa 3; apólice de
+  1,5 mi em `alto-valor` (com `prioridade = alta`) e `notificacao`, não em `cobranca`.
 
 ### Etapa 5 — Cobrança, Notificação e o serviço que não existe
 
