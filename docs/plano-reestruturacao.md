@@ -17,7 +17,7 @@ painel funcionando, e marca o checkbox aqui (é assim que a próxima sessão sab
 - [x] Etapa 5 — `Vida.Assinantes` vira `Vida.Cobranca` e `Vida.Notificacao`; `alto-valor` fica sem serviço
 - [x] Etapa 6 — `Vida.Operacao` (ferramentas de operação) e endpoints de demonstração no dono certo
 - [x] Etapa 7 — Painel, `iniciar.ps1`, `launch.json`
-- [ ] Etapa 8 — Documentação (nota da fase, README, dicas, CLAUDE.md)
+- [x] Etapa 8 — Documentação (nota da fase, README, dicas, CLAUDE.md)
 - [x] Etapa 9 — (Opcional) Banco próprio na Subscrição: outbox + inbox
 - [x] Etapa 10 — Uma solution por squad; contratos e plataforma como pacotes NuGet (feed local)
 
@@ -529,6 +529,13 @@ A mudança de comportamento principal.
 - Notas da fase 7: comando × evento; outbox é padrão, não serviço; dono da assinatura;
   assinatura sem consumidor; contrato versionado × biblioteca compartilhada; ciclo de dependência no Bicep.
 - `CLAUDE.md`: arquitetura com os nomes novos; remover a linha que aponta para este plano.
+- **Resultado (2026-10-29), feita por último (depois das etapas 10 e 9):** `docs/fase-7-servicos-por-squad.md` (modelo
+  mental, glossário com Kafka e RabbitMQ, diagramas, conceitos de todas as etapas, fluxos para depurar, perguntas,
+  referências); `README.md` (fase 7 na tabela, aviso de que as notas 1 a 5 descrevem o código da época, estrutura,
+  portas, comandos, "Rodando a fase 7");
+  `CLAUDE.md` reescrito
+  (tabela de serviços e donos, regra de referências e versões, convenções, fluxos, painel, testes; sem a linha "em
+  andamento").
 
 ### Etapa 9 — (Opcional) Banco na Subscrição
 
