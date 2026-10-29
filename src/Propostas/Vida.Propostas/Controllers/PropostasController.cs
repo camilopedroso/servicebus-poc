@@ -8,6 +8,7 @@ using Vida.Propostas.Contratos;
 using Vida.Propostas.Dados;
 using Vida.Propostas.Outbox;
 using Vida.Plataforma.Api;
+using Azure.Messaging.ServiceBus;
 
 namespace Vida.Propostas.Controllers;
 
@@ -67,7 +68,7 @@ public sealed class PropostasController(
             }
         }
 
-        var proposta = new PropostaSeguroVida(
+        PropostaSeguroVida proposta = new(
             PropostaId: Guid.NewGuid(),
             ClienteId: corpo.ClienteId!.Trim(),
             Idade: corpo.Idade!.Value,
@@ -76,7 +77,7 @@ public sealed class PropostasController(
             Plano: Planos.Interpretar(corpo.Plano)!.Value,
             CriadaEm: DateTimeOffset.UtcNow);
 
-        var registro = new PropostaRegistrada
+        PropostaRegistrada registro = new()
         {
             PropostaId = proposta.PropostaId,
             ClienteId = proposta.ClienteId,
@@ -87,11 +88,16 @@ public sealed class PropostasController(
             RecebidaEm = proposta.CriadaEm,
             ChaveDeIdempotencia = chave,
         };
+
+        // adiciona ao banco na tabela [Propostas].[Registradas]
         banco.Propostas.Add(registro);
 
         // A mensagem é montada pela mesma fábrica do envio direto e guardada como linha do outbox.
-        var mensagem = MensagensProposta.Criar(proposta);
-        var linhaDoOutbox = MensagemDeSaida.De(destino: MensagensProposta.Topico, mensagem: mensagem);
+        ServiceBusMessage mensagem = MensagensProposta.Criar(proposta);
+
+        MensagemDeSaida linhaDoOutbox = MensagemDeSaida.De(destino: MensagensProposta.Topico, mensagem: mensagem);
+
+        // adiciona ao banco na tabela [Propostas].[OutboxMensagens]
         banco.OutboxMensagens.Add(linhaDoOutbox);
 
         try
@@ -111,7 +117,8 @@ public sealed class PropostasController(
             "API: proposta {PropostaId} gravada com a mensagem no outbox ({Plano}, idade {Idade}). 201 sem falar com o Service Bus.",
             registro.PropostaId, registro.Plano, registro.Idade);
         // Location relativo, como antes; CreatedAtAction geraria uma URL absoluta.
-        var resposta = PropostaResposta.De(registro);
+
+        PropostaResposta resposta = PropostaResposta.De(registro);
         return Created($"/api/propostas/{registro.PropostaId}", resposta);
     }
 

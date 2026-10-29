@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using Azure.Messaging.ServiceBus;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using OpenTelemetry;
 using Vida.Propostas.Contratos.Mensagens;
 using Vida.Propostas.Dados;
@@ -61,12 +62,12 @@ public sealed class DespachanteDoOutbox(
     /// <remarks>internal (e não private): os testes de integração rodam um lote sem esperar o timer.</remarks>
     internal async Task<int> DespacharLoteAsync(CancellationToken cancellationToken)
     {
-        await using var escopo = escopos.CreateAsyncScope();
-        var banco = escopo.ServiceProvider.GetRequiredService<BancoDePropostas>();
+        await using AsyncServiceScope escopo = escopos.CreateAsyncScope();
+        BancoDePropostas banco = escopo.ServiceProvider.GetRequiredService<BancoDePropostas>();
 
         // A transação segura o lock das linhas lidas até marcar (table hints no SELECT abaixo).
         // Custo: a transação fica aberta durante o envio ao Service Bus. Com lotes pequenos, aceitável.
-        await using var transacao = await banco.Database.BeginTransactionAsync(cancellationToken);
+        await using IDbContextTransaction transacao = await banco.Database.BeginTransactionAsync(cancellationToken);
         var agora = DateTimeOffset.UtcNow;
         List<MensagemDeSaida> pendentes;
         // Polling a cada segundo: sem isto, cada consulta vazia viraria um trace no App Insights (86 mil por dia).
@@ -91,13 +92,13 @@ public sealed class DespachanteDoOutbox(
 
         // Daqui em diante há trabalho de verdade: um span para o lote, com o envio e o UPDATE dentro dele.
         // As mensagens levam o Diagnostic-Id gravado no POST, então a Subscrição continua o trace da requisição.
-        using var atividade = FonteDeAtividades.Fonte.StartActivity("PublicarOutbox");
+        using Activity? atividade = FonteDeAtividades.Fonte.StartActivity("PublicarOutbox");
         atividade?.SetTag("vida.outbox.mensagens", pendentes.Count);
 
         var gruposPorDestino = pendentes.GroupBy(m => m.Destino);
         foreach (var grupo in gruposPorDestino)
         {
-            var mensagens = grupo.ToList();
+            List<MensagemDeSaida> mensagens = [.. grupo];
             try
             {
                 if (simulacao.Ativa)
@@ -105,10 +106,15 @@ public sealed class DespachanteDoOutbox(
                     throw new ServiceBusException(
                         "Simulação: Service Bus indisponível.", ServiceBusFailureReason.ServiceCommunicationProblem);
                 }
-                var sender = _senders.GetOrAdd(grupo.Key, client.CreateSender);
+
+                ServiceBusSender sender = _senders.GetOrAdd(grupo.Key, client.CreateSender);
                 // Lista na ordem do Id: o broker preserva a ordem dentro da chamada.
-                var remontadas = mensagens.Select(m => m.ParaServiceBus());
+                
+                IEnumerable<ServiceBusMessage> remontadas = mensagens.Select(m => m.ParaServiceBus());
+                // publica na fila
                 await sender.SendMessagesAsync(remontadas, cancellationToken);
+
+                // atualiza a linha na tabela [Propostas].[Registradas] alterando seu status e registrando a data em 'enviadaEm'.
                 await MarcarPublicadasAsync(banco, mensagens, agora, cancellationToken);
             }
             catch (ServiceBusException ex)
@@ -149,6 +155,7 @@ public sealed class DespachanteDoOutbox(
             var enviadas = banco.Propostas.Where(p => propostas.Contains(p.PropostaId));
             // Só sai de Recebida: o desfecho (Aprovada/Recusada) pode chegar entre o envio acima e este UPDATE,
             // porque a recusa é rápida, e não pode ser sobrescrito por um status anterior.
+            
             await enviadas.ExecuteUpdateAsync(
                 colunas =>
                 {

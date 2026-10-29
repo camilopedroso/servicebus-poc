@@ -69,7 +69,10 @@ builder.Services.AddDbContext<BancoDePropostas>(opcoes =>
 // Ordem importa: hosted services começam na ordem de registro, então o banco é migrado antes do despachante.
 builder.Services.AddHostedService<MigracaoDoBanco>();
 builder.Services.AddSingleton<SimulacaoDeIndisponibilidade>();
+
+// despachante do outbox: pega as mensagens pendentes e publica no Service Bus, depois marca como publicadas.
 builder.Services.AddHostedService<DespachanteDoOutbox>();
+
 // Desfecho da subscrição de volta para a API (Aprovada/Recusada). Sem SQL não há onde gravar: sem o processor,
 // os eventos ficam guardados nas assinaturas (TTL de 14 dias) em vez de falhar 5 vezes e ir para a DLQ.
 if (conexaoSql is not null)
