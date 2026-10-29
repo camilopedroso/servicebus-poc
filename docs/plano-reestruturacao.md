@@ -9,7 +9,7 @@ painel funcionando, e marca o checkbox aqui (é assim que a próxima sessão sab
 
 ## Progresso
 
-- [ ] Etapa 0 — Linha de base no PC
+- [x] Etapa 0 — Linha de base no PC
 - [ ] Etapa 1 — Liga/desliga genérico (e o Consumer ganha botão no painel)
 - [ ] Etapa 2 — Quebrar `Vida.Mensageria` em plataforma + contratos por serviço
 - [ ] Etapa 3 — Fila `propostas` vira tópico `proposta-recebida` + caixa de entrada da Subscrição
@@ -348,6 +348,12 @@ Cada etapa: o que fazer, critério de pronto, e o que depurar para ver a mudanç
 - `git pull`, `dotnet tool restore`, `dotnet build`, `dotnet test`, `.\iniciar.ps1 -ComInfra`, rodar 2 cenários no
   painel. Anotar o que falhar **antes** de mexer (é o que diferencia "quebrou na reestruturação" de "já estava
   assim no PC").
+- **Resultado (2026-10-29):** build ok, 68/68 testes, infra e apps no ar; lote (fase 1), proposta aprovada e
+  recusada pela API (fase 4) com desfecho de volta. Já estava assim antes de mexer:
+  - aviso CS1570 em `CenariosDePropostasController.cs:60` (`</summary>` sobrando no `///` de `EnviarUmaAsync`);
+  - rodando o `iniciar.ps1` pelo Claude Code (sandbox), `Porta-Em-Uso` não enxerga a porta do Vite (o `netstat`
+    mostra `[::1]:5173` como `CLOSED`, mas ela responde 200) e o script derruba tudo. No terminal normal não
+    deve acontecer; se acontecer, trocar a checagem por uma requisição HTTP.
 
 ### Etapa 1 — Liga/desliga genérico
 
