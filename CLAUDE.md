@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Study POC for Azure Service Bus in C#/.NET 10, modeled on a life-insurance policy issuance domain ("Vida"). The goal is to explain Service Bus concepts by contrasting them with Kafka and RabbitMQ, which the user already knows. Code identifiers, comments, logs and docs are in **Portuguese (pt-BR)**. Keep that convention.
 
-The work is split into phases (roadmap and status in `README.md`). Each phase gets code plus a study note in `docs/fase-N-*.md` with Kafka/RabbitMQ comparisons, and Microsoft Learn links. Done: 1 queues, settlement, DLQ; 2 topic + subscriptions with filters, cross-entity transaction; 3 sessions/dedup/scheduled/deferral; 4 REST API + Outbox on SQL Server; 5 OpenTelemetry → App Insights + tests. Phase 6 (Azure DevOps + Functions) was dropped by the user; the POC is complete.
+The work is split into phases (roadmap and status in `README.md`). Each phase gets code plus a study note in `docs/fase-N-*.md` with Kafka/RabbitMQ comparisons, and Microsoft Learn links. Done: 1 queues, settlement, DLQ; 2 topic + subscriptions with filters, cross-entity transaction; 3 sessions/dedup/scheduled/deferral; 4 REST API + Outbox on SQL Server; 5 OpenTelemetry → App Insights + tests. Phase 6 (Azure DevOps + Functions) was dropped by the user. **In progress:** restructuring into services per squad (phase 7). The plan, with stages and a progress checklist, is in `docs/plano-reestruturacao.md`; run one stage at a time and tick its checkbox.
 
 ## Commands
 
