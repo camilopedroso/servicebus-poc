@@ -20,6 +20,7 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.13" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.18.5" />
     <!-- Não é usado direto: sobe a versão transitiva do Microsoft.Data.SqlClient 6.1.7 (9.0.11, com vulnerabilidade
          alta GHSA-846f-f764-76mx). Pode sair quando o EF Core trouxer uma SqlClient que já dependa da versão corrigida. -->
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
@@ -33,6 +34,10 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- Gera o XML dos comentários /// ; o Microsoft.AspNetCore.OpenApi (.NET 10) o usa para preencher summary e
+         description no contrato. O 1591 (membro público sem comentário) fica desligado para não poluir o build. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
   </PropertyGroup>
 
 </Project>

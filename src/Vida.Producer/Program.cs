@@ -4,6 +4,7 @@ using Vida.LogsAoVivo.Logs;
 using Vida.Mensageria.Conexao;
 using Vida.Telemetria;
 using Microsoft.EntityFrameworkCore;
+using Scalar.AspNetCore;
 using Vida.Producer.Cenarios;
 using Vida.Producer.Operacao;
 using Vida.Producer.Dados;
@@ -16,6 +17,8 @@ using Vida.Producer.Outbox;
 //   curl -X POST localhost:5180/demo/propostas/lote -H "Content-Type: application/json" -d '{"quantidade":5}'
 //   curl -X POST localhost:5180/demo/propostas -H "Content-Type: application/json" -d '{"idade":85}'
 //   curl localhost:5180/filas/propostas/mensagens?dlq=true
+//
+// Em Development, a interface para explorar e testar fica em http://localhost:5180/scalar (os dois contratos).
 //
 // Prontos para produção (contrato em /openapi/v1.json):
 //   POST /api/propostas                     grava proposta + outbox numa transação → 201 Created (Idempotency-Key opcional)
@@ -57,8 +60,18 @@ builder.AddTelemetria("Vida.Producer");
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<TratadorDeErros>();
 builder.Services.AddControllers();
-// Dois contratos: "v1" só com os endpoints prontos para produção (os de demonstração têm GroupName "demo" e ficam
-// fora por padrão), e "demo" só com os de demonstração.
+
+// Esse trecho cria dois documentos:
+//
+// -v1: o documento padrão.Por convenção ele inclui os endpoints sem GroupName e 
+// deixa de fora os que têm GroupName = "demo". 
+// Aqui ficam as rotas prontas para produção: 
+//  -/api/propostas, 
+//  -/filas, 
+//  -/assinaturas e 
+//  -/outbox.
+//
+// - demo: o ShouldInclude filtra só os endpoints do grupo demo.
 builder.Services.AddOpenApi();
 builder.Services.AddOpenApi("demo", opcoes =>
     opcoes.ShouldInclude = descricao => descricao.GroupName == "demo");
@@ -98,7 +111,16 @@ builder.Services.AddSingleton<EnvioSemOutbox>();
 
 var app = builder.Build();
 app.UseExceptionHandler();
-app.MapOpenApi();
+// Contrato e interface só em Development: em produção a API seria publicada pelo API Management, que importa o
+// OpenAPI no deploy. Sem isso, qualquer um enumeraria as rotas, inclusive as de operação.
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+    // Scalar lê os documentos de /openapi/{nome}.json; "v1" abre primeiro.
+    app.MapScalarApiReference(opcoes => opcoes
+        .AddDocument("v1", "Vida.Producer", isDefault: true)
+        .AddDocument("demo", "Vida.Producer (demonstração)"));
+}
 // Os endpoints ficam nos controllers (pasta Controllers, mais o LogsController da Vida.LogsAoVivo), descobertos por atributo.
 app.MapControllers();
 

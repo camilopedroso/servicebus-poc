@@ -45,7 +45,7 @@ dotnet test --project tests\Vida.Testes.Integracao -- --filter-method "*Idempote
   - `Conexao/`: `ServiceBusClientFactory`
   - `Dominio/`: business rules that aren't messaging (`CalculadoraDePremio`, `Planos`)
 - The user prefers one class per file and folders named after what the code does. Follow that for new code.
-- **Every HTTP API is an MVC controller** (`[ApiController]` + attribute routes, in a `Controllers/` folder). The user dislikes minimal APIs: don't add `app.MapGet`/`MapPost`/`MapGroup`. Request/response records go in `Contratos/`. The only `Map*` calls left are `app.MapControllers()` and the framework's `app.MapOpenApi()`.
+- **Every HTTP API is an MVC controller** (`[ApiController]` + attribute routes, in a `Controllers/` folder). The user dislikes minimal APIs: don't add `app.MapGet`/`MapPost`/`MapGroup`. Request/response records go in `Contratos/`. The only `Map*` calls left are `app.MapControllers()` and the framework's `app.MapOpenApi()` and `app.MapScalarApiReference()` (both inside `if (app.Environment.IsDevelopment())`; `iniciar.ps1` and `launchSettings.json` set `DOTNET_ENVIRONMENT=Development`). `Vida.Producer` has `GenerateDocumentationFile` on so `///` comments reach the OpenAPI contract, with CS1591 suppressed.
 - **`Vida.Consumer` (`Worker.cs`):** a `BackgroundService` around `ServiceBusProcessor` in PeekLock mode with `AutoCompleteMessages = false`. Settlement is explicit and demonstrates the distinct DLQ paths:
   - unreadable body → `DeadLetter(MotivosDeDeadLetter.PayloadInvalido)`
   - application property `simularFalha=true` → `Abandon`. The broker dead-letters it after the queue's `maxDeliveryCount` (5) with reason `MaxDeliveryCountExceeded`.

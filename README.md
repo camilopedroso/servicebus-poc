@@ -192,7 +192,8 @@ outbox (SQL Server)":
 | Sem outbox: dual write com falha         | a proposta é gravada e nunca publicada (fica em Recebida)                  |
 | Ver o outbox                             | pendentes e publicadas                                                     |
 
-A API também pode ser chamada direto. O contrato fica em `http://localhost:5180/openapi/v1.json`:
+A API também pode ser chamada direto. Em Development, o contrato fica em `http://localhost:5180/openapi/v1.json` e a
+interface para explorar e testar (Scalar) em `http://localhost:5180/scalar`:
 
 ```powershell
 curl -i -X POST localhost:5180/api/propostas -H "Content-Type: application/json" -H "Idempotency-Key: abc-123" `

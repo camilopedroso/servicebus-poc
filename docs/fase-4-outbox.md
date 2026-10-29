@@ -83,8 +83,9 @@ Capture do SQL Server, ou bibliotecas que já trazem o outbox (MassTransit, NSer
 |---|---|
 | `POST /api/propostas` | `201 Created` + `Location: /api/propostas/{id}`; `400` com erros por campo (ProblemDetails); `200` se a `Idempotency-Key` já foi usada |
 | `GET /api/propostas/{id}` | `200` com `status` (`Recebida` → `EnviadaParaAnalise` → `Aprovada` ou `Recusada`), `apoliceId` ou `motivoDaRecusa`; `404` ProblemDetails |
-| `/openapi/v1.json` | Contrato OpenAPI gerado pelo ASP.NET Core |
-| `/openapi/demo.json` | Contrato dos endpoints de demonstração (`/demo/...`), separado do v1 |
+| `/openapi/v1.json` | Contrato OpenAPI gerado pelo ASP.NET Core, com os comentários `///` como summary/description (só em Development) |
+| `/openapi/demo.json` | Contrato dos endpoints de demonstração (`/demo/...`), separado do v1 (só em Development) |
+| `/scalar` | Interface para explorar e testar os dois contratos (Scalar; só em Development) |
 
 ### Idempotency-Key
 O cliente que não recebeu a resposta (timeout) não sabe se a proposta foi criada. Com o cabeçalho
