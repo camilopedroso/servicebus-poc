@@ -4,6 +4,7 @@ import { cenarios, valoresIniciais, type Cenario, type Valores } from './cenario
 import { ColunaDeLogs } from './componentes/ColunaDeLogs';
 import { CamposDoCenario } from './componentes/CamposDoCenario';
 import { ControleDeAssinaturas } from './componentes/ControleDeAssinaturas';
+import { ControleDeProcessadores } from './componentes/ControleDeProcessadores';
 import { SeletorDeCenario } from './componentes/SeletorDeCenario';
 import { montarTrilha } from './correlacao';
 import { useAspire } from './hooks/useAspire';
@@ -17,6 +18,13 @@ const colunas: { app: NomeDoApp; papel: string; comando: string }[] = [
   { app: 'consumer', papel: 'Filas propostas e endossos; publica nos tópicos', comando: 'dotnet run --project src\\Vida.Consumer' },
   { app: 'assinantes', papel: 'Assinaturas dos tópicos', comando: 'dotnet run --project src\\Vida.Assinantes' },
 ];
+
+/** Liga/desliga no cabeçalho da coluna: processors no Consumer, assinaturas (com filtros e contagens) no Assinantes. */
+function controlesDaColuna(app: NomeDoApp, versao: number) {
+  if (app === 'consumer') return <ControleDeProcessadores app="consumer" versao={versao} />;
+  if (app === 'assinantes') return <ControleDeAssinaturas versao={versao} />;
+  return undefined;
+}
 
 export function App() {
   const [cenario, setCenario] = useState<Cenario>(cenarios[0]);
@@ -156,7 +164,7 @@ export function App() {
             trilha={trilha}
             idFixado={idFixado}
             onFixarId={fixar}
-            controles={app === 'assinantes' ? <ControleDeAssinaturas versao={versao} /> : undefined}
+            controles={controlesDaColuna(app, versao)}
             ativaNoCelular={colunaNoCelular === app}
             aspireNoAr={aspireNoAr}
           />

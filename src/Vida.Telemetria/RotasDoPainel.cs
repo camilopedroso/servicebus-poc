@@ -7,7 +7,7 @@ namespace Vida.Telemetria;
 /// </summary>
 internal static class RotasDoPainel
 {
-    /// <summary>SSE de logs, namespace (lido na carga) e polling das contagens das assinaturas.</summary>
+    /// <summary>SSE de logs, namespace (lido na carga) e polling das contagens das assinaturas e do liga/desliga.</summary>
     public static bool Contem(HttpRequest requisicao)
     {
         if (requisicao.Path.StartsWithSegments("/logs") || requisicao.Path.StartsWithSegments("/namespace"))
@@ -19,6 +19,8 @@ internal static class RotasDoPainel
         var caminho = requisicao.Path.Value ?? string.Empty;
         var semBarraNoFim = caminho.TrimEnd('/');
         var ehListaDeAssinaturas = string.Equals(semBarraNoFim, "/assinaturas", StringComparison.OrdinalIgnoreCase);
-        return HttpMethods.IsGet(requisicao.Method) && ehListaDeAssinaturas;
+        var ehListaDeProcessadores = string.Equals(semBarraNoFim, "/processadores", StringComparison.OrdinalIgnoreCase);
+        // Só o GET: ligar e desligar (POST) é ação do usuário e vale o trace.
+        return HttpMethods.IsGet(requisicao.Method) && (ehListaDeAssinaturas || ehListaDeProcessadores);
     }
 }

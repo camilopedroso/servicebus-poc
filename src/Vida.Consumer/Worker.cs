@@ -3,6 +3,7 @@ using Azure.Messaging.ServiceBus;
 using Vida.Mensageria.Contratos;
 using Vida.Mensageria.Dominio;
 using Vida.Mensageria.Mensagens;
+using Vida.Mensageria.Processamento;
 using Vida.Mensageria.Topologia;
 using Vida.Telemetria;
 
@@ -12,10 +13,14 @@ namespace Vida.Consumer;
 /// Consumer da fila de propostas: lê propostas da fila, decide o destino de cada mensagem e,
 /// quando aprova, publica ApoliceEmitida; quando recusa por regra de negócio, publica PropostaRecusada.
 /// Rode duas instâncias para ver "competing consumers": cada mensagem vai para só uma delas.
+/// Quem liga e desliga o processor é o GerenciadorDeProcessadores (POST /processadores/propostas/parar).
 /// </summary>
 public sealed class Worker(ServiceBusClient client, IConfiguration configuration, ILogger<Worker> logger)
-    : BackgroundService
+    : IAsyncDisposable
 {
+    /// <summary>Nome do processador na rota /processadores/{nome} e no painel.</summary>
+    public const string NomeDoProcessador = "propostas";
+
     private const int IdadeMaximaAceita = 80;
 
     // Retry com backoff: a falha simulada some nesta tentativa; acima do máximo, DLQ.
@@ -32,9 +37,11 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
     // Para reagendar na própria fila (retry com backoff).
     private readonly ServiceBusSender _senderPropostas = client.CreateSender(Filas.Propostas);
 
-    private ServiceBusProcessor? _processor;
-
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    /// <summary>
+    /// Cria o processor da fila propostas com os handlers deste Worker. Chamado uma vez, no registro (Program.cs).
+    /// </summary>
+    /// <returns>O processor, pronto para o GerenciadorDeProcessadores ligar.</returns>
+    public ProcessadorControlavel CriarProcessador()
     {
         var opcoes = new ServiceBusProcessorOptions
         {
@@ -48,22 +55,12 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
             // O SDK renova o lock (lockDuration=30s na fila) enquanto o handler roda, até este limite.
             MaxAutoLockRenewalDuration = TimeSpan.FromMinutes(5),
         };
-        _processor = client.CreateProcessor(Filas.Propostas, opcoes);
+        var processor = client.CreateProcessor(Filas.Propostas, opcoes);
 
-        _processor.ProcessMessageAsync += ProcessarMensagem;
-        _processor.ProcessErrorAsync += TratarErro;
+        processor.ProcessMessageAsync += ProcessarMensagem;
+        processor.ProcessErrorAsync += TratarErro;
 
-        logger.LogInformation("[{Instancia}] Ouvindo a fila '{Fila}'...", _instancia, Filas.Propostas);
-        await _processor.StartProcessingAsync(stoppingToken);
-
-        try
-        {
-            await Task.Delay(Timeout.Infinite, stoppingToken);
-        }
-        catch (OperationCanceledException)
-        {
-            // Encerramento normal (Ctrl+C).
-        }
+        return new ProcessadorControlavel(NomeDoProcessador, processor, logger);
     }
 
     private async Task ProcessarMensagem(ProcessMessageEventArgs args)
@@ -292,19 +289,14 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
         return Task.CompletedTask;
     }
 
-    public override async Task StopAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// Libera os senders no encerramento. O processor já foi parado pelo GerenciadorDeProcessadores.
+    /// </summary>
+    /// <returns>Tarefa representando a operação assíncrona.</returns>
+    public async ValueTask DisposeAsync()
     {
-        if (_processor is not null)
-        {
-            // Para de buscar novas mensagens e espera as em andamento terminarem.
-            await _processor.StopProcessingAsync(cancellationToken);
-            await _processor.DisposeAsync();
-        }
-
         await _senderApolices.DisposeAsync();
         await _senderRecusas.DisposeAsync();
         await _senderPropostas.DisposeAsync();
-
-        await base.StopAsync(cancellationToken);
     }
 }

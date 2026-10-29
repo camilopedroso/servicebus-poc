@@ -2,9 +2,11 @@ using Vida.Consumer;
 using Vida.Consumer.Endossos;
 using Vida.LogsAoVivo.Logs;
 using Vida.Mensageria.Conexao;
+using Vida.Mensageria.Processamento;
 using Vida.Telemetria;
 
-// Host web só para expor GET /logs ao painel (web/painel), pelo LogsController da Vida.LogsAoVivo. O trabalho continua no Worker.
+// Host web para o painel (web/painel): GET /logs (LogsController, da Vida.LogsAoVivo) e o liga/desliga dos processors
+// (ProcessadoresController, da Vida.Mensageria). O trabalho continua no Worker e no ProcessadorDeEndossos.
 var builder = WebApplication.CreateBuilder(args);
 
 var arquivoDoServiceBus = Path.Combine(AppContext.BaseDirectory, ServiceBusClientFactory.ArquivoConfiguracaoLocal);
@@ -15,6 +17,8 @@ builder.Configuration.AddCommandLine(args);
 builder.AddLogsAoVivo();
 // Fase 5: OpenTelemetry (traces, métricas, logs) para o Application Insights. Depois da config local, que traz a connection string.
 builder.AddTelemetria("Vida.Consumer");
+// GET /processadores e POST /processadores/{nome}/iniciar|parar: desligar o consumo sem derrubar o processo.
+builder.AddProcessadoresControlaveis();
 
 // Um ServiceBusClient por aplicação (singleton): ele mantém a conexão AMQP e é thread-safe.
 // Transações entre entidades: o Worker completa na fila e publica no tópico atomicamente.
@@ -24,7 +28,12 @@ builder.Services.AddSingleton(sp =>
     var fqdn = ServiceBusClientFactory.ObterNamespace(configuracao);
     return ServiceBusClientFactory.Criar(fqdn, transacoesEntreEntidades: true);
 });
-builder.Services.AddHostedService<Worker>();
+builder.Services.AddSingleton<Worker>();
+builder.Services.AddProcessadorControlavel(sp =>
+{
+    var worker = sp.GetRequiredService<Worker>();
+    return worker.CriarProcessador();
+});
 
 // Fase 3: fila endossos, com sessions. NÃO pode usar o client acima: com transações entre entidades, todos os
 // links do client passam pela primeira entidade tocada (a fila propostas, a "via"), e o broker recusa abrir
@@ -36,7 +45,12 @@ builder.Services.AddKeyedSingleton(ProcessadorDeEndossos.ChaveDoClient, (sp, _) 
     var fqdn = ServiceBusClientFactory.ObterNamespace(configuracao);
     return ServiceBusClientFactory.Criar(fqdn);
 });
-builder.Services.AddHostedService<ProcessadorDeEndossos>();
+builder.Services.AddSingleton<ProcessadorDeEndossos>();
+builder.Services.AddProcessadorControlavel(sp =>
+{
+    var endossos = sp.GetRequiredService<ProcessadorDeEndossos>();
+    return endossos.CriarProcessador();
+});
 
 var app = builder.Build();
 app.MapControllers();

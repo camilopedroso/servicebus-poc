@@ -2,6 +2,7 @@ using System.Text.Json;
 using Azure.Messaging.ServiceBus;
 using Vida.Mensageria.Contratos;
 using Vida.Mensageria.Mensagens;
+using Vida.Mensageria.Processamento;
 using Vida.Mensageria.Topologia;
 using Vida.Telemetria;
 
@@ -12,21 +13,26 @@ namespace Vida.Consumer.Endossos;
 /// Sessions garantem a ordem de CHEGADA por apólice e um consumer por apólice de cada vez.
 /// Se o producer mandar fora de ordem (v3 antes da v2), a ordem de chegada não basta:
 /// a v3 é adiada (defer) e retomada pelo SequenceNumber quando a v2 for aplicada.
+/// Quem liga e desliga o processor é o GerenciadorDeProcessadores (POST /processadores/endossos/parar).
 /// </summary>
 public sealed class ProcessadorDeEndossos(
     [FromKeyedServices(ProcessadorDeEndossos.ChaveDoClient)] ServiceBusClient client, ILogger<ProcessadorDeEndossos> logger)
-    : BackgroundService
 {
     /// <summary>Chave do ServiceBusClient próprio (sem transações entre entidades). Ver Program.cs.</summary>
     public const string ChaveDoClient = "endossos";
 
+    /// <summary>Nome do processador na rota /processadores/{nome} e no painel.</summary>
+    public const string NomeDoProcessador = "endossos";
+
     private readonly string _instancia = $"{Environment.MachineName}-{Environment.ProcessId}";
 
-    private ServiceBusSessionProcessor? _processor;
-
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    /// <summary>
+    /// Cria o session processor da fila endossos com os handlers desta classe. Chamado uma vez, no registro (Program.cs).
+    /// </summary>
+    /// <returns>O processor, pronto para o GerenciadorDeProcessadores ligar.</returns>
+    public ProcessadorControlavel CriarProcessador()
     {
-        _processor = client.CreateSessionProcessor(Filas.Endossos, new ServiceBusSessionProcessorOptions
+        var processor = client.CreateSessionProcessor(Filas.Endossos, new ServiceBusSessionProcessorOptions
         {
             AutoCompleteMessages = false,
             // Até 8 apólices ao mesmo tempo nesta instância, mas uma mensagem por vez dentro de cada apólice.
@@ -36,35 +42,25 @@ public sealed class ProcessadorDeEndossos(
             SessionIdleTimeout = TimeSpan.FromSeconds(3),
         });
 
-        _processor.ProcessMessageAsync += ProcessarMensagem;
-        _processor.ProcessErrorAsync += args =>
+        processor.ProcessMessageAsync += ProcessarMensagem;
+        processor.ProcessErrorAsync += args =>
         {
             logger.LogError(args.Exception, "[{Instancia}] Erro no processor de endossos ({Origem}).", _instancia, args.ErrorSource);
             return Task.CompletedTask;
         };
         // Sessão aberta/fechada: mostra qual instância "é dona" de cada apólice naquele momento.
-        _processor.SessionInitializingAsync += args =>
+        processor.SessionInitializingAsync += args =>
         {
             logger.LogInformation("[{Instancia}] Sessão da apólice {ApoliceId} aberta nesta instância.", _instancia, args.SessionId);
             return Task.CompletedTask;
         };
-        _processor.SessionClosingAsync += args =>
+        processor.SessionClosingAsync += args =>
         {
             logger.LogInformation("[{Instancia}] Sessão da apólice {ApoliceId} liberada.", _instancia, args.SessionId);
             return Task.CompletedTask;
         };
 
-        logger.LogInformation("[{Instancia}] Ouvindo a fila '{Fila}' (sessions)...", _instancia, Filas.Endossos);
-        await _processor.StartProcessingAsync(stoppingToken);
-
-        try
-        {
-            await Task.Delay(Timeout.Infinite, stoppingToken);
-        }
-        catch (OperationCanceledException)
-        {
-            // Encerramento normal (Ctrl+C).
-        }
+        return new ProcessadorControlavel(NomeDoProcessador, processor, logger);
     }
 
     private async Task ProcessarMensagem(ProcessSessionMessageEventArgs args)
@@ -185,15 +181,5 @@ public sealed class ProcessadorDeEndossos(
         {
             return null;
         }
-    }
-
-    public override async Task StopAsync(CancellationToken cancellationToken)
-    {
-        if (_processor is not null)
-        {
-            await _processor.StopProcessingAsync(cancellationToken);
-            await _processor.DisposeAsync();
-        }
-        await base.StopAsync(cancellationToken);
     }
 }

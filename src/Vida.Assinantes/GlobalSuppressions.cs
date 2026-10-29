@@ -5,7 +5,5 @@
 
 using System.Diagnostics.CodeAnalysis;
 
-[assembly: SuppressMessage("Performance", "CA1873:Avoid potentially expensive logging", Justification = "<Pending>", Scope = "member", Target = "~M:Vida.Assinantes.Processamento.ProcessadorDeAssinatura.IniciarAsync(System.Threading.CancellationToken)~System.Threading.Tasks.Task")]
-[assembly: SuppressMessage("Performance", "CA1873:Avoid potentially expensive logging", Justification = "<Pending>", Scope = "member", Target = "~M:Vida.Assinantes.Processamento.ProcessadorDeAssinatura.PararAsync(System.Threading.CancellationToken)~System.Threading.Tasks.Task")]
 [assembly: SuppressMessage("Performance", "CA1873:Avoid potentially expensive logging", Justification = "<Pending>", Scope = "member", Target = "~M:Vida.Assinantes.Processamento.ProcessadorDeAssinatura.ProcessarApolice(Azure.Messaging.ServiceBus.ProcessMessageEventArgs)~System.Threading.Tasks.Task")]
 [assembly: SuppressMessage("Performance", "CA1873:Avoid potentially expensive logging", Justification = "<Pending>", Scope = "member", Target = "~M:Vida.Assinantes.Processamento.ProcessadorDeAssinatura.ProcessarRecusa(Azure.Messaging.ServiceBus.ProcessMessageEventArgs)~System.Threading.Tasks.Task")]

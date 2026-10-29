@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { chamar, ErroDaApi } from '../api';
+import { useFecharAoSair } from '../hooks/useFecharAoSair';
 import type { EstadoDaAssinatura } from '../tipos';
 
 interface Props {
@@ -21,6 +22,8 @@ export function ControleDeAssinaturas({ versao }: Props) {
   const [alterando, setAlterando] = useState<string | null>(null);
   const raiz = useRef<HTMLDivElement>(null);
   const idDaLista = useId();
+  const fechar = useCallback(() => setAberto(false), []);
+  useFecharAoSair(aberto, raiz, fechar);
 
   const atualizar = useCallback(async () => {
     try {
@@ -38,25 +41,11 @@ export function ControleDeAssinaturas({ versao }: Props) {
     return () => clearInterval(intervalo);
   }, [aberto, versao, atualizar]);
 
-  // Fecha com Esc ou com clique fora.
-  useEffect(() => {
-    if (!aberto) return;
-    const aoTeclar = (e: KeyboardEvent) => e.key === 'Escape' && setAberto(false);
-    const aoClicar = (e: PointerEvent) => {
-      if (raiz.current && !raiz.current.contains(e.target as Node)) setAberto(false);
-    };
-    document.addEventListener('keydown', aoTeclar);
-    document.addEventListener('pointerdown', aoClicar);
-    return () => {
-      document.removeEventListener('keydown', aoTeclar);
-      document.removeEventListener('pointerdown', aoClicar);
-    };
-  }, [aberto]);
-
   const alternar = async (assinatura: EstadoDaAssinatura) => {
     setAlterando(assinatura.nome);
     try {
-      await chamar('assinantes', 'POST', `/assinaturas/${assinatura.nome}/${assinatura.ativa ? 'parar' : 'iniciar'}`);
+      // Ligar e desligar é o mesmo mecanismo dos outros apps (ProcessadoresController); o nome do processor é o da assinatura.
+      await chamar('assinantes', 'POST', `/processadores/${assinatura.nome}/${assinatura.ativa ? 'parar' : 'iniciar'}`);
       await atualizar();
     } catch (e) {
       setErro(e instanceof ErroDaApi ? e.message : 'Não foi possível alterar a assinatura.');

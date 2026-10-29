@@ -4,12 +4,13 @@ using Azure.Messaging.ServiceBus.Administration;
 using Vida.Assinantes.Processamento;
 using Vida.LogsAoVivo.Logs;
 using Vida.Mensageria.Conexao;
+using Vida.Mensageria.Processamento;
 using Vida.Telemetria;
 using Vida.Mensageria.Topologia;
 
 // Uso: dotnet run                        → todas as assinaturas ligadas na partida
 //      dotnet run -- cobranca alto-valor  → só as informadas começam ligadas
-// Depois da partida, o painel (web/painel) liga e desliga cada uma por HTTP.
+// Depois da partida, o painel (web/painel) liga e desliga cada uma por HTTP (POST /processadores/{nome}/iniciar|parar).
 var nomesInformados = args.Where(a => !a.StartsWith('-'));
 // Aceita qualquer grafia ("Cobranca", "ALTO-VALOR") e guarda o nome da topologia.
 var escolhidas = new List<string>();
@@ -48,6 +49,8 @@ builder.Configuration.AddCommandLine(argumentosDoHost);
 builder.AddLogsAoVivo();
 // Fase 5: OpenTelemetry (traces, métricas, logs) para o Application Insights. Depois da config local, que traz a connection string.
 builder.AddTelemetria("Vida.Assinantes");
+// GET /processadores e POST /processadores/{nome}/iniciar|parar (ProcessadoresController, da Vida.Mensageria).
+builder.AddProcessadoresControlaveis();
 
 builder.Services.AddSingleton(sp =>
 {
@@ -65,16 +68,21 @@ builder.Services.AddSingleton(sp =>
 });
 
 // Um processor por assinatura, todos compartilhando o mesmo ServiceBusClient (uma conexão AMQP).
-builder.Services.AddSingleton(sp =>
+// Todas são registradas; as que não vieram na linha de comando começam desligadas e podem ser ligadas pelo painel.
+foreach (var nome in Assinaturas.DoAssinantes)
 {
-    var client = sp.GetRequiredService<ServiceBusClient>();
-    var logger = sp.GetRequiredService<ILogger<ProcessadorDeAssinatura>>();
-    return new GerenciadorDeAssinaturas(assinaturas, client, logger);
-});
-builder.Services.AddHostedService(sp => sp.GetRequiredService<GerenciadorDeAssinaturas>());
+    var ligarNaPartida = assinaturas.Contains(nome);
+    builder.Services.AddProcessadorControlavel(sp =>
+    {
+        var client = sp.GetRequiredService<ServiceBusClient>();
+        var logger = sp.GetRequiredService<ILogger<ProcessadorDeAssinatura>>();
+        var processadorDeAssinatura = new ProcessadorDeAssinatura(nome, client, logger);
+        return processadorDeAssinatura.CriarProcessador(ligarNaPartida);
+    });
+}
 
 var app = builder.Build();
-// Controllers: AssinaturasController (deste app) e LogsController (da Vida.LogsAoVivo, registrado por AddLogsAoVivo).
+// Controllers: AssinaturasController (deste app), LogsController (AddLogsAoVivo) e ProcessadoresController (AddProcessadoresControlaveis).
 app.MapControllers();
 app.Run();
 return 0;

@@ -10,7 +10,7 @@ painel funcionando, e marca o checkbox aqui (é assim que a próxima sessão sab
 ## Progresso
 
 - [x] Etapa 0 — Linha de base no PC
-- [ ] Etapa 1 — Liga/desliga genérico (e o Consumer ganha botão no painel)
+- [x] Etapa 1 — Liga/desliga genérico (e o Consumer ganha botão no painel)
 - [ ] Etapa 2 — Quebrar `Vida.Mensageria` em plataforma + contratos por serviço
 - [ ] Etapa 3 — Fila `propostas` vira tópico `proposta-recebida` + caixa de entrada da Subscrição
 - [ ] Etapa 4 — Bicep por serviço (quem publica cria o tópico, quem consome cria a assinatura)
@@ -368,6 +368,14 @@ Pequena e independente: já entrega a demo "outbox com consumidor fora".
 - Cenário novo em `cenarios.ts`: "Outbox com a Subscrição desligada" (diagrama 5.2).
 - **Pronto quando:** parar o Consumer pelo painel, criar propostas, ver a fila crescer e as propostas em
   `EnviadaParaAnalise`, religar e ver todas virarem `Aprovada`/`Recusada`.
+- **Resultado (2026-10-29):** `Vida.Mensageria/Processamento/` (`ProcessadorControlavel`, `GerenciadorDeProcessadores`,
+  `ProcessadoresController`, `AddProcessadoresControlaveis()`/`AddProcessadorControlavel()`). `Worker`,
+  `ProcessadorDeEndossos` e `ProcessadorDeAssinatura` ganharam `CriarProcessador()`; `GerenciadorDeAssinaturas` saiu e
+  `POST /assinaturas/{nome}/iniciar|parar` virou `/processadores/{nome}/...` (`GET /assinaturas` ficou, com contagens).
+  Cenário "Outbox com o Consumer desligado" (fase 4 no painel). Testado ao vivo: 5 na fila com `propostas` parado,
+  0 depois de religar, 4 `Aprovada` + 1 `Recusada`. CLAUDE.md ainda cita as rotas antigas: atualizar na etapa 8.
+  Obs.: o Smart App Control do Windows bloqueava as DLLs recém-compiladas (evento 3077/3118 em CodeIntegrity); foi
+  desligado no PC.
 
 ### Etapa 2 — Plataforma + contratos
 

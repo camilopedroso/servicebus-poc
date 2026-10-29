@@ -30,3 +30,11 @@ export interface EstadoDaAssinatura {
   pendentes: number;
   naDlq: number;
 }
+
+/** GET /processadores (Consumer e Assinantes): liga/desliga de cada processor do app. */
+export interface EstadoDoProcessador {
+  nome: string;
+  /** Fila ou assinatura que ele lê. */
+  entidade: string;
+  ativo: boolean;
+}

@@ -626,7 +626,7 @@ code {
   cursor: pointer;
 }
 
-/* Seletor de assinaturas (coluna do Assinantes) */
+/* Liga/desliga: seletor de assinaturas (coluna do Assinantes) e de processadores (coluna do Consumer) */
 .assinaturas {
   position: relative;
 }

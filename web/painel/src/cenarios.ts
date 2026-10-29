@@ -402,6 +402,31 @@ export const cenarios: Cenario[] = [
     },
   },
   {
+    id: 'consumidor-desligado',
+    fase: 4,
+    titulo: 'Outbox com o Consumer desligado',
+    mostra:
+      'Para o processor da fila propostas sem derrubar o processo. A API e o outbox não dependem do consumidor: as propostas são aceitas, publicadas e esperam na fila.',
+    esperado:
+      'Cinco 201 e as propostas em EnviadaParaAnalise, com as mensagens paradas na fila. Religue "propostas" no seletor da coluna do Consumer: ele drena a fila e o GET passa a mostrar Aprovada ou Recusada.',
+    campos: [],
+    executar: async (v) => {
+      await chamar('consumer', 'POST', '/processadores/propostas/parar');
+      const ids: string[] = [];
+      for (let i = 0; i < 5; i++) {
+        const { dados } = await chamarDetalhado<PropostaDaApi>('producer', 'POST', '/api/propostas', novaProposta(v));
+        ids.push(dados.propostaId);
+      }
+      // Tempo para o despachante (polling de 1 s) publicar.
+      await esperar(3000);
+      const naFila = await chamar<unknown[]>('producer', 'GET', '/filas/propostas/mensagens?dlq=false');
+      const consultas = ids.map(consultarProposta);
+      const propostas = await Promise.all(consultas);
+      const enviadas = propostas.filter((p) => p.status === 'EnviadaParaAnalise').length;
+      return `Consumer parado. 5 propostas aceitas; 3 s depois, ${enviadas} em EnviadaParaAnalise e ${plural(naFila.length, 'mensagem', 'mensagens')} esperando na fila propostas. Religue "propostas" na coluna do Consumer.`;
+    },
+  },
+  {
     id: 'dual-write',
     fase: 4,
     titulo: 'Sem outbox: dual write com falha',
