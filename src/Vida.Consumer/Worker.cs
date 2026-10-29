@@ -13,7 +13,8 @@ using Vida.Telemetria;
 namespace Vida.Consumer;
 
 /// <summary>
-/// Consumer da fila de propostas: lê propostas da fila, decide o destino de cada mensagem e,
+/// Consumer da caixa de entrada da Subscrição (fila subscricao-entrada, alimentada pelo tópico proposta-recebida):
+/// lê as propostas, decide o destino de cada mensagem e,
 /// quando aprova, publica ApoliceEmitida; quando recusa por regra de negócio, publica PropostaRecusada.
 /// Rode duas instâncias para ver "competing consumers": cada mensagem vai para só uma delas.
 /// Quem liga e desliga o processor é o GerenciadorDeProcessadores (POST /processadores/propostas/parar).
@@ -37,11 +38,12 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
     // Sender criado a partir do mesmo client do processor: exigência da transação entre entidades.
     private readonly ServiceBusSender _senderApolices = client.CreateSender(Topicos.ApoliceEmitida);
     private readonly ServiceBusSender _senderRecusas = client.CreateSender(Topicos.PropostaRecusada);
-    // Para reagendar na própria fila (retry com backoff).
-    private readonly ServiceBusSender _senderPropostas = client.CreateSender(Filas.Propostas);
+    // Para reagendar na própria fila (retry com backoff). Na fila, e não no tópico proposta-recebida: lá a cópia
+    // chegaria a todas as assinaturas, e um interessado novo receberia cada tentativa.
+    private readonly ServiceBusSender _senderEntrada = client.CreateSender(Filas.SubscricaoEntrada);
 
     /// <summary>
-    /// Cria o processor da fila propostas com os handlers deste Worker. Chamado uma vez, no registro (Program.cs).
+    /// Cria o processor da fila subscricao-entrada com os handlers deste Worker. Chamado uma vez, no registro (Program.cs).
     /// </summary>
     /// <returns>O processor, pronto para o GerenciadorDeProcessadores ligar.</returns>
     public ProcessadorControlavel CriarProcessador()
@@ -58,7 +60,7 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
             // O SDK renova o lock (lockDuration=30s na fila) enquanto o handler roda, até este limite.
             MaxAutoLockRenewalDuration = TimeSpan.FromMinutes(5),
         };
-        var processor = client.CreateProcessor(Filas.Propostas, opcoes);
+        var processor = client.CreateProcessor(Filas.SubscricaoEntrada, opcoes);
 
         processor.ProcessMessageAsync += ProcessarMensagem;
         processor.ProcessErrorAsync += TratarErro;
@@ -266,7 +268,7 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
             await args.CompleteMessageAsync(mensagem, args.CancellationToken);
             // Send com ScheduledEnqueueTime = agendamento. ScheduleMessageAsync faz o mesmo e devolve o
             // SequenceNumber para cancelar depois (CancelScheduledMessageAsync).
-            await _senderPropostas.SendMessageAsync(copia, args.CancellationToken);
+            await _senderEntrada.SendMessageAsync(copia, args.CancellationToken);
             transacao.Complete();
         }
 
@@ -300,6 +302,6 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
     {
         await _senderApolices.DisposeAsync();
         await _senderRecusas.DisposeAsync();
-        await _senderPropostas.DisposeAsync();
+        await _senderEntrada.DisposeAsync();
     }
 }

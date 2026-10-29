@@ -2,11 +2,11 @@ using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using Vida.Subscricao.Contratos.Topologia;
 using Vida.Producer.Contratos;
 using Vida.Producer.Dados;
 using Vida.Producer.Outbox;
 using Vida.Testes.Integracao.Infra;
+using Vida.Propostas.Contratos.Mensagens;
 
 namespace Vida.Testes.Integracao.Outbox;
 
@@ -74,7 +74,7 @@ public sealed class DespachanteDoOutboxTestes(FabricaDaApi fabrica)
         // Enviada uma vez só, para a fila de propostas, com o MessageId estável (o id da proposta).
         var messageId = id.ToString();
         var (destino, mensagem) = Assert.Single(_serviceBus.Enviadas, e => e.Mensagem.MessageId == messageId);
-        Assert.Equal(Filas.Propostas, destino);
+        Assert.Equal(MensagensProposta.Topico, destino);
         // E marcada na mesma transação que segurou o lock: a linha sai das pendentes e a proposta avança.
         var (proposta, linha) = await Ler(id);
         Assert.NotNull(linha.PublicadaEm);

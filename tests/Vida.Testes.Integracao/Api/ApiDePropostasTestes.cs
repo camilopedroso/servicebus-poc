@@ -3,11 +3,11 @@ using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Vida.Propostas.Contratos.Dominio;
-using Vida.Subscricao.Contratos.Topologia;
 using Vida.Producer.Controllers;
 using Vida.Producer.Contratos;
 using Vida.Producer.Dados;
 using Vida.Testes.Integracao.Infra;
+using Vida.Propostas.Contratos.Mensagens;
 
 namespace Vida.Testes.Integracao.Api;
 
@@ -50,7 +50,7 @@ public sealed class ApiDePropostasTestes(FabricaDaApi fabrica)
         var banco = escopo.ServiceProvider.GetRequiredService<BancoDePropostas>();
         var messageId = criada.PropostaId.ToString();
         var linha = await banco.OutboxMensagens.SingleAsync(m => m.MessageId == messageId, TestContext.Current.CancellationToken);
-        Assert.Equal(Filas.Propostas, linha.Destino);
+        Assert.Equal(MensagensProposta.Topico, linha.Destino);
         // Ainda não publicada: a API não fala com o Service Bus, e o despachante foi tirado do host na FabricaDaApi.
         Assert.Null(linha.PublicadaEm);
     }

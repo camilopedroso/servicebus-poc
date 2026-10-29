@@ -4,7 +4,6 @@ using Microsoft.EntityFrameworkCore;
 using Vida.Propostas.Contratos.Eventos;
 using Vida.Propostas.Contratos.Dominio;
 using Vida.Propostas.Contratos.Mensagens;
-using Vida.Subscricao.Contratos.Topologia;
 using Vida.Producer.Contratos;
 using Vida.Producer.Dados;
 using Vida.Producer.Outbox;
@@ -91,7 +90,7 @@ public sealed class PropostasController(
 
         // A mensagem é montada pela mesma fábrica do envio direto e guardada como linha do outbox.
         var mensagem = MensagensProposta.Criar(proposta);
-        var linhaDoOutbox = MensagemDeSaida.De(destino: Filas.Propostas, mensagem: mensagem);
+        var linhaDoOutbox = MensagemDeSaida.De(destino: MensagensProposta.Topico, mensagem: mensagem);
         banco.OutboxMensagens.Add(linhaDoOutbox);
 
         try

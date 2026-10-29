@@ -2,7 +2,6 @@ using Azure.Messaging.ServiceBus;
 using Vida.Propostas.Contratos.Eventos;
 using Vida.Propostas.Contratos.Dominio;
 using Vida.Propostas.Contratos.Mensagens;
-using Vida.Subscricao.Contratos.Topologia;
 using Vida.Producer.Dados;
 
 namespace Vida.Producer.Cenarios;
@@ -15,7 +14,7 @@ namespace Vida.Producer.Cenarios;
 /// <param name="logger">Logger; o painel mostra estas linhas na coluna do Producer.</param>
 public sealed class EnvioSemOutbox(ServiceBusClient client, ILogger<EnvioSemOutbox> logger) : IAsyncDisposable
 {
-    private readonly ServiceBusSender _sender = client.CreateSender(Filas.Propostas);
+    private readonly ServiceBusSender _sender = client.CreateSender(MensagensProposta.Topico);
 
     /// <summary>
     /// Grava a proposta e publica direto. Com a falha simulada, o "processo cai" depois do INSERT.

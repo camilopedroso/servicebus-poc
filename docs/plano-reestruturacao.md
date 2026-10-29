@@ -12,7 +12,7 @@ painel funcionando, e marca o checkbox aqui (é assim que a próxima sessão sab
 - [x] Etapa 0 — Linha de base no PC
 - [x] Etapa 1 — Liga/desliga genérico (e o Consumer ganha botão no painel)
 - [x] Etapa 2 — Quebrar `Vida.Mensageria` em plataforma + contratos por serviço
-- [ ] Etapa 3 — Fila `propostas` vira tópico `proposta-recebida` + caixa de entrada da Subscrição
+- [x] Etapa 3 — Fila `propostas` vira tópico `proposta-recebida` + caixa de entrada da Subscrição
 - [ ] Etapa 4 — Bicep por serviço (quem publica cria o tópico, quem consome cria a assinatura)
 - [ ] Etapa 5 — `Vida.Assinantes` vira `Vida.Cobranca` e `Vida.Notificacao`; `alto-valor` fica sem serviço
 - [ ] Etapa 6 — `Vida.Operacao` (ferramentas de operação) e endpoints de demonstração no dono certo
@@ -416,6 +416,17 @@ A mudança de comportamento principal.
 - **Pronto quando:** os cenários das fases 1, 3 e 4 funcionam pelo painel; `curl localhost:5180/assinaturas/regras`
   mostra a `subscricao`.
 - **Depurar:** 🔴 no despachante e no Worker; no meio, só o broker age (`forwardTo`).
+- **Resultado (2026-10-29):** o nome do tópico mora no contrato (`MensagensProposta.Topico`); `Filas.Propostas` virou
+  `Filas.SubscricaoEntrada`; `Assinaturas.Subscricao` fica em `Assinaturas.Encaminhadas`, fora do peek. Rotas de
+  operação: `/filas/subscricao-entrada/...` (`FilaDeEntradaController`). Testado ao vivo: regras com `subscricao`
+  ($Default), API aprovada/recusada com desfecho de volta, lote, Abandon → DLQ após 5 entregas, payload inválido →
+  DLQ, reprocessamento (1 movida, 1 mantida), backoff 2 s/4 s na própria fila, endossos fora de ordem, Consumer
+  desligado (3 na fila, 3 `Aprovada` ao religar).
+  Verificado na documentação (Azure MCP), para a nota da fase: auto-forward de assinatura para fila no mesmo namespace
+  é transacional e existe no Standard; o broker não deixa abrir receiver (nem peek) na entidade de origem do forward;
+  forward que falha (destino cheio ou desabilitado) vai para a transfer DLQ da origem
+  (`<tópico>/Subscriptions/<assinatura>/$Transfer/$DeadLetterQueue`), não para a DLQ do destino; cadeia de mais de
+  4 saltos vai para a DLQ.
 
 ### Etapa 4 — Bicep por serviço
 

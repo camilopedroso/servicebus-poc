@@ -13,7 +13,7 @@ export interface Origem {
  */
 const origens: Record<string, Origem> = {
   // Producer
-  EnvioDePropostas: { rotulo: 'cenário', descricao: 'Envio direto para a fila propostas (cenários das fases 1 e 3)' },
+  EnvioDePropostas: { rotulo: 'cenário', descricao: 'Publicação direta no tópico proposta-recebida, sem outbox (cenários das fases 1 e 3)' },
   PublicacaoDeApolices: { rotulo: 'cenário', descricao: 'Publicação direta no tópico apolice-emitida (fase 2)' },
   EnvioDeEndossos: { rotulo: 'cenário', descricao: 'Envio de endossos para a fila endossos (fase 3)' },
   EnvioSemOutbox: { rotulo: 'sem outbox', descricao: 'Dual write: grava no banco e publica sem outbox (fase 4)' },
@@ -29,7 +29,7 @@ const origens: Record<string, Origem> = {
   },
   MigracaoDoBanco: { rotulo: 'banco', descricao: 'Migrations do EF Core na partida' },
   // Consumer
-  Worker: { rotulo: 'propostas', descricao: 'Fila propostas: análise, emissão da apólice ou recusa' },
+  Worker: { rotulo: 'propostas', descricao: 'Fila subscricao-entrada (vinda do tópico proposta-recebida): análise, emissão da apólice ou recusa' },
   ProcessadorDeEndossos: { rotulo: 'endossos', descricao: 'Fila endossos: sessions, session state e deferral (fase 3)' },
 };
 

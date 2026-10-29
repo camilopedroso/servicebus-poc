@@ -15,7 +15,7 @@ type Resultado = { tipo: 'executando' } | { tipo: 'ok'; texto: string } | { tipo
 
 const colunas: { app: NomeDoApp; papel: string; comando: string }[] = [
   { app: 'producer', papel: 'Cenários, API REST e outbox', comando: 'dotnet run --project src\\Vida.Producer' },
-  { app: 'consumer', papel: 'Filas propostas e endossos; publica nos tópicos', comando: 'dotnet run --project src\\Vida.Consumer' },
+  { app: 'consumer', papel: 'Filas subscricao-entrada e endossos; publica nos tópicos', comando: 'dotnet run --project src\\Vida.Consumer' },
   { app: 'assinantes', papel: 'Assinaturas dos tópicos', comando: 'dotnet run --project src\\Vida.Assinantes' },
 ];
 

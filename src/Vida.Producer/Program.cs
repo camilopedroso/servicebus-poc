@@ -16,15 +16,15 @@ using Vida.Producer.Outbox;
 // O painel (web/painel) chama estes endpoints; também dá para usar curl. Exemplos:
 //   curl -X POST localhost:5180/demo/propostas/lote -H "Content-Type: application/json" -d '{"quantidade":5}'
 //   curl -X POST localhost:5180/demo/propostas -H "Content-Type: application/json" -d '{"idade":85}'
-//   curl localhost:5180/filas/propostas/mensagens?dlq=true
+//   curl localhost:5180/filas/subscricao-entrada/mensagens?dlq=true
 //
 // Em Development, a interface para explorar e testar fica em http://localhost:5180/scalar (os dois contratos).
 //
 // Prontos para produção (contrato em /openapi/v1.json):
 //   POST /api/propostas                     grava proposta + outbox numa transação → 201 Created (Idempotency-Key opcional)
 //   GET  /api/propostas/{id}                status: Recebida (no outbox), EnviadaParaAnalise (publicada), Aprovada ou Recusada
-//   GET  /filas/propostas/mensagens?dlq=    peek na fila (ou na DLQ, com o motivo)
-//   POST /filas/propostas/dlq/reprocessar   devolve a DLQ para a fila (payload inválido fica na DLQ)
+//   GET  /filas/subscricao-entrada/mensagens?dlq=    peek na fila de entrada da Subscrição (ou na DLQ, com o motivo)
+//   POST /filas/subscricao-entrada/dlq/reprocessar   devolve a DLQ para a fila (payload inválido fica na DLQ)
 //   GET  /assinaturas/{nome}/mensagens?dlq= peek em uma assinatura (ou na DLQ dela)
 //   GET  /assinaturas/regras                lista as regras (filtros/actions) de cada assinatura
 //   GET  /outbox                            pendentes e publicadas
@@ -36,7 +36,7 @@ using Vida.Producer.Outbox;
 //   POST /demo/propostas                    fase 1: uma proposta: idade > 80 → recusa; simularFalha → retry até maxDeliveryCount → DLQ
 //                                           fase 3: com retryComBackoff, novas tentativas agendadas (2 s, 4 s...)
 //   POST /demo/propostas/invalida           fase 1: corpo ilegível → DLQ na primeira entrega (PayloadInvalido)
-//   POST /demo/apolices                     fase 2: publica uma ApoliceEmitida direto no tópico (sem passar pela fila)
+//   POST /demo/apolices                     fase 2: publica uma ApoliceEmitida direto no tópico (sem passar pela Subscrição)
 //   POST /demo/endossos/em-ordem            fase 3: {apolices, versoes}: v1..vN intercaladas entre apólices (sessões em paralelo)
 //   POST /demo/endossos/fora-de-ordem       fase 3: 5 versões de uma apólice embaralhadas → deferral
 //   POST /demo/endossos/duplicado           fase 3: v1, v1 de novo (mesmo MessageId) e v2 → o broker descarta a cópia

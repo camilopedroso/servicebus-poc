@@ -1,4 +1,4 @@
-// Infraestrutura da POC: namespace Service Bus (Standard) + fila de propostas.
+// Infraestrutura da POC: namespace Service Bus (Standard) com tópicos, filas e assinaturas, e Application Insights.
 // Standard é o tier mínimo com tópicos/assinaturas (fase 2); Basic só tem filas.
 
 @description('Região dos recursos.')
@@ -35,10 +35,23 @@ resource namespace 'Microsoft.ServiceBus/namespaces@2024-01-01' = {
   }
 }
 
-// Criação da fila de propostas no namespace Service Bus.
-resource propostas 'Microsoft.ServiceBus/namespaces/queues@2024-01-01' = {
+// Tópico "proposta-recebida": a squad de Propostas publica o FATO (evento), sem saber quem reage.
+// Antes era a fila "propostas", um COMANDO endereçado à Subscrição: um interessado novo (antifraude, CRM)
+// exigia mudar a API. Agora ele só cria a sua assinatura.
+resource propostaRecebida 'Microsoft.ServiceBus/namespaces/topics@2024-01-01' = {
   parent: namespace
-  name: 'propostas'
+  name: 'proposta-recebida'
+  properties: {
+    defaultMessageTimeToLive: 'P14D'
+  }
+}
+
+// Caixa de entrada da Subscrição: a fila continua existindo, mas é DELA, não da API. A retentativa agendada
+// (backoff) e o reprocessamento da DLQ voltam para cá; se voltassem para o tópico, iriam para todas as assinaturas.
+// Mesmas propriedades da antiga fila "propostas".
+resource subscricaoEntrada 'Microsoft.ServiceBus/namespaces/queues@2024-01-01' = {
+  parent: namespace
+  name: 'subscricao-entrada'
   properties: {
     lockDuration: lockDuration
     // Após 5 entregas sem Complete, a mensagem vai para a DLQ ($DeadLetterQueue).
@@ -47,6 +60,19 @@ resource propostas 'Microsoft.ServiceBus/namespaces/queues@2024-01-01' = {
     // Mensagens expiradas também vão para a DLQ em vez de sumir.
     deadLetteringOnMessageExpiration: true
   }
+}
+
+// Assinatura da Subscrição no tópico de Propostas: sem filtro ($Default) e com auto-forward para a caixa de entrada.
+// O broker move cada mensagem, de forma transacional, sem código; não dá para abrir receiver aqui (nem peek).
+// Se o encaminhamento falhar (destino cheio ou desabilitado), a mensagem fica na transfer DLQ desta assinatura
+// (proposta-recebida/Subscriptions/subscricao/$Transfer/$DeadLetterQueue), não na DLQ da fila.
+resource subscricao 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
+  parent: propostaRecebida
+  name: 'subscricao'
+  properties: union(propriedadesAssinatura, {
+    // Referência ao recurso (e não o texto) cria a dependência: a fila existe antes da assinatura apontar para ela.
+    forwardTo: subscricaoEntrada.name
+  })
 }
 
 // Fase 3: fila de endossos (alterações numa apólice já emitida, que precisam ser aplicadas em ordem).

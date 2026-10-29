@@ -13,7 +13,13 @@ public static class MensagensProposta
     public const string Tipo = "PropostaRecebida";
 
     /// <summary>
-    /// Monta a mensagem da proposta para a fila "propostas".
+    /// Tópico onde a squad de Propostas publica o fato "proposta recebida". Ela não sabe quem reage: a Subscrição
+    /// recebe pela assinatura "subscricao" (que encaminha para a fila dela), e um interessado novo só cria a sua.
+    /// </summary>
+    public const string Topico = "proposta-recebida";
+
+    /// <summary>
+    /// Monta a mensagem da proposta para o tópico "proposta-recebida".
     /// </summary>
     /// <param name="proposta">Proposta de seguro de vida.</param>
     /// <param name="simularFalha">Se true, adiciona a propriedade SimularFalha na mensagem.</param>

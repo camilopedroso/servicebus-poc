@@ -2,13 +2,13 @@ using Azure.Messaging.ServiceBus;
 using Vida.Propostas.Contratos.Eventos;
 using Vida.Propostas.Contratos.Dominio;
 using Vida.Propostas.Contratos.Mensagens;
-using Vida.Subscricao.Contratos.Topologia;
 using Vida.Producer.Contratos.Demonstracao;
 
 namespace Vida.Producer.Cenarios;
 
 /// <summary>
-/// Fase 1: envia propostas para a fila "propostas", em lote ou uma de cada vez.
+/// Fase 1: publica propostas no tópico "proposta-recebida" (o broker encaminha para a fila subscricao-entrada),
+/// em lote ou uma de cada vez.
 /// </summary>
 /// <param name="client">ServiceBusClient singleton do app.</param>
 /// <param name="logger">Logger; o painel mostra estas linhas na coluna do Producer.</param>
@@ -17,10 +17,10 @@ public sealed class EnvioDePropostas(ServiceBusClient client, ILogger<EnvioDePro
     private static readonly System.Globalization.CultureInfo PtBr = new("pt-BR");
 
     // Sender é thread-safe e mantém um link AMQP aberto: criar um por cenário reabriria o link a cada clique.
-    private readonly ServiceBusSender _sender = client.CreateSender(Filas.Propostas);
+    private readonly ServiceBusSender _sender = client.CreateSender(MensagensProposta.Topico);
 
     /// <summary>
-    /// Envia um lote de propostas válidas para a fila.
+    /// Envia um lote de propostas válidas para o tópico.
     /// </summary>
     /// <param name="quantidade">Número de propostas a enviar.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
@@ -55,12 +55,12 @@ public sealed class EnvioDePropostas(ServiceBusClient client, ILogger<EnvioDePro
                 enviadas.Add(proposta.PropostaId);
             }
         }
-        logger.LogInformation("Total: {Quantidade} proposta(s) em '{Fila}'.", enviadas.Count, Filas.Propostas);
+        logger.LogInformation("Total: {Quantidade} proposta(s) em '{Topico}'.", enviadas.Count, MensagensProposta.Topico);
         return [.. enviadas];
     }
 
     /// <summary>
-    /// Envia uma única proposta para a fila.
+    /// Envia uma única proposta para o tópico.
     /// </summary>
     /// <param name="parametros">Idade, capital, plano e falha simulada; campos nulos são sorteados.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>

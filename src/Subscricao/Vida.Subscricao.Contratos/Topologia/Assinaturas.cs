@@ -1,3 +1,5 @@
+using Vida.Propostas.Contratos.Mensagens;
+
 namespace Vida.Subscricao.Contratos.Topologia;
 
 public static class Assinaturas
@@ -20,14 +22,27 @@ public static class Assinaturas
     /// <summary>Tópico proposta-recusada. Sem filtro: o Producer marca a proposta como Recusada.</summary>
     public const string StatusRecusada = "status-recusada";
 
+    /// <summary>
+    /// Tópico proposta-recebida. Sem filtro, com forwardTo para a fila subscricao-entrada: o broker move cada
+    /// proposta para a caixa de entrada da Subscrição. Ninguém lê desta assinatura.
+    /// </summary>
+    public const string Subscricao = "subscricao";
+
     /// <summary>Assinaturas que o Vida.Assinantes processa (e liga/desliga pelo painel).</summary>
     public static readonly string[] DoAssinantes = [Cobranca, Notificacao, AltoValor, NotificacaoRecusa];
 
     /// <summary>Assinaturas que o Vida.Producer processa para atualizar o status das propostas da API.</summary>
     public static readonly string[] DoProducer = [StatusAprovada, StatusRecusada];
 
-    /// <summary>Todas as assinaturas da topologia, para as ferramentas de operação (peek, regras).</summary>
+    /// <summary>Assinaturas que guardam mensagens, para as ferramentas de operação (peek, regras).</summary>
     public static readonly string[] Todas = [.. DoAssinantes, .. DoProducer];
+
+    /// <summary>
+    /// Assinaturas com forwardTo. O broker não deixa abrir receiver nelas (nem para peek), e as mensagens nem
+    /// ficam lá: só entram na leitura das regras. Se o encaminhamento falhar (destino desabilitado ou cheio), a
+    /// mensagem vai para a transfer DLQ da assinatura ($Transfer/$DeadLetterQueue), não para a DLQ da fila.
+    /// </summary>
+    public static readonly string[] Encaminhadas = [Subscricao];
 
     /// <summary>
     /// Converte o nome que veio de fora (rota HTTP, argumento de linha de comando) no nome da topologia,
@@ -61,6 +76,7 @@ public static class Assinaturas
     /// <returns>Nome do tópico.</returns>
     public static string TopicoDe(string assinatura) => assinatura switch
     {
+        Subscricao => MensagensProposta.Topico,
         NotificacaoRecusa or StatusRecusada => Topicos.PropostaRecusada,
         Cobranca or Notificacao or AltoValor or StatusAprovada => Topicos.ApoliceEmitida,
         _ => throw new ArgumentException($"Assinatura desconhecida: {assinatura}.", nameof(assinatura)),

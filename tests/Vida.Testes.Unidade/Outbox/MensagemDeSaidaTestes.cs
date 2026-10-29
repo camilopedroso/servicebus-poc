@@ -1,7 +1,6 @@
 using Vida.Propostas.Contratos.Eventos;
 using Vida.Propostas.Contratos.Dominio;
 using Vida.Propostas.Contratos.Mensagens;
-using Vida.Subscricao.Contratos.Topologia;
 using System.Diagnostics;
 using Vida.Producer.Outbox;
 
@@ -18,7 +17,7 @@ public class MensagemDeSaidaTestes
         var original = MensagensProposta.Criar(Proposta, simularFalha: true);
         original.ApplicationProperties["numero"] = 42L;
 
-        var linha = MensagemDeSaida.De(Filas.Propostas, original);
+        var linha = MensagemDeSaida.De(MensagensProposta.Topico, original);
         var remontada = linha.ParaServiceBus();
 
         Assert.Equal(original.MessageId, remontada.MessageId);
@@ -41,7 +40,7 @@ public class MensagemDeSaidaTestes
         requisicao.Start();
 
         var mensagem = MensagensProposta.Criar(Proposta);
-        var linha = MensagemDeSaida.De(Filas.Propostas, mensagem);
+        var linha = MensagemDeSaida.De(MensagensProposta.Topico, mensagem);
         // O despachante publica depois, dentro de outro span: o Diagnostic-Id tem de continuar sendo o da requisição.
         using var despachante = new Activity("PublicarOutbox");
         despachante.SetIdFormat(ActivityIdFormat.W3C);
@@ -57,7 +56,7 @@ public class MensagemDeSaidaTestes
         Activity.Current = null;
 
         var mensagem = MensagensProposta.Criar(Proposta);
-        var linha = MensagemDeSaida.De(Filas.Propostas, mensagem);
+        var linha = MensagemDeSaida.De(MensagensProposta.Topico, mensagem);
         var publicada = linha.ParaServiceBus();
 
         var temDiagnosticId = publicada.ApplicationProperties.ContainsKey(MensagemDeSaida.PropriedadeDeTrace);

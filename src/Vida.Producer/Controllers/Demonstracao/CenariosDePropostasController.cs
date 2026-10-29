@@ -7,10 +7,10 @@ using Vida.Producer.Dados;
 namespace Vida.Producer.Controllers.Demonstracao;
 
 /// <summary>
-/// Cenários que enviam propostas direto para a fila "propostas" (fases 1 e 3) e o dual write sem outbox (fase 4).
+/// Cenários que publicam propostas direto no tópico "proposta-recebida", sem outbox (fases 1 e 3) e o dual write sem outbox (fase 4).
 /// Não é a API de negócio (essa é a PropostasController): são os botões do painel.
 /// </summary>
-/// <param name="envio">Envio direto para a fila.</param>
+/// <param name="envio">Envio direto para o tópico.</param>
 [ApiController]
 [Route("demo/propostas")]
 [Tags("Demonstração")]

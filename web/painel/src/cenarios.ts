@@ -108,7 +108,7 @@ export const cenarios: Cenario[] = [
       const { propostas } = await chamar<{ propostas: string[] }>('producer', 'POST', '/demo/propostas/lote', {
         quantidade: Number(v.quantidade),
       });
-      return `${plural(propostas.length, 'proposta enviada', 'propostas enviadas')} para a fila.`;
+      return `${plural(propostas.length, 'proposta publicada', 'propostas publicadas')} no tópico proposta-recebida.`;
     },
   },
   {
@@ -160,11 +160,11 @@ export const cenarios: Cenario[] = [
   {
     id: 'espiar-fila',
     fase: 1,
-    titulo: 'Espiar a fila propostas',
-    mostra: 'Peek lê as mensagens sem travar nem consumir.',
+    titulo: 'Espiar a fila subscricao-entrada',
+    mostra: 'Peek lê as mensagens sem travar nem consumir. A fila é a caixa de entrada da Subscrição: o tópico proposta-recebida encaminha para ela (forwardTo).',
     esperado: 'Com o Consumer no ar a fila costuma estar vazia. Pare o Consumer e envie um lote para ver mensagens acumuladas.',
     campos: [],
-    executar: espiar('/filas/propostas/mensagens?dlq=false', 'propostas'),
+    executar: espiar('/filas/subscricao-entrada/mensagens?dlq=false', 'subscricao-entrada'),
   },
   {
     id: 'espiar-dlq',
@@ -173,7 +173,7 @@ export const cenarios: Cenario[] = [
     mostra: 'Mensagens mortas guardam o motivo e a descrição de quem as mandou para lá.',
     esperado: 'A coluna do Producer lista cada mensagem com DeadLetterReason e quantas entregas teve.',
     campos: [],
-    executar: espiar('/filas/propostas/mensagens?dlq=true', 'propostas/$DeadLetterQueue'),
+    executar: espiar('/filas/subscricao-entrada/mensagens?dlq=true', 'subscricao-entrada/$DeadLetterQueue'),
   },
   {
     id: 'reprocessar',
@@ -188,7 +188,7 @@ export const cenarios: Cenario[] = [
       const { movidas, mantidas } = await chamar<{ movidas: number; mantidas: number }>(
         'producer',
         'POST',
-        '/filas/propostas/dlq/reprocessar',
+        '/filas/subscricao-entrada/dlq/reprocessar',
       );
       const ficaram = mantidas > 0 ? ` ${plural(mantidas, 'ficou', 'ficaram')} na DLQ por motivo permanente.` : '';
       return `${plural(movidas, 'mensagem devolvida', 'mensagens devolvidas')} para a fila.${ficaram}`;
@@ -406,7 +406,7 @@ export const cenarios: Cenario[] = [
     fase: 4,
     titulo: 'Outbox com o Consumer desligado',
     mostra:
-      'Para o processor da fila propostas sem derrubar o processo. A API e o outbox não dependem do consumidor: as propostas são aceitas, publicadas e esperam na fila.',
+      'Para o processor da fila subscricao-entrada sem derrubar o processo. A API e o outbox não dependem do consumidor: as propostas são aceitas, publicadas e esperam na fila.',
     esperado:
       'Cinco 201 e as propostas em EnviadaParaAnalise, com as mensagens paradas na fila. Religue "propostas" no seletor da coluna do Consumer: ele drena a fila e o GET passa a mostrar Aprovada ou Recusada.',
     campos: [],
@@ -419,11 +419,11 @@ export const cenarios: Cenario[] = [
       }
       // Tempo para o despachante (polling de 1 s) publicar.
       await esperar(3000);
-      const naFila = await chamar<unknown[]>('producer', 'GET', '/filas/propostas/mensagens?dlq=false');
+      const naFila = await chamar<unknown[]>('producer', 'GET', '/filas/subscricao-entrada/mensagens?dlq=false');
       const consultas = ids.map(consultarProposta);
       const propostas = await Promise.all(consultas);
       const enviadas = propostas.filter((p) => p.status === 'EnviadaParaAnalise').length;
-      return `Consumer parado. 5 propostas aceitas; 3 s depois, ${enviadas} em EnviadaParaAnalise e ${plural(naFila.length, 'mensagem', 'mensagens')} esperando na fila propostas. Religue "propostas" na coluna do Consumer.`;
+      return `Consumer parado. 5 propostas aceitas; 3 s depois, ${enviadas} em EnviadaParaAnalise e ${plural(naFila.length, 'mensagem', 'mensagens')} esperando na fila subscricao-entrada. Religue "propostas" na coluna do Consumer.`;
     },
   },
   {

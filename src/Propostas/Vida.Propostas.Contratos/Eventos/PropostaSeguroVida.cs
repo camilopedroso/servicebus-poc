@@ -4,7 +4,7 @@ namespace Vida.Propostas.Contratos.Eventos;
 
 /// <summary>
 /// Proposta de seguro de vida enviada para subscrição (análise de risco).
-/// É o corpo (payload) da mensagem na fila "propostas".
+/// É o corpo (payload) do evento PropostaRecebida, publicado no tópico "proposta-recebida".
 /// </summary>
 public sealed record PropostaSeguroVida(
     Guid PropostaId,

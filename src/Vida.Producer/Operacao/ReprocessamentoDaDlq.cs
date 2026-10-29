@@ -7,7 +7,8 @@ using Vida.Producer.Contratos;
 namespace Vida.Producer.Operacao;
 
 /// <summary>
-/// Move mensagens da DLQ da fila "propostas" de volta para a fila principal.
+/// Move mensagens da DLQ da fila "subscricao-entrada" de volta para a mesma fila. Para a fila, e não para o tópico
+/// proposta-recebida: no tópico, a cópia chegaria de novo a todas as assinaturas, não só à Subscrição.
 /// </summary>
 /// <param name="client">ServiceBusClient singleton do app.</param>
 /// <param name="logger">Logger; o painel mostra estas linhas na coluna do Producer.</param>
@@ -23,16 +24,16 @@ public sealed class ReprocessamentoDaDlq(ServiceBusClient client, ILogger<Reproc
     /// <returns>Quantas mensagens foram movidas e quantas ficaram na DLQ.</returns>
     public async Task<ResultadoDoReprocessamento> ReprocessarAsync(CancellationToken cancellationToken)
     {
-        await using var dlqReceiver = client.CreateReceiver(Filas.Propostas, new ServiceBusReceiverOptions
+        await using var dlqReceiver = client.CreateReceiver(Filas.SubscricaoEntrada, new ServiceBusReceiverOptions
         {
             SubQueue = SubQueue.DeadLetter,
         });
-        await using var sender = client.CreateSender(Filas.Propostas);
+        await using var sender = client.CreateSender(Filas.SubscricaoEntrada);
 
         var ultimaSequencia = await UltimaSequenciaAsync(dlqReceiver, cancellationToken);
         if (ultimaSequencia is null)
         {
-            logger.LogInformation("DLQ de '{Fila}' vazia: nada a reprocessar.", Filas.Propostas);
+            logger.LogInformation("DLQ de '{Fila}' vazia: nada a reprocessar.", Filas.SubscricaoEntrada);
             return new ResultadoDoReprocessamento(Movidas: 0, Mantidas: 0);
         }
 
@@ -91,7 +92,7 @@ public sealed class ReprocessamentoDaDlq(ServiceBusClient client, ILogger<Reproc
 
         logger.LogInformation(
             "{Movidas} mensagem(ns) movida(s) da DLQ de volta para '{Fila}'; {Mantidas} mantida(s) na DLQ.",
-            movidas, Filas.Propostas, mantidas.Count);
+            movidas, Filas.SubscricaoEntrada, mantidas.Count);
         return new ResultadoDoReprocessamento(movidas, mantidas.Count);
     }
 

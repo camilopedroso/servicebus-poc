@@ -21,7 +21,7 @@ public sealed class InspecaoDeEntidades(
     private const int MaximoDeMensagens = 50;
 
     /// <summary>
-    /// Espia mensagens da fila "propostas" ou da DLQ dela.
+    /// Espia mensagens da fila "subscricao-entrada" ou da DLQ dela.
     /// </summary>
     /// <param name="deadLetter">Se true, espiar a DLQ; caso contrário, a fila normal.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
@@ -33,10 +33,10 @@ public sealed class InspecaoDeEntidades(
         {
             SubQueue = deadLetter ? SubQueue.DeadLetter : SubQueue.None,
         };
-        await using var receiver = client.CreateReceiver(Filas.Propostas, opcoes);
+        await using var receiver = client.CreateReceiver(Filas.SubscricaoEntrada, opcoes);
 
         var mensagens = await receiver.PeekMessagesAsync(MaximoDeMensagens, cancellationToken: cancellationToken);
-        var nome = deadLetter ? $"{Filas.Propostas}/$DeadLetterQueue" : Filas.Propostas;
+        var nome = deadLetter ? $"{Filas.SubscricaoEntrada}/$DeadLetterQueue" : Filas.SubscricaoEntrada;
         logger.LogInformation("{Quantidade} mensagem(ns) em '{Entidade}'.", mensagens.Count, nome);
 
         foreach (var m in mensagens)
@@ -85,7 +85,7 @@ public sealed class InspecaoDeEntidades(
     }
 
     /// <summary>
-    /// Lista as regras de todas as assinaturas, dos dois tópicos.
+    /// Lista as regras de todas as assinaturas, inclusive as que só encaminham (forwardTo).
     /// </summary>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <returns>Regras por assinatura.</returns>
@@ -94,7 +94,8 @@ public sealed class InspecaoDeEntidades(
         // Administration client = operações de gerenciamento (criar/listar entidades e regras) pelo data plane.
         // A infra de verdade está no Bicep; aqui é só leitura, para conferir o que o broker aplicou.
         var resultado = new List<RegrasDaAssinatura>();
-        foreach (var assinatura in Assinaturas.Todas)
+        string[] assinaturas = [.. Assinaturas.Todas, .. Assinaturas.Encaminhadas];
+        foreach (var assinatura in assinaturas)
         {
             var topico = Assinaturas.TopicoDe(assinatura);
             logger.LogInformation("{Topico}/{Assinatura}:", topico, assinatura);

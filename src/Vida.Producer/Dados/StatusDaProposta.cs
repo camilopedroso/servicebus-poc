@@ -8,7 +8,7 @@ public enum StatusDaProposta
     /// <summary>Gravada no banco; a mensagem está no outbox esperando o despachante.</summary>
     Recebida,
 
-    /// <summary>O despachante publicou a mensagem na fila "propostas".</summary>
+    /// <summary>O despachante publicou o evento no tópico "proposta-recebida".</summary>
     EnviadaParaAnalise,
 
     /// <summary>A subscrição aprovou e emitiu a apólice (evento ApoliceEmitida).</summary>
