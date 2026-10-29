@@ -57,7 +57,6 @@ public sealed class CenariosDePropostasController(
     /// <param name="cancellationToken">
     ///     Token de cancelamento da requisição.
     /// </param>
-    /// </summary>
     [HttpPost]
     public async Task<ActionResult<PropostaSeguroVida>> EnviarUmaAsync(
         EnvioDeProposta corpo,

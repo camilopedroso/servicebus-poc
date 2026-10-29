@@ -351,9 +351,9 @@ Cada etapa: o que fazer, critério de pronto, e o que depurar para ver a mudanç
 - **Resultado (2026-10-29):** build ok, 68/68 testes, infra e apps no ar; lote (fase 1), proposta aprovada e
   recusada pela API (fase 4) com desfecho de volta. Já estava assim antes de mexer:
   - aviso CS1570 em `CenariosDePropostasController.cs:60` (`</summary>` sobrando no `///` de `EnviarUmaAsync`);
-  - rodando o `iniciar.ps1` pelo Claude Code (sandbox), `Porta-Em-Uso` não enxerga a porta do Vite (o `netstat`
-    mostra `[::1]:5173` como `CLOSED`, mas ela responde 200) e o script derruba tudo. No terminal normal não
-    deve acontecer; se acontecer, trocar a checagem por uma requisição HTTP.
+  - `Porta-Em-Uso` do `iniciar.ps1` não enxergava a porta do Vite (o `netstat` mostra `[::1]:5173` como
+    `CLOSED`, mas ela responde 200) e o script derrubava tudo depois de 60 s, também no terminal normal.
+    Corrigido: a checagem agora tenta conectar (`TcpClient`), e o `-Parar` acha o Vite sem `-State Listen`.
 
 ### Etapa 1 — Liga/desliga genérico
 

@@ -30,13 +30,27 @@ function Parar-Tudo {
     # Pelo nome do executável: matar só o "dotnet run" deixaria o app filho vivo segurando a porta.
     Get-Process -Name ($apps | ForEach-Object { "Vida.$($_.Nome)" }) -ErrorAction SilentlyContinue |
         Stop-Process -Force -ErrorAction SilentlyContinue
-    Get-NetTCPConnection -LocalPort $portaDoPainel -State Listen -ErrorAction SilentlyContinue |
+    # Sem -State Listen: o Vite aparece como CLOSED aqui (ver Porta-Em-Uso).
+    Get-NetTCPConnection -LocalPort $portaDoPainel -ErrorAction SilentlyContinue |
         Select-Object -ExpandProperty OwningProcess -Unique |
         ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }
 }
 
 function Porta-Em-Uso([int]$porta) {
-    [bool](Get-NetTCPConnection -LocalPort $porta -State Listen -ErrorAction SilentlyContinue)
+    # Tenta conectar em vez de listar as portas: neste PC o Get-NetTCPConnection mostra o Vite ([::1]:5173) como
+    # CLOSED mesmo respondendo, e o script esperava os 60 s e derrubava tudo. "localhost" tenta IPv6 e IPv4.
+    $cliente = [System.Net.Sockets.TcpClient]::new()
+    try {
+        $conexao = $cliente.ConnectAsync('localhost', $porta)
+        $conectou = $conexao.Wait(500)
+        return $conectou -and $cliente.Connected
+    }
+    catch {
+        return $false
+    }
+    finally {
+        $cliente.Dispose()
+    }
 }
 
 if ($Parar) {
