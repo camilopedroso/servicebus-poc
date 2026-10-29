@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Linguagem publicada da squad de Subscrição: os eventos que ela publica (apolice-emitida, proposta-recusada),
+    o comando que ela aceita (endossos) e as propriedades que os filtros das assinaturas usam.
+    Referencia os contratos de Propostas porque ApoliceEmitida carrega o Plano (contrato que usa outro contrato).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.21.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Propostas\Vida.Propostas.Contratos\Vida.Propostas.Contratos.csproj" />
+  </ItemGroup>
+
+</Project>

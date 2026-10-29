@@ -11,7 +11,7 @@ painel funcionando, e marca o checkbox aqui (é assim que a próxima sessão sab
 
 - [x] Etapa 0 — Linha de base no PC
 - [x] Etapa 1 — Liga/desliga genérico (e o Consumer ganha botão no painel)
-- [ ] Etapa 2 — Quebrar `Vida.Mensageria` em plataforma + contratos por serviço
+- [x] Etapa 2 — Quebrar `Vida.Mensageria` em plataforma + contratos por serviço
 - [ ] Etapa 3 — Fila `propostas` vira tópico `proposta-recebida` + caixa de entrada da Subscrição
 - [ ] Etapa 4 — Bicep por serviço (quem publica cria o tópico, quem consome cria a assinatura)
 - [ ] Etapa 5 — `Vida.Assinantes` vira `Vida.Cobranca` e `Vida.Notificacao`; `alto-valor` fica sem serviço
@@ -389,6 +389,19 @@ Refatoração pura: o comportamento não muda.
   caminho relativo não quebra quando os projetos descem um nível de pasta.
 - Testes: só os `using` e as referências mudam.
 - **Pronto quando:** `dotnet test` verde, painel igual ao de antes.
+- **Resultado (2026-10-29):** `Vida.Plataforma` (`Conexao`, `Processamento`, `Mensagens`: serialização e motivos de
+  DLQ, `Topologia/DescricaoDeRegras`); `Vida.Propostas.Contratos` (`Eventos/PropostaSeguroVida`, `Dominio/Plano(s)`,
+  `Mensagens/MensagensProposta` + `PropriedadesDaProposta`); `Vida.Subscricao.Contratos` (`Eventos/ApoliceEmitida`,
+  `PropostaRecusada`, `Comandos/EndossoSolicitado`, `Mensagens/*` + `PropriedadesDeRoteamento`, `Topologia/Filas`,
+  `Topicos`, `Assinaturas`). `LogsAoVivo` e `Telemetria` em `src/Plataforma/`. Diferenças em relação ao plano:
+  - `CalculadoraDePremio` e `PoliticaDeRevisao` ficaram em `Vida.Subscricao.Contratos/Dominio`, marcadas como
+    provisórias: a demo `/demo/apolices` do Producer também as usa. Entram no serviço na etapa 6, junto com a demo.
+  - `TiposDeMensagem` saiu: cada fábrica tem o seu `Tipo` (`MensagensProposta.Tipo`...), e `Propriedades` virou
+    `PropriedadesDaProposta` + `PropriedadesDeRoteamento` (`plano` existe nas duas, uma por mensagem).
+  - `Filas`/`Topicos`/`Assinaturas` ficaram nos contratos da Subscrição até deixarem de ser lista global (etapa 6).
+  - `src/Directory.Build.props` linka `servicebus.local.json` (todo `Exe`) e `sqlserver.local.json` (quem declara
+    `<UsaSqlServerLocal>true</UsaSqlServerLocal>`, hoje só o Producer).
+  Build sem avisos, 68/68 testes. Painel não testado ao vivo (infra derrubada); o código dele só mudou um comentário.
 
 ### Etapa 3 — Fila vira tópico
 

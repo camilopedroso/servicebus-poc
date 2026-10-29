@@ -1,5 +1,5 @@
-using Vida.Mensageria.Contratos;
-using Vida.Mensageria.Mensagens;
+using Vida.Subscricao.Contratos.Comandos;
+using Vida.Subscricao.Contratos.Mensagens;
 
 namespace Vida.Testes.Unidade.Mensagens;
 

@@ -1,4 +1,4 @@
-using Vida.Mensageria.Contratos;
+using Vida.Subscricao.Contratos.Eventos;
 using Vida.Producer.Dados;
 
 namespace Vida.Producer.Desfechos;

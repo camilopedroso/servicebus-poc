@@ -1,7 +1,7 @@
 using System.Net.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
-using Vida.Mensageria.Contratos;
-using Vida.Mensageria.Dominio;
+using Vida.Propostas.Contratos.Dominio;
+using Vida.Subscricao.Contratos.Eventos;
 using Vida.Producer.Contratos;
 using Vida.Producer.Dados;
 using Vida.Producer.Desfechos;

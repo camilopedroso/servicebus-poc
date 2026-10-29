@@ -1,8 +1,9 @@
 using Azure.Messaging.ServiceBus;
-using Vida.Mensageria.Contratos;
-using Vida.Mensageria.Mensagens;
-using Vida.Mensageria.Processamento;
-using Vida.Mensageria.Topologia;
+using Vida.Plataforma.Processamento;
+using Vida.Plataforma.Mensagens;
+using Vida.Subscricao.Contratos.Eventos;
+using Vida.Subscricao.Contratos.Mensagens;
+using Vida.Subscricao.Contratos.Topologia;
 
 namespace Vida.Assinantes.Processamento;
 
@@ -53,7 +54,7 @@ public sealed class ProcessadorDeAssinatura(string assinatura, ServiceBusClient 
     /// <returns></returns>
     private Task ProcessarMensagem(ProcessMessageEventArgs args) =>
         // O Subject diz o tipo do evento: cada tópico carrega um tipo, mas o handler não depende disso.
-        args.Message.Subject == TiposDeMensagem.PropostaRecusada
+        args.Message.Subject == MensagensRecusa.Tipo
             ? ProcessarRecusa(args)
             : ProcessarApolice(args);
 
@@ -71,7 +72,7 @@ public sealed class ProcessadorDeAssinatura(string assinatura, ServiceBusClient 
         }
 
         // "prioridade" não foi enviada pelo publisher: quem colocou foi a action da regra da assinatura alto-valor.
-        var prioridade = mensagem.ApplicationProperties.TryGetValue(Propriedades.Prioridade, out var valor)
+        var prioridade = mensagem.ApplicationProperties.TryGetValue(PropriedadesDeRoteamento.Prioridade, out var valor)
             ? valor?.ToString()
             : "normal";
 

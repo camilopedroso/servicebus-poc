@@ -1,10 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
-using Vida.Mensageria.Contratos;
-using Vida.Mensageria.Dominio;
-using Vida.Mensageria.Mensagens;
-using Vida.Mensageria.Topologia;
+using Vida.Propostas.Contratos.Eventos;
+using Vida.Propostas.Contratos.Dominio;
+using Vida.Propostas.Contratos.Mensagens;
+using Vida.Subscricao.Contratos.Topologia;
 using Vida.Producer.Contratos;
 using Vida.Producer.Dados;
 using Vida.Producer.Outbox;

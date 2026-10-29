@@ -3,10 +3,10 @@ using Azure.Messaging.ServiceBus;
 using Azure.Messaging.ServiceBus.Administration;
 using Vida.Assinantes.Processamento;
 using Vida.LogsAoVivo.Logs;
-using Vida.Mensageria.Conexao;
-using Vida.Mensageria.Processamento;
+using Vida.Plataforma.Conexao;
+using Vida.Plataforma.Processamento;
+using Vida.Subscricao.Contratos.Topologia;
 using Vida.Telemetria;
-using Vida.Mensageria.Topologia;
 
 // Uso: dotnet run                        → todas as assinaturas ligadas na partida
 //      dotnet run -- cobranca alto-valor  → só as informadas começam ligadas
@@ -49,7 +49,7 @@ builder.Configuration.AddCommandLine(argumentosDoHost);
 builder.AddLogsAoVivo();
 // Fase 5: OpenTelemetry (traces, métricas, logs) para o Application Insights. Depois da config local, que traz a connection string.
 builder.AddTelemetria("Vida.Assinantes");
-// GET /processadores e POST /processadores/{nome}/iniciar|parar (ProcessadoresController, da Vida.Mensageria).
+// GET /processadores e POST /processadores/{nome}/iniciar|parar (ProcessadoresController, da Vida.Plataforma).
 builder.AddProcessadoresControlaveis();
 
 builder.Services.AddSingleton(sp =>

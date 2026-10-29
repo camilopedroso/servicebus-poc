@@ -1,8 +1,9 @@
 using Azure.Messaging.ServiceBus;
-using Vida.Mensageria.Contratos;
-using Vida.Mensageria.Dominio;
-using Vida.Mensageria.Mensagens;
-using Vida.Mensageria.Topologia;
+using Vida.Propostas.Contratos.Dominio;
+using Vida.Subscricao.Contratos.Eventos;
+using Vida.Subscricao.Contratos.Mensagens;
+using Vida.Subscricao.Contratos.Topologia;
+using Vida.Subscricao.Contratos.Dominio;
 using Vida.Producer.Contratos.Demonstracao;
 
 namespace Vida.Producer.Cenarios;

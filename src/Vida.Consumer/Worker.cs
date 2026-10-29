@@ -1,10 +1,13 @@
 using System.Transactions;
 using Azure.Messaging.ServiceBus;
-using Vida.Mensageria.Contratos;
-using Vida.Mensageria.Dominio;
-using Vida.Mensageria.Mensagens;
-using Vida.Mensageria.Processamento;
-using Vida.Mensageria.Topologia;
+using Vida.Plataforma.Processamento;
+using Vida.Plataforma.Mensagens;
+using Vida.Propostas.Contratos.Eventos;
+using Vida.Propostas.Contratos.Mensagens;
+using Vida.Subscricao.Contratos.Eventos;
+using Vida.Subscricao.Contratos.Mensagens;
+using Vida.Subscricao.Contratos.Topologia;
+using Vida.Subscricao.Contratos.Dominio;
 using Vida.Telemetria;
 
 namespace Vida.Consumer;
@@ -99,9 +102,9 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
             return;
         }
 
-        var simularFalha = mensagem.ApplicationProperties.TryGetValue(Propriedades.SimularFalha, out var falha) && falha is true;
-        var comBackoff = mensagem.ApplicationProperties.TryGetValue(Propriedades.RetryComBackoff, out var backoff) && backoff is true;
-        var tentativa = mensagem.ApplicationProperties.TryGetValue(Propriedades.Tentativa, out var t) && t is int n ? n : 1;
+        var simularFalha = mensagem.ApplicationProperties.TryGetValue(PropriedadesDaProposta.SimularFalha, out var falha) && falha is true;
+        var comBackoff = mensagem.ApplicationProperties.TryGetValue(PropriedadesDaProposta.RetryComBackoff, out var backoff) && backoff is true;
+        var tentativa = mensagem.ApplicationProperties.TryGetValue(PropriedadesDaProposta.Tentativa, out var t) && t is int n ? n : 1;
 
         // 2a) Falha transitória com retry agendado (fase 3). A dependência simulada volta na 3ª tentativa:
         //     com backoff, ela teve tempo de se recuperar; com Abandon (2b), as 5 entregas acabam em segundos.
@@ -256,7 +259,7 @@ public sealed class Worker(ServiceBusClient client, IConfiguration configuration
         {
             ScheduledEnqueueTime = DateTimeOffset.UtcNow + espera,
         };
-        copia.ApplicationProperties[Propriedades.Tentativa] = tentativa + 1;
+        copia.ApplicationProperties[PropriedadesDaProposta.Tentativa] = tentativa + 1;
 
         using (var transacao = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
         {

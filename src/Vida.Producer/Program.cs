@@ -1,7 +1,7 @@
 ﻿using Azure.Identity;
 using Azure.Messaging.ServiceBus.Administration;
 using Vida.LogsAoVivo.Logs;
-using Vida.Mensageria.Conexao;
+using Vida.Plataforma.Conexao;
 using Vida.Telemetria;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;

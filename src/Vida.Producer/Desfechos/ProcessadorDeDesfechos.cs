@@ -1,7 +1,7 @@
 using Azure.Messaging.ServiceBus;
-using Vida.Mensageria.Contratos;
-using Vida.Mensageria.Mensagens;
-using Vida.Mensageria.Topologia;
+using Vida.Plataforma.Mensagens;
+using Vida.Subscricao.Contratos.Eventos;
+using Vida.Subscricao.Contratos.Topologia;
 using Vida.Producer.Dados;
 
 namespace Vida.Producer.Desfechos;

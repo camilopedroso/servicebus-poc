@@ -1,7 +1,7 @@
 using System.Text.Json;
-using Vida.Mensageria.Contratos;
-using Vida.Mensageria.Dominio;
-using Vida.Mensageria.Mensagens;
+using Vida.Plataforma.Mensagens;
+using Vida.Propostas.Contratos.Eventos;
+using Vida.Propostas.Contratos.Dominio;
 
 namespace Vida.Testes.Unidade.Mensagens;
 

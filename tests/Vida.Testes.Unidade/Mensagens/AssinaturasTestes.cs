@@ -1,4 +1,4 @@
-using Vida.Mensageria.Topologia;
+using Vida.Subscricao.Contratos.Topologia;
 
 namespace Vida.Testes.Unidade.Mensagens;
 

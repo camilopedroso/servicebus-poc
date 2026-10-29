@@ -1,9 +1,9 @@
 using System.Text.Json;
 using Azure.Messaging.ServiceBus;
-using Vida.Mensageria.Contratos;
-using Vida.Mensageria.Mensagens;
-using Vida.Mensageria.Processamento;
-using Vida.Mensageria.Topologia;
+using Vida.Plataforma.Processamento;
+using Vida.Plataforma.Mensagens;
+using Vida.Subscricao.Contratos.Comandos;
+using Vida.Subscricao.Contratos.Topologia;
 using Vida.Telemetria;
 
 namespace Vida.Consumer.Endossos;

@@ -3,7 +3,7 @@ using System.Diagnostics;
 using Azure.Messaging.ServiceBus;
 using Microsoft.EntityFrameworkCore;
 using OpenTelemetry;
-using Vida.Mensageria.Mensagens;
+using Vida.Propostas.Contratos.Mensagens;
 using Vida.Producer.Dados;
 using Vida.Telemetria;
 
@@ -141,7 +141,7 @@ public sealed class DespachanteDoOutbox(
         // Atualiza a proposta junto, na mesma transação. Acopla o despachante às propostas, mas evita outro
         // mecanismo só para o GET mostrar "EnviadaParaAnalise".
         var propostas = mensagens
-            .Where(m => m.Subject == TiposDeMensagem.PropostaRecebida)
+            .Where(m => m.Subject == MensagensProposta.Tipo)
             .Select(m => Guid.Parse(m.MessageId))
             .ToList();
         if (propostas.Count > 0)

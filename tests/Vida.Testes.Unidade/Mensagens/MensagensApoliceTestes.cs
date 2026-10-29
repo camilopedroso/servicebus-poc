@@ -1,6 +1,6 @@
-using Vida.Mensageria.Contratos;
-using Vida.Mensageria.Dominio;
-using Vida.Mensageria.Mensagens;
+using Vida.Propostas.Contratos.Dominio;
+using Vida.Subscricao.Contratos.Eventos;
+using Vida.Subscricao.Contratos.Mensagens;
 
 namespace Vida.Testes.Unidade.Mensagens;
 
@@ -21,10 +21,10 @@ public class MensagensApoliceTestes
         var mensagem = MensagensApolice.Criar(apolice);
 
 
-        Assert.IsType<bool>(mensagem.ApplicationProperties[Propriedades.RequerRevisao]);
-        Assert.IsType<long>(mensagem.ApplicationProperties[Propriedades.CapitalSegurado]);
-        Assert.Equal(true, mensagem.ApplicationProperties[Propriedades.RequerRevisao]);
-        Assert.Equal(1_500_000L, mensagem.ApplicationProperties[Propriedades.CapitalSegurado]);
+        Assert.IsType<bool>(mensagem.ApplicationProperties[PropriedadesDeRoteamento.RequerRevisao]);
+        Assert.IsType<long>(mensagem.ApplicationProperties[PropriedadesDeRoteamento.CapitalSegurado]);
+        Assert.Equal(true, mensagem.ApplicationProperties[PropriedadesDeRoteamento.RequerRevisao]);
+        Assert.Equal(1_500_000L, mensagem.ApplicationProperties[PropriedadesDeRoteamento.CapitalSegurado]);
     }
 
     [Fact]
@@ -34,6 +34,6 @@ public class MensagensApoliceTestes
 
         var mensagem = MensagensApolice.Criar(apolice);
 
-        Assert.Equal(TiposDeMensagem.ApoliceEmitida, mensagem.Subject);
+        Assert.Equal(MensagensApolice.Tipo, mensagem.Subject);
     }
 }

@@ -2,8 +2,9 @@ using System.Collections.Concurrent;
 using Azure.Messaging.ServiceBus.Administration;
 using Microsoft.AspNetCore.Mvc;
 using Vida.Assinantes.Contratos;
-using Vida.Mensageria.Processamento;
-using Vida.Mensageria.Topologia;
+using Vida.Plataforma.Processamento;
+using Vida.Plataforma.Topologia;
+using Vida.Subscricao.Contratos.Topologia;
 
 namespace Vida.Assinantes.Controllers;
 

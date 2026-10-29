@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Linguagem publicada da squad de Propostas: o evento da proposta e como a mensagem dele é montada.
+    Num cenário real seria um pacote NuGet versionado; aqui é ProjectReference, mas a regra vale:
+    quem consome referencia só os contratos, nunca o código interno do serviço.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.21.0" />
+  </ItemGroup>
+
+</Project>

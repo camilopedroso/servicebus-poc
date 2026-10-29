@@ -1,4 +1,4 @@
-using Vida.Mensageria.Dominio;
+using Vida.Propostas.Contratos.Dominio;
 
 namespace Vida.Producer.Contratos.Demonstracao;
 

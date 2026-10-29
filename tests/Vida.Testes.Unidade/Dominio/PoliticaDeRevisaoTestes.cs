@@ -1,4 +1,4 @@
-using Vida.Mensageria.Dominio;
+using Vida.Subscricao.Contratos.Dominio;
 
 namespace Vida.Testes.Unidade.Dominio;
 

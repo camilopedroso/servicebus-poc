@@ -1,16 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
-    <ProjectReference Include="..\Vida.Mensageria\Vida.Mensageria.csproj" />
-    <ProjectReference Include="..\Vida.LogsAoVivo\Vida.LogsAoVivo.csproj" />
-    <ProjectReference Include="..\Vida.Telemetria\Vida.Telemetria.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- Gerado por infra/up.ps1 -->
-    <None Include="..\servicebus.local.json" Link="servicebus.local.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\servicebus.local.json')" />
-    <!-- Gerado por infra/sql-up.ps1 (connection string do SQL Server local, fase 4) -->
-    <None Include="..\sqlserver.local.json" Link="sqlserver.local.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\sqlserver.local.json')" />
+    <ProjectReference Include="..\Plataforma\Vida.Plataforma\Vida.Plataforma.csproj" />
+    <ProjectReference Include="..\Propostas\Vida.Propostas.Contratos\Vida.Propostas.Contratos.csproj" />
+    <ProjectReference Include="..\Subscricao\Vida.Subscricao.Contratos\Vida.Subscricao.Contratos.csproj" />
+    <ProjectReference Include="..\Plataforma\Vida.LogsAoVivo\Vida.LogsAoVivo.csproj" />
+    <ProjectReference Include="..\Plataforma\Vida.Telemetria\Vida.Telemetria.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -34,6 +29,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- Copia o src/sqlserver.local.json (infra/sql-up.ps1) para a saída: ver src/Directory.Build.props -->
+    <UsaSqlServerLocal>true</UsaSqlServerLocal>
     <!-- Gera o XML dos comentários /// ; o Microsoft.AspNetCore.OpenApi (.NET 10) o usa para preencher summary e
          description no contrato. O 1591 (membro público sem comentário) fica desligado para não poluir o build. -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>

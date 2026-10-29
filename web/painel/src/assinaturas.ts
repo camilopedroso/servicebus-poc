@@ -1,4 +1,4 @@
-/** Assinaturas dos tópicos apolice-emitida e proposta-recusada, na ordem de Vida.Mensageria.Topologia.Assinaturas. */
+/** Assinaturas dos tópicos apolice-emitida e proposta-recusada, na ordem de Vida.Subscricao.Contratos.Topologia.Assinaturas. */
 export const assinaturas = [
   'cobranca',
   'notificacao',

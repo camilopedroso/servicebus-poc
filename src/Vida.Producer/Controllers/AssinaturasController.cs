@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using Vida.Mensageria.Topologia;
+using Vida.Subscricao.Contratos.Topologia;
 using Vida.Producer.Operacao;
 using Vida.Producer.Contratos;
 

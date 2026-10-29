@@ -1,8 +1,8 @@
-using Vida.Mensageria.Dominio;
+using Vida.Propostas.Contratos.Eventos;
+using Vida.Propostas.Contratos.Dominio;
+using Vida.Propostas.Contratos.Mensagens;
+using Vida.Subscricao.Contratos.Topologia;
 using System.Diagnostics;
-using Vida.Mensageria.Contratos;
-using Vida.Mensageria.Mensagens;
-using Vida.Mensageria.Topologia;
 using Vida.Producer.Outbox;
 
 namespace Vida.Testes.Unidade.Outbox;
@@ -28,9 +28,9 @@ public class MensagemDeSaidaTestes
         var corpoRemontado = remontada.Body.ToString();
         Assert.Equal(corpoOriginal, corpoRemontado);
         // JSON não guarda tipo .NET: sem a conversão, bool e número voltariam como string e os filtros SQL não casariam.
-        Assert.Equal(true, remontada.ApplicationProperties[Propriedades.SimularFalha]);
+        Assert.Equal(true, remontada.ApplicationProperties[PropriedadesDaProposta.SimularFalha]);
         Assert.Equal(42L, remontada.ApplicationProperties["numero"]);
-        Assert.Equal("Familiar", remontada.ApplicationProperties[Propriedades.Plano]);
+        Assert.Equal("Familiar", remontada.ApplicationProperties[PropriedadesDaProposta.Plano]);
     }
 
     [Fact]

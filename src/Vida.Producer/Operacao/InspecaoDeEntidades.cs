@@ -1,9 +1,10 @@
 using System.Text.Json;
 using Azure.Messaging.ServiceBus;
 using Azure.Messaging.ServiceBus.Administration;
-using Vida.Mensageria.Contratos;
-using Vida.Mensageria.Mensagens;
-using Vida.Mensageria.Topologia;
+using Vida.Plataforma.Mensagens;
+using Vida.Plataforma.Topologia;
+using Vida.Propostas.Contratos.Eventos;
+using Vida.Subscricao.Contratos.Topologia;
 using Vida.Producer.Contratos;
 
 namespace Vida.Producer.Operacao;

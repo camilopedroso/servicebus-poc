@@ -2,7 +2,7 @@ using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using Vida.Mensageria.Topologia;
+using Vida.Subscricao.Contratos.Topologia;
 using Vida.Producer.Contratos;
 using Vida.Producer.Dados;
 using Vida.Producer.Outbox;

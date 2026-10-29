@@ -1,6 +1,7 @@
 using Azure.Messaging.ServiceBus;
-using Vida.Mensageria.Mensagens;
-using Vida.Mensageria.Topologia;
+using Vida.Plataforma.Mensagens;
+using Vida.Propostas.Contratos.Mensagens;
+using Vida.Subscricao.Contratos.Topologia;
 using Vida.Producer.Contratos;
 
 namespace Vida.Producer.Operacao;
@@ -69,7 +70,7 @@ public sealed class ReprocessamentoDaDlq(ServiceBusClient client, ILogger<Reproc
                     // Copia corpo e propriedades para uma nova mensagem (DeliveryCount volta a 0).
                     // Remove o gatilho de falha simulada para a mensagem conseguir ser processada.
                     var reenvio = new ServiceBusMessage(m);
-                    reenvio.ApplicationProperties.Remove(Propriedades.SimularFalha);
+                    reenvio.ApplicationProperties.Remove(PropriedadesDaProposta.SimularFalha);
                     await sender.SendMessageAsync(reenvio, cancellationToken);
                     // Só completa na DLQ depois do reenvio: se cair no meio, no pior caso duplica (at-least-once), não perde.
                     await dlqReceiver.CompleteMessageAsync(m, cancellationToken);

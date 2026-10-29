@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using Vida.Mensageria.Contratos;
+using Vida.Propostas.Contratos.Eventos;
 using Vida.Producer.Cenarios;
 using Vida.Producer.Contratos.Demonstracao;
 using Vida.Producer.Dados;

@@ -1,0 +1,20 @@
+<Project>
+
+  <!--
+    Arquivos de configuração local gerados pelos scripts de infra, copiados para a saída de cada app
+    (os apps os leem de AppContext.BaseDirectory). Ficam aqui, e não em cada csproj, para o caminho não
+    depender da profundidade da pasta do projeto. Se o build rodou antes do script, recompile depois dele.
+  -->
+  <ItemGroup Condition="'$(OutputType)' == 'Exe'">
+    <!-- Gerado por infra/up.ps1: namespace do Service Bus e connection string do App Insights -->
+    <None Include="$(MSBuildThisFileDirectory)servicebus.local.json" Link="servicebus.local.json"
+          CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(MSBuildThisFileDirectory)servicebus.local.json')" />
+  </ItemGroup>
+
+  <!-- Gerado por infra/sql-up.ps1. Só para quem tem banco: o csproj liga com <UsaSqlServerLocal>true</UsaSqlServerLocal> -->
+  <ItemGroup Condition="'$(UsaSqlServerLocal)' == 'true'">
+    <None Include="$(MSBuildThisFileDirectory)sqlserver.local.json" Link="sqlserver.local.json"
+          CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(MSBuildThisFileDirectory)sqlserver.local.json')" />
+  </ItemGroup>
+
+</Project>

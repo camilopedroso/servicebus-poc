@@ -1,12 +1,12 @@
 using Vida.Consumer;
 using Vida.Consumer.Endossos;
 using Vida.LogsAoVivo.Logs;
-using Vida.Mensageria.Conexao;
-using Vida.Mensageria.Processamento;
+using Vida.Plataforma.Conexao;
+using Vida.Plataforma.Processamento;
 using Vida.Telemetria;
 
 // Host web para o painel (web/painel): GET /logs (LogsController, da Vida.LogsAoVivo) e o liga/desliga dos processors
-// (ProcessadoresController, da Vida.Mensageria). O trabalho continua no Worker e no ProcessadorDeEndossos.
+// (ProcessadoresController, da Vida.Plataforma). O trabalho continua no Worker e no ProcessadorDeEndossos.
 var builder = WebApplication.CreateBuilder(args);
 
 var arquivoDoServiceBus = Path.Combine(AppContext.BaseDirectory, ServiceBusClientFactory.ArquivoConfiguracaoLocal);

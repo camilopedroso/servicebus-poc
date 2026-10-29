@@ -8,13 +8,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Vida.Mensageria\Vida.Mensageria.csproj" />
-    <ProjectReference Include="..\Vida.LogsAoVivo\Vida.LogsAoVivo.csproj" />
-    <ProjectReference Include="..\Vida.Telemetria\Vida.Telemetria.csproj" />
+    <ProjectReference Include="..\Plataforma\Vida.Plataforma\Vida.Plataforma.csproj" />
+    <ProjectReference Include="..\Propostas\Vida.Propostas.Contratos\Vida.Propostas.Contratos.csproj" />
+    <ProjectReference Include="..\Subscricao\Vida.Subscricao.Contratos\Vida.Subscricao.Contratos.csproj" />
+    <ProjectReference Include="..\Plataforma\Vida.LogsAoVivo\Vida.LogsAoVivo.csproj" />
+    <ProjectReference Include="..\Plataforma\Vida.Telemetria\Vida.Telemetria.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <!-- Gerado por infra/up.ps1 -->
-    <None Include="..\servicebus.local.json" Link="servicebus.local.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\servicebus.local.json')" />
-  </ItemGroup>
 </Project>
