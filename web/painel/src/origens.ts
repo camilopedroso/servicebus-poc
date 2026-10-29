@@ -24,6 +24,9 @@ const origens: Record<string, Origem> = {
     descricao: 'Assinaturas status-aprovada e status-recusada: grava Aprovada ou Recusada na proposta da API',
   },
   MigracaoDoBanco: { rotulo: 'banco', descricao: 'Migrations do EF Core na partida' },
+  TratadorDeErrosDoBanco: { rotulo: 'erro', descricao: 'Falha do SQL Server convertida em ProblemDetails' },
+  // Todos os serviços com API (Propostas, Subscrição, Operação)
+  TratadorDeErrosDoServiceBus: { rotulo: 'erro', descricao: 'Falha do Service Bus ou de autenticação convertida em ProblemDetails' },
   // Subscrição
   ProcessadorDePropostas: {
     rotulo: 'propostas',

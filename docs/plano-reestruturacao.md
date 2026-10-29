@@ -16,7 +16,7 @@ painel funcionando, e marca o checkbox aqui (é assim que a próxima sessão sab
 - [x] Etapa 4 — Bicep por serviço (quem publica cria o tópico, quem consome cria a assinatura)
 - [x] Etapa 5 — `Vida.Assinantes` vira `Vida.Cobranca` e `Vida.Notificacao`; `alto-valor` fica sem serviço
 - [x] Etapa 6 — `Vida.Operacao` (ferramentas de operação) e endpoints de demonstração no dono certo
-- [ ] Etapa 7 — Painel, `iniciar.ps1`, `launch.json`
+- [x] Etapa 7 — Painel, `iniciar.ps1`, `launch.json`
 - [ ] Etapa 8 — Documentação (nota da fase, README, dicas, CLAUDE.md)
 - [ ] Etapa 9 — (Opcional) Banco próprio na Subscrição: outbox + inbox
 
@@ -508,6 +508,15 @@ A mudança de comportamento principal.
   `.vscode/launch.json` (uma configuração por serviço + composto "Fluxo completo").
 - **Pronto quando:** `.\iniciar.ps1` sobe os cinco serviços e o painel; a trilha liga uma proposta através de
   Propostas → Subscrição → Cobrança/Notificação → Propostas.
+- **Resultado (2026-10-29):** `web/painel/src/apps.ts` (id, nome, porta, cor, papel, pasta) é a fonte do tipo `App`, das
+  colunas, das abas, das mensagens de erro e do proxy do `vite.config.ts` (que importa o mesmo arquivo; por isso o
+  `tsconfig` ganhou `allowImportingTsExtensions`). Barra de colunas com um botão por serviço (esconde/mostra, guardado
+  em `localStorage`; escondida continua conectada e na trilha; no celular valem as abas) e o cartão "Resseguro (sem
+  serviço)" com os pendentes da `alto-valor`, vindos do `GET /assinaturas` da Operação. Cada coluna tem um filete com a
+  cor do serviço. `iniciar.ps1` e `launch.json` já estavam com os seis processos desde a etapa 6.
+  Verificado: `tsc`, `vite build`, os módulos novos servidos pelo Vite, proxy dos cinco serviços, e a trilha nos dados
+  do SSE (proposta → Subscrição com `PropostaId` + `ApoliceId` → Cobrança e Notificação com `ApoliceId` → desfecho em
+  Propostas). O visual no navegador não foi conferido por mim.
 
 ### Etapa 8 — Documentação
 

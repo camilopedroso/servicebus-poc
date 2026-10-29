@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { separarAssinatura } from '../assinaturas';
 import { linhaNaTrilha, partesDaMensagem, type Trilha } from '../correlacao';
 import { enderecoDoAspire } from '../hooks/useAspire';
@@ -9,6 +9,8 @@ interface Props {
   app: App;
   titulo: string;
   papel: string;
+  /** Cor do serviço (apps.ts), no filete do cabeçalho. */
+  cor: string;
   comandoParaSubir: string;
   linhas: LinhaDeLog[];
   estado: EstadoDaConexao;
@@ -18,6 +20,8 @@ interface Props {
   onFixarId: (id: string) => void;
   /** Controles extras no cabeçalho (liga/desliga dos processors na Subscrição, das assinaturas na Cobrança e na Notificação). */
   controles?: ReactNode;
+  /** Escondida pela barra de colunas (só no desktop; no celular quem escolhe são as abas). */
+  oculta: boolean;
   ativaNoCelular: boolean;
   /** Se o Aspire Dashboard está no ar: o trace de cada linha abre nele; senão, o TraceId é copiado. */
   aspireNoAr: boolean;
@@ -58,6 +62,8 @@ export function ColunaDeLogs(props: Props) {
       className="coluna"
       aria-labelledby={`coluna-${props.app}`}
       data-ativa-no-celular={props.ativaNoCelular}
+      data-oculta={props.oculta}
+      style={{ '--cor-do-app': props.cor } as CSSProperties}
       id={`painel-${props.app}`}
       role="tabpanel"
     >

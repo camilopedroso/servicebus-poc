@@ -1,4 +1,4 @@
-import type { App } from './tipos';
+import { descricaoDoApp, type App } from './apps';
 
 /** Erro de um endpoint, com a explicação do ProblemDetails quando houver. */
 export class ErroDaApi extends Error {}
@@ -43,7 +43,7 @@ export async function chamarDetalhado<T>(
       body: corpo === undefined ? undefined : JSON.stringify(corpo),
     });
   } catch {
-    throw new ErroDaApi(`Sem resposta do ${nomeDoApp[app]}. Confira se ele está rodando.`);
+    throw new ErroDaApi(`Sem resposta do serviço ${descricaoDoApp(app).nome}. Confira se ele está rodando.`);
   }
 
   // O proxy do Vite responde 502/504 sem corpo JSON quando o app está fora do ar.
@@ -57,7 +57,7 @@ export async function chamarDetalhado<T>(
       errosDeCampo ||
         problema?.detail ||
         problema?.title ||
-        `O ${nomeDoApp[app]} respondeu ${resposta.status}. Confira se ele está rodando.`,
+        `O serviço ${descricaoDoApp(app).nome} respondeu ${resposta.status}. Confira se ele está rodando.`,
     );
   }
   return { status: resposta.status, cabecalhos: resposta.headers, dados: dados as T };
@@ -70,11 +70,3 @@ function tentarJson(texto: string): unknown {
     return undefined;
   }
 }
-
-export const nomeDoApp: Record<App, string> = {
-  propostas: 'Propostas',
-  subscricao: 'Subscrição',
-  cobranca: 'Cobrança',
-  notificacao: 'Notificação',
-  operacao: 'Operação',
-};

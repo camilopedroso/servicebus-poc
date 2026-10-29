@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { chamar, ErroDaApi, nomeDoApp } from './api';
+import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react';
+import { chamar, ErroDaApi } from './api';
+import { apps, type App as NomeDoApp } from './apps';
 import { cenarios, valoresIniciais, type Cenario, type Valores } from './cenarios';
+import { CartaoDoResseguro } from './componentes/CartaoDoResseguro';
 import { ColunaDeLogs } from './componentes/ColunaDeLogs';
 import { CamposDoCenario } from './componentes/CamposDoCenario';
 import { ControleDeAssinaturas } from './componentes/ControleDeAssinaturas';
@@ -8,22 +10,12 @@ import { ControleDeProcessadores } from './componentes/ControleDeProcessadores';
 import { SeletorDeCenario } from './componentes/SeletorDeCenario';
 import { montarTrilha } from './correlacao';
 import { useAspire } from './hooks/useAspire';
+import { useColunasOcultas } from './hooks/useColunasOcultas';
 import { useLogsAoVivo } from './hooks/useLogsAoVivo';
-import type { App as NomeDoApp } from './tipos';
 
 type Resultado = { tipo: 'executando' } | { tipo: 'ok'; texto: string } | { tipo: 'erro'; texto: string } | null;
 
-const colunas: { app: NomeDoApp; papel: string; comando: string }[] = [
-  { app: 'propostas', papel: 'API REST, outbox e desfechos', comando: 'dotnet run --project src\\Propostas\\Vida.Propostas' },
-  {
-    app: 'subscricao',
-    papel: 'Analisa propostas, emite apólices, aplica endossos',
-    comando: 'dotnet run --project src\\Subscricao\\Vida.Subscricao',
-  },
-  { app: 'cobranca', papel: 'Assinatura cobranca: boleto do 1º prêmio', comando: 'dotnet run --project src\\Cobranca\\Vida.Cobranca' },
-  { app: 'notificacao', papel: 'Boas-vindas e aviso de recusa', comando: 'dotnet run --project src\\Notificacao\\Vida.Notificacao' },
-  { app: 'operacao', papel: 'Peek, DLQ e regras (descobre as entidades)', comando: 'dotnet run --project src\\Operacao\\Vida.Operacao' },
-];
+type LogsDoApp = ReturnType<typeof useLogsAoVivo>;
 
 /** Liga/desliga no cabeçalho da coluna: processors na Subscrição, assinaturas (com filtros e contagens) nos que assinam tópicos. */
 function controlesDaColuna(app: NomeDoApp, versao: number) {
@@ -38,17 +30,16 @@ export function App() {
   const [resultado, setResultado] = useState<Resultado>(null);
   const [versao, setVersao] = useState(0);
   const [idFixado, setIdFixado] = useState<string | null>(null);
-  const [colunaNoCelular, setColunaNoCelular] = useState<NomeDoApp>('propostas');
+  const [colunaNoCelular, setColunaNoCelular] = useState<NomeDoApp>(apps[0].id);
   const [namespace, setNamespace] = useState<string | null>(null);
   const aspireNoAr = useAspire();
+  const { ocultas, alternar } = useColunasOcultas();
 
-  const logs = {
-    propostas: useLogsAoVivo('propostas'),
-    subscricao: useLogsAoVivo('subscricao'),
-    cobranca: useLogsAoVivo('cobranca'),
-    notificacao: useLogsAoVivo('notificacao'),
-    operacao: useLogsAoVivo('operacao'),
-  };
+  // Um stream de logs por app. A lista é constante (apps.ts), então os hooks são chamados sempre na mesma ordem.
+  const logs = {} as Record<NomeDoApp, LogsDoApp>;
+  for (const app of apps) {
+    logs[app.id] = useLogsAoVivo(app.id);
+  }
 
   useEffect(() => {
     chamar<{ namespace: string }>('operacao', 'GET', '/namespace')
@@ -56,16 +47,12 @@ export function App() {
       .catch(() => setNamespace(null));
   }, [logs.operacao.estado]);
 
-  const [linhasPropostas, linhasSubscricao, linhasCobranca, linhasNotificacao, linhasOperacao] = [
-    logs.propostas.linhas,
-    logs.subscricao.linhas,
-    logs.cobranca.linhas,
-    logs.notificacao.linhas,
-    logs.operacao.linhas,
-  ];
+  // A trilha olha todas as colunas, inclusive as escondidas: esconder é só visual.
+  const linhasPorApp = apps.map((app) => logs[app.id].linhas);
   const trilha = useMemo(
-    () => (idFixado ? montarTrilha(idFixado, [...linhasPropostas, ...linhasSubscricao, ...linhasCobranca, ...linhasNotificacao, ...linhasOperacao]) : null),
-    [idFixado, linhasPropostas, linhasSubscricao, linhasCobranca, linhasNotificacao, linhasOperacao],
+    () => (idFixado ? montarTrilha(idFixado, linhasPorApp.flat()) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- uma dependência por app, em número fixo
+    [idFixado, ...linhasPorApp],
   );
 
   const escolher = (novo: Cenario) => {
@@ -88,12 +75,15 @@ export function App() {
 
   const fixar = (id: string) => setIdFixado((atual) => (atual === id ? null : id));
 
+  const visiveis = apps.filter((app) => !ocultas.has(app.id));
+  const estiloDasColunas = { '--quantidade-de-colunas': visiveis.length } as CSSProperties;
+
   return (
     <div className="painel">
       <header className="topo">
         <div>
           <h1 className="topo__titulo">Laboratório Service Bus</h1>
-          <p className="topo__subtitulo">Emissão de apólices do portfólio de Vida, do envio da proposta às assinaturas</p>
+          <p className="topo__subtitulo">Emissão de apólices do portfólio de Vida, um serviço por squad, conversando por eventos</p>
         </div>
         <p className="topo__namespace" title="Namespace do Service Bus">
           {namespace ?? 'Namespace desconhecido até a Operação responder'}
@@ -141,41 +131,67 @@ export function App() {
             </button>
           </>
         ) : (
-          <p className="trilha__dica">Clique em um id em qualquer coluna para seguir a mensagem por todos os processos.</p>
+          <p className="trilha__dica">Clique em um id em qualquer coluna para seguir a mensagem por todos os serviços.</p>
         )}
       </div>
 
-      <div className="abas" role="tablist" aria-label="Processo">
-        {colunas.map(({ app }) => (
+      <div className="servicos">
+        <div className="servicos__colunas" role="group" aria-label="Colunas visíveis">
+          <span className="servicos__rotulo">Colunas</span>
+          {apps.map((app) => {
+            const visivel = !ocultas.has(app.id);
+            return (
+              <button
+                key={app.id}
+                className="chip-de-coluna"
+                aria-pressed={visivel}
+                style={{ '--cor-do-app': app.cor } as CSSProperties}
+                // A última visível não esconde: alguma coluna sempre fica na tela.
+                disabled={visivel && visiveis.length === 1}
+                onClick={() => alternar(app.id)}
+                title={visivel ? `Esconder a coluna ${app.nome} (os logs continuam chegando)` : `Mostrar a coluna ${app.nome}`}
+              >
+                {app.nome}
+              </button>
+            );
+          })}
+        </div>
+        <CartaoDoResseguro versao={versao} />
+      </div>
+
+      <div className="abas" role="tablist" aria-label="Serviço">
+        {apps.map((app) => (
           <button
-            key={app}
+            key={app.id}
             role="tab"
-            aria-selected={colunaNoCelular === app}
-            aria-controls={`painel-${app}`}
+            aria-selected={colunaNoCelular === app.id}
+            aria-controls={`painel-${app.id}`}
             className="aba"
-            onClick={() => setColunaNoCelular(app)}
+            onClick={() => setColunaNoCelular(app.id)}
           >
-            {nomeDoApp[app]}
+            {app.nome}
           </button>
         ))}
       </div>
 
-      <main className="colunas">
-        {colunas.map(({ app, papel, comando }) => (
+      <main className="colunas" style={estiloDasColunas}>
+        {apps.map((app) => (
           <ColunaDeLogs
-            key={app}
-            app={app}
-            titulo={nomeDoApp[app]}
-            papel={papel}
-            comandoParaSubir={comando}
-            linhas={logs[app].linhas}
-            estado={logs[app].estado}
-            onLimpar={logs[app].limpar}
+            key={app.id}
+            app={app.id}
+            titulo={app.nome}
+            papel={app.papel}
+            cor={app.cor}
+            comandoParaSubir={`dotnet run --project ${app.pasta}`}
+            linhas={logs[app.id].linhas}
+            estado={logs[app.id].estado}
+            onLimpar={logs[app.id].limpar}
             trilha={trilha}
             idFixado={idFixado}
             onFixarId={fixar}
-            controles={controlesDaColuna(app, versao)}
-            ativaNoCelular={colunaNoCelular === app}
+            controles={controlesDaColuna(app.id, versao)}
+            oculta={ocultas.has(app.id)}
+            ativaNoCelular={colunaNoCelular === app.id}
             aspireNoAr={aspireNoAr}
           />
         ))}

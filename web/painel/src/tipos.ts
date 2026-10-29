@@ -1,5 +1,5 @@
-/** Os processos .NET que o painel acompanha. */
-export type App = 'propostas' | 'subscricao' | 'cobranca' | 'notificacao' | 'operacao';
+/** Os serviços .NET que o painel acompanha (lista em apps.ts). */
+export type { App } from './apps';
 
 /** Uma linha de log como chega do GET /logs (Vida.LogsAoVivo.Logs.RegistroDeLog). */
 export interface RegistroDeLog {
