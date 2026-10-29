@@ -14,15 +14,20 @@ import type { App as NomeDoApp } from './tipos';
 type Resultado = { tipo: 'executando' } | { tipo: 'ok'; texto: string } | { tipo: 'erro'; texto: string } | null;
 
 const colunas: { app: NomeDoApp; papel: string; comando: string }[] = [
-  { app: 'producer', papel: 'Cenários, API REST e outbox', comando: 'dotnet run --project src\\Vida.Producer' },
-  { app: 'consumer', papel: 'Filas subscricao-entrada e endossos; publica nos tópicos', comando: 'dotnet run --project src\\Vida.Consumer' },
+  { app: 'propostas', papel: 'API REST, outbox e desfechos', comando: 'dotnet run --project src\\Propostas\\Vida.Propostas' },
+  {
+    app: 'subscricao',
+    papel: 'Analisa propostas, emite apólices, aplica endossos',
+    comando: 'dotnet run --project src\\Subscricao\\Vida.Subscricao',
+  },
   { app: 'cobranca', papel: 'Assinatura cobranca: boleto do 1º prêmio', comando: 'dotnet run --project src\\Cobranca\\Vida.Cobranca' },
   { app: 'notificacao', papel: 'Boas-vindas e aviso de recusa', comando: 'dotnet run --project src\\Notificacao\\Vida.Notificacao' },
+  { app: 'operacao', papel: 'Peek, DLQ e regras (descobre as entidades)', comando: 'dotnet run --project src\\Operacao\\Vida.Operacao' },
 ];
 
-/** Liga/desliga no cabeçalho da coluna: processors no Consumer, assinaturas (com filtros e contagens) nos que assinam tópicos. */
+/** Liga/desliga no cabeçalho da coluna: processors na Subscrição, assinaturas (com filtros e contagens) nos que assinam tópicos. */
 function controlesDaColuna(app: NomeDoApp, versao: number) {
-  if (app === 'consumer') return <ControleDeProcessadores app="consumer" versao={versao} />;
+  if (app === 'subscricao') return <ControleDeProcessadores app="subscricao" versao={versao} />;
   if (app === 'cobranca' || app === 'notificacao') return <ControleDeAssinaturas app={app} versao={versao} />;
   return undefined;
 }
@@ -33,32 +38,34 @@ export function App() {
   const [resultado, setResultado] = useState<Resultado>(null);
   const [versao, setVersao] = useState(0);
   const [idFixado, setIdFixado] = useState<string | null>(null);
-  const [colunaNoCelular, setColunaNoCelular] = useState<NomeDoApp>('producer');
+  const [colunaNoCelular, setColunaNoCelular] = useState<NomeDoApp>('propostas');
   const [namespace, setNamespace] = useState<string | null>(null);
   const aspireNoAr = useAspire();
 
   const logs = {
-    producer: useLogsAoVivo('producer'),
-    consumer: useLogsAoVivo('consumer'),
+    propostas: useLogsAoVivo('propostas'),
+    subscricao: useLogsAoVivo('subscricao'),
     cobranca: useLogsAoVivo('cobranca'),
     notificacao: useLogsAoVivo('notificacao'),
+    operacao: useLogsAoVivo('operacao'),
   };
 
   useEffect(() => {
-    chamar<{ namespace: string }>('producer', 'GET', '/namespace')
+    chamar<{ namespace: string }>('operacao', 'GET', '/namespace')
       .then((r) => setNamespace(r.namespace))
       .catch(() => setNamespace(null));
-  }, [logs.producer.estado]);
+  }, [logs.operacao.estado]);
 
-  const [linhasProducer, linhasConsumer, linhasCobranca, linhasNotificacao] = [
-    logs.producer.linhas,
-    logs.consumer.linhas,
+  const [linhasPropostas, linhasSubscricao, linhasCobranca, linhasNotificacao, linhasOperacao] = [
+    logs.propostas.linhas,
+    logs.subscricao.linhas,
     logs.cobranca.linhas,
     logs.notificacao.linhas,
+    logs.operacao.linhas,
   ];
   const trilha = useMemo(
-    () => (idFixado ? montarTrilha(idFixado, [...linhasProducer, ...linhasConsumer, ...linhasCobranca, ...linhasNotificacao]) : null),
-    [idFixado, linhasProducer, linhasConsumer, linhasCobranca, linhasNotificacao],
+    () => (idFixado ? montarTrilha(idFixado, [...linhasPropostas, ...linhasSubscricao, ...linhasCobranca, ...linhasNotificacao, ...linhasOperacao]) : null),
+    [idFixado, linhasPropostas, linhasSubscricao, linhasCobranca, linhasNotificacao, linhasOperacao],
   );
 
   const escolher = (novo: Cenario) => {
@@ -89,7 +96,7 @@ export function App() {
           <p className="topo__subtitulo">Emissão de apólices do portfólio de Vida, do envio da proposta às assinaturas</p>
         </div>
         <p className="topo__namespace" title="Namespace do Service Bus">
-          {namespace ?? 'Namespace desconhecido até o Producer responder'}
+          {namespace ?? 'Namespace desconhecido até a Operação responder'}
         </p>
       </header>
 

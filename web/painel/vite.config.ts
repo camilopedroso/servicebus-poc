@@ -4,10 +4,11 @@ import react from '@vitejs/plugin-react';
 // Cada app .NET tem porta fixa (Urls no appsettings.json). O proxy deixa tudo na mesma origem do painel,
 // então os backends não precisam de CORS.
 const apps = {
-  producer: 'http://localhost:5180',
-  consumer: 'http://localhost:5181',
+  propostas: 'http://localhost:5180',
+  subscricao: 'http://localhost:5181',
   cobranca: 'http://localhost:5182',
   notificacao: 'http://localhost:5183',
+  operacao: 'http://localhost:5184',
   // Fase 5: Aspire Dashboard local (iniciar.ps1 -ComAspire). O painel só consulta se ele está no ar.
   aspire: 'http://localhost:18888',
 };

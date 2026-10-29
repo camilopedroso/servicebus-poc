@@ -12,6 +12,12 @@ public static class MensagensApolice
     public const string Tipo = "ApoliceEmitida";
 
     /// <summary>
+    /// Tópico onde a Subscrição publica a apólice emitida. Cada interessado (Cobrança, Notificação, Resseguro,
+    /// Propostas) cria a sua assinatura nele, no Bicep da própria squad.
+    /// </summary>
+    public const string Topico = "apolice-emitida";
+
+    /// <summary>
     /// Fábrica que monta a mensagem do evento, com as propriedades que os filtros das assinaturas usam.
     /// </summary>
     /// <param name="apolice">Evento ApoliceEmitida a ser enviado.</param>

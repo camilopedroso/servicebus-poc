@@ -1,13 +1,12 @@
 <Solution>
-  <Folder Name="/src/">
-    <Project Path="src/Vida.Consumer/Vida.Consumer.csproj" />
-    <Project Path="src/Vida.Producer/Vida.Producer.csproj" />
-  </Folder>
   <Folder Name="/src/Cobranca/">
     <Project Path="src/Cobranca/Vida.Cobranca/Vida.Cobranca.csproj" />
   </Folder>
   <Folder Name="/src/Notificacao/">
     <Project Path="src/Notificacao/Vida.Notificacao/Vida.Notificacao.csproj" />
+  </Folder>
+  <Folder Name="/src/Operacao/">
+    <Project Path="src/Operacao/Vida.Operacao/Vida.Operacao.csproj" />
   </Folder>
   <Folder Name="/src/Plataforma/">
     <Project Path="src/Plataforma/Vida.LogsAoVivo/Vida.LogsAoVivo.csproj" />
@@ -15,9 +14,11 @@
     <Project Path="src/Plataforma/Vida.Telemetria/Vida.Telemetria.csproj" />
   </Folder>
   <Folder Name="/src/Propostas/">
+    <Project Path="src/Propostas/Vida.Propostas/Vida.Propostas.csproj" />
     <Project Path="src/Propostas/Vida.Propostas.Contratos/Vida.Propostas.Contratos.csproj" />
   </Folder>
   <Folder Name="/src/Subscricao/">
+    <Project Path="src/Subscricao/Vida.Subscricao/Vida.Subscricao.csproj" />
     <Project Path="src/Subscricao/Vida.Subscricao.Contratos/Vida.Subscricao.Contratos.csproj" />
   </Folder>
   <Folder Name="/tests/">

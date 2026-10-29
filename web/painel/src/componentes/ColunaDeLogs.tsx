@@ -16,7 +16,7 @@ interface Props {
   trilha: Trilha | null;
   idFixado: string | null;
   onFixarId: (id: string) => void;
-  /** Controles extras no cabeçalho (liga/desliga dos processors no Consumer, das assinaturas na Cobrança e na Notificação). */
+  /** Controles extras no cabeçalho (liga/desliga dos processors na Subscrição, das assinaturas na Cobrança e na Notificação). */
   controles?: ReactNode;
   ativaNoCelular: boolean;
   /** Se o Aspire Dashboard está no ar: o trace de cada linha abre nele; senão, o TraceId é copiado. */

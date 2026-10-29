@@ -1,4 +1,4 @@
-using Vida.Producer.Contratos;
+using Vida.Propostas.Contratos;
 
 namespace Vida.Testes.Unidade.Api;
 

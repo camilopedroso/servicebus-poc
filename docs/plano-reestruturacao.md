@@ -15,7 +15,7 @@ painel funcionando, e marca o checkbox aqui (é assim que a próxima sessão sab
 - [x] Etapa 3 — Fila `propostas` vira tópico `proposta-recebida` + caixa de entrada da Subscrição
 - [x] Etapa 4 — Bicep por serviço (quem publica cria o tópico, quem consome cria a assinatura)
 - [x] Etapa 5 — `Vida.Assinantes` vira `Vida.Cobranca` e `Vida.Notificacao`; `alto-valor` fica sem serviço
-- [ ] Etapa 6 — `Vida.Operacao` (ferramentas de operação) e endpoints de demonstração no dono certo
+- [x] Etapa 6 — `Vida.Operacao` (ferramentas de operação) e endpoints de demonstração no dono certo
 - [ ] Etapa 7 — Painel, `iniciar.ps1`, `launch.json`
 - [ ] Etapa 8 — Documentação (nota da fase, README, dicas, CLAUDE.md)
 - [ ] Etapa 9 — (Opcional) Banco próprio na Subscrição: outbox + inbox
@@ -475,6 +475,29 @@ A mudança de comportamento principal.
 - Renomear `Vida.Producer` → `Vida.Propostas` e `Vida.Consumer` → `Vida.Subscricao` (e `Worker` →
   `Analise/ProcessadorDePropostas`) aqui, quando já não sobra nada fora do lugar.
 - **Pronto quando:** `/openapi/v1.json` do Propostas só tem `/api/propostas`; o de Operação tem as ferramentas.
+- **Resultado (2026-10-29):** `src/Propostas/Vida.Propostas`, `src/Subscricao/Vida.Subscricao`
+  (`Analise/ProcessadorDePropostas`) e `src/Operacao/Vida.Operacao` (:5184, `Ferramentas/`: `DescobertaDeEntidades`,
+  `InspecaoDeEntidades`, `ReprocessamentoDaDlq`, `NomesDeEntidades`). Diferenças e detalhes:
+  - Operação não referencia contrato nenhum: peek mostra Subject, propriedades e o começo do corpo como texto; o
+    reprocessamento ganhou `?removerPropriedade=` (o cenário do painel tira o `simularFalha`, simulando "corrigir a
+    causa"). Peek recusa, com explicação, assinatura com forwardTo e fila com sessions. Rotas novas: `GET /filas`,
+    `GET /assinaturas` (com contagens e forwardTo), `/filas/{nome}/...` genérico.
+  - `Topologia/` saiu do contrato da Subscrição: o endereço fica na fábrica de cada mensagem (`MensagensApolice.Topico`,
+    `MensagensRecusa.Topico`, `MensagensEndosso.Fila`), como `MensagensProposta.Topico`. `subscricao-entrada` virou
+    detalhe interno (`ProcessadorDePropostas.Fila`): desde a etapa 3 ninguém de fora envia para ela. Desfechos
+    declaram as suas assinaturas (`ProcessadorDeDesfechos.AssinaturaAprovada/Recusada`).
+  - `CalculadoraDePremio` e `PoliticaDeRevisao` em `Vida.Subscricao/Dominio`, junto com a demo de apólice.
+  - `GET /outbox` virou `GET /demo/outbox` (só os cenários usam; o outbox mora no banco de Propostas, e a Operação não
+    lê banco de ninguém).
+  - Plataforma ganhou `Api/`: `ExtensoesDeValidacao` e `TratadorDeErrosDoServiceBus` (Propostas fica com o
+    `TratadorDeErrosDoBanco`; vários `IExceptionHandler`, o primeiro que reconhece responde).
+  - Subscrição: o segundo client (sem transação) virou `ClientSemTransacao.Chave` e serve aos endossos e às demos;
+    config `Consumer:MaxConcurrentCalls` → `Subscricao:MaxConcurrentCalls`. Contrato `/openapi/demo.json` próprio.
+  - Painel: chaves `propostas`, `subscricao`, `operacao`; 5 colunas; cada cenário chama o dono do endpoint.
+    `iniciar.ps1` e `launch.json` com os seis processos (o mínimo; generalizar é da etapa 7).
+  Testado ao vivo: contratos OpenAPI, descoberta (2 filas, 7 assinaturas, forward), lote, Abandon → DLQ, payload
+  inválido, reprocessamento (1 movida e aprovada, 1 mantida), backoff, apólice de alto valor (peek com
+  `prioridade=alta`), endossos em ordem, fora de ordem e duplicado, outbox; 68/68 testes.
 
 ### Etapa 7 — Painel e scripts
 

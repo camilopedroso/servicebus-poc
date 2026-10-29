@@ -1,0 +1,107 @@
+using Microsoft.AspNetCore.Mvc;
+using Vida.Propostas.Contratos.Eventos;
+using Vida.Propostas.Cenarios;
+using Vida.Propostas.Contratos.Demonstracao;
+using Vida.Propostas.Dados;
+using Vida.Plataforma.Api;
+
+namespace Vida.Propostas.Controllers.Demonstracao;
+
+/// <summary>
+/// Cenários que publicam propostas direto no tópico "proposta-recebida", sem outbox (fases 1 e 3) e o dual write sem outbox (fase 4).
+/// Não é a API de negócio (essa é a PropostasController): são os botões do painel.
+/// </summary>
+/// <param name="envio">Envio direto para o tópico.</param>
+[ApiController]
+[Route("demo/propostas")]
+[Tags("Demonstração")]
+[ApiExplorerSettings(GroupName = "demo")]
+public sealed class CenariosDePropostasController(
+    EnvioDePropostas envio
+    ) : ControllerBase
+{
+    /// <summary>
+    /// POST /demo/propostas/lote: propostas válidas, enviadas em lote.
+    /// </summary>
+    /// <param name="corpo">Dados do lote de propostas a ser enviado.</param>
+    /// <param name="cancellationToken">
+    ///     Token de cancelamento da requisição.
+    /// </param>
+    [HttpPost("lote")]
+    public async Task<IActionResult> EnviarLoteAsync(
+        EnvioDeLote corpo,
+        CancellationToken cancellationToken)
+    {
+        // Pattern matching: "is { Count: > 0 } erros" é um property pattern.
+        // Testa se o resultado de Validar() não é nulo e se a propriedade
+        // Count do dicionário é maior que zero; se for, atribui o resultado
+        // à variável "erros" (só tem valor garantido dentro do if). Equivale a:
+        //   var erros = corpo.Validar();
+        //   if (erros is not null && erros.Count > 0) { ... }
+        if (corpo.Validar() is { Count: > 0 } erros)
+        {
+            return this.ProblemaDeValidacao(erros);
+        }
+
+        var propostas = await envio.EnviarLoteAsync(
+            corpo.Quantidade,
+            cancellationToken);
+
+        return Ok(new { Propostas = propostas });
+    }
+
+    /// <summary>
+    /// POST /demo/propostas: uma proposta. Idade > 80 → recusa; 
+    /// simularFalha → retry até maxDeliveryCount → DLQ.
+    /// </summary>
+    /// <param name="corpo">Dados da proposta a ser enviada.</param>
+    /// <param name="cancellationToken">
+    ///     Token de cancelamento da requisição.
+    /// </param>
+    [HttpPost]
+    public async Task<ActionResult<PropostaSeguroVida>> EnviarUmaAsync(
+        EnvioDeProposta corpo,
+        CancellationToken cancellationToken)
+    {
+        // Pattern matching: "is { Count: > 0 } erros" é um property pattern.
+        // Testa se o resultado de Validar() não é nulo e se a propriedade
+        // Count do dicionário é maior que zero; se for, atribui o resultado
+        // à variável "erros" (só tem valor garantido dentro do if). Equivale a:
+        //   var erros = corpo.Validar();
+        //   if (erros is not null && erros.Count > 0) { ... }
+        if (corpo.Validar() is { Count: > 0 } erros)
+        {
+            return this.ProblemaDeValidacao(erros);
+        }
+
+        return await envio.EnviarUmaAsync(corpo, cancellationToken);
+    }
+
+    /// <summary>
+    /// POST /demo/propostas/invalida: corpo ilegível → DLQ na primeira entrega (PayloadInvalido).
+    /// </summary>
+    [HttpPost("invalida")]
+    public async Task<IActionResult> EnviarInvalidaAsync(CancellationToken cancellationToken)
+    {
+        var messageId = await envio.EnviarInvalidaAsync(cancellationToken);
+        return Ok(new { MessageId = messageId });
+    }
+
+    /// <summary>
+    /// POST /demo/propostas/sem-outbox: grava no banco e publica, sem outbox. O problema que o outbox resolve.
+    /// </summary>
+    /// <remarks>
+    /// O banco vem por [FromServices], e não pelo construtor: sem a connection string, resolver o DbContext lança
+    /// BancoNaoConfiguradoException, e os outros cenários deste controller (que não usam banco) parariam de funcionar.
+    /// </remarks>
+    [HttpPost("sem-outbox")]
+    public async Task<IActionResult> EnviarSemOutboxAsync(
+        EnvioSemOutboxParametros corpo,
+        [FromServices] EnvioSemOutbox envioSemOutbox,
+        [FromServices] BancoDePropostas banco,
+        CancellationToken cancellationToken)
+    {
+        var (proposta, publicada) = await envioSemOutbox.EnviarAsync(banco, corpo.FalharAntesDoEnvio, cancellationToken);
+        return Ok(new { proposta.PropostaId, Publicada = publicada });
+    }
+}

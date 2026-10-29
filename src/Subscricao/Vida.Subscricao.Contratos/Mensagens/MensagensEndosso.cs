@@ -12,6 +12,12 @@ public static class MensagensEndosso
     public const string Tipo = "EndossoSolicitado";
 
     /// <summary>
+    /// Fila onde a Subscrição aceita o COMANDO de endosso (fila, e não tópico: é um pedido a um destinatário).
+    /// Tem sessions (SessionId = ApoliceId) e detecção de duplicatas.
+    /// </summary>
+    public const string Fila = "endossos";
+
+    /// <summary>
     /// Monta a mensagem do endosso para a fila "endossos".
     /// </summary>
     /// <param name="endosso">Endosso a enviar.</param>

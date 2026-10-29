@@ -3,7 +3,7 @@ using Azure.Messaging.ServiceBus;
 using Vida.Plataforma.Mensagens;
 using Vida.Plataforma.Processamento;
 using Vida.Subscricao.Contratos.Eventos;
-using Vida.Subscricao.Contratos.Topologia;
+using Vida.Subscricao.Contratos.Mensagens;
 
 namespace Vida.Notificacao.Processamento;
 
@@ -31,7 +31,7 @@ public sealed class ProcessadorDeBoasVindas(ServiceBusClient client, ILogger<Pro
             AutoCompleteMessages = false,
             MaxConcurrentCalls = 2,
         };
-        var processor = client.CreateProcessor(Topicos.ApoliceEmitida, Assinatura, opcoes);
+        var processor = client.CreateProcessor(MensagensApolice.Topico, Assinatura, opcoes);
 
         processor.ProcessMessageAsync += ProcessarMensagem;
         processor.ProcessErrorAsync += args =>

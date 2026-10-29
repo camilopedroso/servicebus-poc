@@ -2,9 +2,9 @@ using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using Vida.Producer.Contratos;
-using Vida.Producer.Dados;
-using Vida.Producer.Outbox;
+using Vida.Propostas.Contratos;
+using Vida.Propostas.Dados;
+using Vida.Propostas.Outbox;
 using Vida.Testes.Integracao.Infra;
 using Vida.Propostas.Contratos.Mensagens;
 
@@ -16,7 +16,7 @@ namespace Vida.Testes.Integracao.Outbox;
 /// linhas depois do envio ou da falha: PublicadaEm, Tentativas, ProximaTentativaEm e o status da proposta.
 /// <para>
 /// A fábrica tira o despachante do host, para o polling de 1 s não disputar as linhas com as asserções. Cada teste
-/// cria o seu e chama <see cref="DespachanteDoOutbox.DespacharLoteAsync"/> à mão (é internal; o csproj do Producer
+/// cria o seu e chama <see cref="DespachanteDoOutbox.DespacharLoteAsync"/> à mão (é internal; o csproj de Propostas
 /// tem InternalsVisibleTo para este projeto): uma rodada do loop, no momento que o teste escolhe.
 /// </para>
 /// <para>

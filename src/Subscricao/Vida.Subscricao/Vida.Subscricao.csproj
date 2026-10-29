@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-Vida.Subscricao-98dc07a3-99c1-4a49-9176-c83a3352f306</UserSecretsId>
+    <!-- Comentários /// no contrato OpenAPI das demonstrações; o 1591 (membro público sem comentário) fica desligado. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.13" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.18.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Plataforma\Vida.Plataforma\Vida.Plataforma.csproj" />
+    <ProjectReference Include="..\..\Propostas\Vida.Propostas.Contratos\Vida.Propostas.Contratos.csproj" />
+    <ProjectReference Include="..\..\Subscricao\Vida.Subscricao.Contratos\Vida.Subscricao.Contratos.csproj" />
+    <ProjectReference Include="..\..\Plataforma\Vida.LogsAoVivo\Vida.LogsAoVivo.csproj" />
+    <ProjectReference Include="..\..\Plataforma\Vida.Telemetria\Vida.Telemetria.csproj" />
+  </ItemGroup>
+
+</Project>

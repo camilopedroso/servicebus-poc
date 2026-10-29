@@ -1,4 +1,4 @@
-using Vida.Consumer.Endossos;
+using Vida.Subscricao.Endossos;
 
 namespace Vida.Testes.Unidade.Endossos;
 

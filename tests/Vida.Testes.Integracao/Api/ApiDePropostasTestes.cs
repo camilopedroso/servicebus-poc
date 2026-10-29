@@ -3,19 +3,19 @@ using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Vida.Propostas.Contratos.Dominio;
-using Vida.Producer.Controllers;
-using Vida.Producer.Contratos;
-using Vida.Producer.Dados;
+using Vida.Propostas.Controllers;
+using Vida.Propostas.Contratos;
+using Vida.Propostas.Dados;
 using Vida.Testes.Integracao.Infra;
 using Vida.Propostas.Contratos.Mensagens;
 
 namespace Vida.Testes.Integracao.Api;
 
 /// <summary>
-/// Testes de integração da API de propostas: o Producer inteiro roda em memória (WebApplicationFactory), com o
+/// Testes de integração da API de propostas: o serviço de Propostas inteiro roda em memória (WebApplicationFactory), com o
 /// mesmo Program.cs, os mesmos controllers e o mesmo BancoDePropostas do desenvolvimento. O que muda é só o banco:
 /// um SQL Server descartável em Docker (Testcontainers), com a mesma imagem do infra/sql-up.ps1. Na partida, o
-/// Producer aplica as migrations nele, então o schema testado é o que as migrations produzem, não uma cópia.
+/// serviço aplica as migrations nele, então o schema testado é o que as migrations produzem, não uma cópia.
 /// <para>
 /// Por que não SQLite ou o provider InMemory: o código depende de recursos do SQL Server que eles não têm, ou
 /// emulam de outro jeito: hints de lock no despachante (UPDLOCK, READPAST), índice único filtrado da

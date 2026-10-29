@@ -2,7 +2,7 @@ import type { LinhaDeLog } from './tipos';
 
 /**
  * A partir de um id fixado, junta todos os ids que aparecem na mesma linha que ele, em todas as colunas.
- * Assim, fixar uma PropostaId também acende a ApoliceId que o Consumer emitiu para ela,
+ * Assim, fixar uma PropostaId também acende a ApoliceId que a Subscrição emitiu para ela,
  * e as linhas de Cobrança e Notificação (que só conhecem a ApoliceId) entram na trilha.
  */
 export function idsDaTrilha(fixado: string, todasAsLinhas: LinhaDeLog[]): Set<string> {

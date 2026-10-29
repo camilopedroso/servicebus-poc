@@ -365,7 +365,7 @@ code {
 /* Colunas de log */
 .colunas {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   min-height: 0;
 }
 
@@ -626,7 +626,7 @@ code {
   cursor: pointer;
 }
 
-/* Liga/desliga: seletor de assinaturas (Cobrança, Notificação) e de processadores (Consumer) */
+/* Liga/desliga: seletor de assinaturas (Cobrança, Notificação) e de processadores (Subscrição) */
 .assinaturas {
   position: relative;
 }

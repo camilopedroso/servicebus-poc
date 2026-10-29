@@ -17,7 +17,7 @@ export interface RespostaDetalhada<T> {
 }
 
 /**
- * Chama um app .NET pelo proxy do Vite (/api/producer, /api/consumer, /api/cobranca, /api/notificacao).
+ * Chama um app .NET pelo proxy do Vite (/api/propostas, /api/subscricao, /api/cobranca, /api/notificacao, /api/operacao).
  * Respostas de erro viram ErroDaApi com o texto que o painel mostra ao usuário.
  */
 export async function chamar<T>(app: App, metodo: 'GET' | 'POST', caminho: string, corpo?: unknown): Promise<T> {
@@ -72,8 +72,9 @@ function tentarJson(texto: string): unknown {
 }
 
 export const nomeDoApp: Record<App, string> = {
-  producer: 'Producer',
-  consumer: 'Consumer',
+  propostas: 'Propostas',
+  subscricao: 'Subscrição',
   cobranca: 'Cobrança',
   notificacao: 'Notificação',
+  operacao: 'Operação',
 };

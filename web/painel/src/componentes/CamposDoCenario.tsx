@@ -6,7 +6,7 @@ interface Props {
   onAlterar: (valores: Valores) => void;
 }
 
-/** Os parâmetros que o cenário escolhido aceita. Vazio significa que o Producer sorteia. */
+/** Os parâmetros que o cenário escolhido aceita. Vazio significa que o serviço sorteia. */
 export function CamposDoCenario({ campos, valores, onAlterar }: Props) {
   const alterar = <K extends Campo>(campo: K, valor: Valores[K]) => onAlterar({ ...valores, [campo]: valor });
 

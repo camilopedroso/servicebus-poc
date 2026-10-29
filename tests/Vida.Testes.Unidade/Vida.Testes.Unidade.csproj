@@ -17,8 +17,9 @@
     <ProjectReference Include="..\..\src\Plataforma\Vida.Plataforma\Vida.Plataforma.csproj" />
     <ProjectReference Include="..\..\src\Propostas\Vida.Propostas.Contratos\Vida.Propostas.Contratos.csproj" />
     <ProjectReference Include="..\..\src\Subscricao\Vida.Subscricao.Contratos\Vida.Subscricao.Contratos.csproj" />
-    <ProjectReference Include="..\..\src\Vida.Consumer\Vida.Consumer.csproj" />
-    <ProjectReference Include="..\..\src\Vida.Producer\Vida.Producer.csproj" />
+    <ProjectReference Include="..\..\src\Subscricao\Vida.Subscricao\Vida.Subscricao.csproj" />
+    <ProjectReference Include="..\..\src\Propostas\Vida.Propostas\Vida.Propostas.csproj" />
+    <ProjectReference Include="..\..\src\Operacao\Vida.Operacao\Vida.Operacao.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -2,26 +2,26 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Consumer",
+      "name": "Subscrição",
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build",
-      "program": "${workspaceFolder}/src/Vida.Consumer/bin/Debug/net10.0/Vida.Consumer.dll",
-      "cwd": "${workspaceFolder}/src/Vida.Consumer",
+      "program": "${workspaceFolder}/src/Subscricao/Vida.Subscricao/bin/Debug/net10.0/Vida.Subscricao.dll",
+      "cwd": "${workspaceFolder}/src/Subscricao/Vida.Subscricao",
       "console": "integratedTerminal",
       "env": {
         "DOTNET_ENVIRONMENT": "Development",
         // Uma mensagem por vez: com 4 em paralelo, o passo a passo pula entre threads.
-        "Consumer__MaxConcurrentCalls": "1"
+        "Subscricao__MaxConcurrentCalls": "1"
       }
     },
     {
-      "name": "Producer",
+      "name": "Propostas",
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build",
-      "program": "${workspaceFolder}/src/Vida.Producer/bin/Debug/net10.0/Vida.Producer.dll",
-      "cwd": "${workspaceFolder}/src/Vida.Producer",
+      "program": "${workspaceFolder}/src/Propostas/Vida.Propostas/bin/Debug/net10.0/Vida.Propostas.dll",
+      "cwd": "${workspaceFolder}/src/Propostas/Vida.Propostas",
       "console": "integratedTerminal"
     },
     {
@@ -41,6 +41,16 @@
       "preLaunchTask": "build",
       "program": "${workspaceFolder}/src/Notificacao/Vida.Notificacao/bin/Debug/net10.0/Vida.Notificacao.dll",
       "cwd": "${workspaceFolder}/src/Notificacao/Vida.Notificacao",
+      "console": "integratedTerminal",
+      "env": { "DOTNET_ENVIRONMENT": "Development" }
+    },
+    {
+      "name": "Operação",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/src/Operacao/Vida.Operacao/bin/Debug/net10.0/Vida.Operacao.dll",
+      "cwd": "${workspaceFolder}/src/Operacao/Vida.Operacao",
       "console": "integratedTerminal",
       "env": { "DOTNET_ENVIRONMENT": "Development" }
     },
@@ -65,24 +75,34 @@
       "presentation": { "hidden": true }
     },
     {
-      "name": "Consumer (sem build)",
+      "name": "Operação (sem build)",
       "type": "coreclr",
       "request": "launch",
-      "program": "${workspaceFolder}/src/Vida.Consumer/bin/Debug/net10.0/Vida.Consumer.dll",
-      "cwd": "${workspaceFolder}/src/Vida.Consumer",
+      "program": "${workspaceFolder}/src/Operacao/Vida.Operacao/bin/Debug/net10.0/Vida.Operacao.dll",
+      "cwd": "${workspaceFolder}/src/Operacao/Vida.Operacao",
+      "console": "integratedTerminal",
+      "env": { "DOTNET_ENVIRONMENT": "Development" },
+      "presentation": { "hidden": true }
+    },
+    {
+      "name": "Subscrição (sem build)",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/Subscricao/Vida.Subscricao/bin/Debug/net10.0/Vida.Subscricao.dll",
+      "cwd": "${workspaceFolder}/src/Subscricao/Vida.Subscricao",
       "console": "integratedTerminal",
       "env": {
         "DOTNET_ENVIRONMENT": "Development",
-        "Consumer__MaxConcurrentCalls": "1"
+        "Subscricao__MaxConcurrentCalls": "1"
       },
       "presentation": { "hidden": true }
     },
     {
-      "name": "Producer (sem build)",
+      "name": "Propostas (sem build)",
       "type": "coreclr",
       "request": "launch",
-      "program": "${workspaceFolder}/src/Vida.Producer/bin/Debug/net10.0/Vida.Producer.dll",
-      "cwd": "${workspaceFolder}/src/Vida.Producer",
+      "program": "${workspaceFolder}/src/Propostas/Vida.Propostas/bin/Debug/net10.0/Vida.Propostas.dll",
+      "cwd": "${workspaceFolder}/src/Propostas/Vida.Propostas",
       "console": "integratedTerminal",
       "presentation": { "hidden": true }
     }
@@ -90,15 +110,21 @@
   "compounds": [
     {
       // Compila uma vez só (dois builds em paralelo brigam pelos mesmos arquivos) e sobe os dois.
-      "name": "Consumer + Producer",
+      "name": "Subscrição + Propostas",
       "preLaunchTask": "build",
-      "configurations": ["Consumer (sem build)", "Producer (sem build)"],
+      "configurations": ["Subscrição (sem build)", "Propostas (sem build)"],
       "stopAll": true
     },
     {
-      "name": "Fluxo completo (Consumer + Cobrança + Notificação + Producer)",
+      "name": "Fluxo completo (todos os serviços)",
       "preLaunchTask": "build",
-      "configurations": ["Consumer (sem build)", "Cobrança (sem build)", "Notificação (sem build)", "Producer (sem build)"],
+      "configurations": [
+        "Subscrição (sem build)",
+        "Cobrança (sem build)",
+        "Notificação (sem build)",
+        "Operação (sem build)",
+        "Propostas (sem build)"
+      ],
       "stopAll": true
     }
   ]

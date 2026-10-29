@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    Squad de Plataforma: ferramentas de operação (peek, DLQ, reprocessamento, regras). Não referencia contrato de
+    nenhuma squad: descobre as entidades no broker, então um serviço novo aparece aqui sem mudar este projeto.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Comentários /// no contrato OpenAPI; o 1591 (membro público sem comentário) fica desligado. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.13" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.18.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Plataforma\Vida.Plataforma\Vida.Plataforma.csproj" />
+    <ProjectReference Include="..\..\Plataforma\Vida.LogsAoVivo\Vida.LogsAoVivo.csproj" />
+    <ProjectReference Include="..\..\Plataforma\Vida.Telemetria\Vida.Telemetria.csproj" />
+  </ItemGroup>
+
+</Project>

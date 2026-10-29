@@ -2,9 +2,9 @@ using System.Net.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Vida.Propostas.Contratos.Dominio;
 using Vida.Subscricao.Contratos.Eventos;
-using Vida.Producer.Contratos;
-using Vida.Producer.Dados;
-using Vida.Producer.Desfechos;
+using Vida.Propostas.Contratos;
+using Vida.Propostas.Dados;
+using Vida.Propostas.Desfechos;
 using Vida.Testes.Integracao.Infra;
 
 namespace Vida.Testes.Integracao.Desfechos;

@@ -13,7 +13,7 @@ public static class MetricasDeNegocio
 
     private static readonly Meter Medidor = new(Nome);
 
-    /// <summary>Propostas analisadas pelo Consumer, com a tag "resultado" (aprovada, recusada).</summary>
+    /// <summary>Propostas analisadas pela Subscrição, com a tag "resultado" (aprovada, recusada).</summary>
     public static readonly Counter<long> PropostasDecididas =
         Medidor.CreateCounter<long>("vida.propostas.decididas", description: "Propostas analisadas, por resultado.");
 

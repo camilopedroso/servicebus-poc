@@ -2,7 +2,7 @@ using Vida.Propostas.Contratos.Eventos;
 using Vida.Propostas.Contratos.Dominio;
 using Vida.Propostas.Contratos.Mensagens;
 using System.Diagnostics;
-using Vida.Producer.Outbox;
+using Vida.Propostas.Outbox;
 
 namespace Vida.Testes.Unidade.Outbox;
 

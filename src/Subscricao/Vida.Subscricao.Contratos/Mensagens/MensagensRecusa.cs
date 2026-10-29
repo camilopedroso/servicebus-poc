@@ -11,6 +11,9 @@ public static class MensagensRecusa
     /// <summary>Subject da mensagem ("PropostaRecusada"): o tipo do evento, que os filtros de assinatura podem usar.</summary>
     public const string Tipo = "PropostaRecusada";
 
+    /// <summary>Tópico onde a Subscrição publica a recusa por regra de negócio (um desfecho, não uma falha).</summary>
+    public const string Topico = "proposta-recusada";
+
     /// <summary>
     /// Fábrica que monta a mensagem do evento de recusa.
     /// </summary>

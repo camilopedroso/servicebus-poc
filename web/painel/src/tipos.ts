@@ -1,5 +1,5 @@
 /** Os processos .NET que o painel acompanha. */
-export type App = 'producer' | 'consumer' | 'cobranca' | 'notificacao';
+export type App = 'propostas' | 'subscricao' | 'cobranca' | 'notificacao' | 'operacao';
 
 /** Uma linha de log como chega do GET /logs (Vida.LogsAoVivo.Logs.RegistroDeLog). */
 export interface RegistroDeLog {
@@ -32,7 +32,7 @@ export interface EstadoDaAssinatura {
   naDlq: number;
 }
 
-/** GET /processadores (Consumer, Cobrança, Notificação): liga/desliga de cada processor do app. */
+/** GET /processadores (Subscrição, Cobrança, Notificação): liga/desliga de cada processor do app. */
 export interface EstadoDoProcessador {
   nome: string;
   /** Fila ou assinatura que ele lê. */
