@@ -14,7 +14,7 @@ namespace Vida.Cobranca.Processamento;
 /// consumers); outra squad no mesmo tópico recebe a sua própria cópia (publish/subscribe).
 /// </summary>
 /// <param name="client">ServiceBusClient singleton do app.</param>
-/// <param name="logger">Logger; o painel mostra estas linhas na coluna da Cobrança.</param>
+/// <param name="logger">Logger do processador de cobrança.</param>
 public sealed class ProcessadorDeCobranca(ServiceBusClient client, ILogger<ProcessadorDeCobranca> logger)
 {
     /// <summary>Assinatura da squad no tópico apolice-emitida. É também o nome do processador na rota /processadores.</summary>

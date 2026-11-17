@@ -11,7 +11,8 @@
     <Nullable>enable</Nullable>
     <!-- Publicado como pacote (publicar-pacotes.ps1): mudou, sobe a versão. Quem consome atualiza quando quiser. -->
     <!-- 1.1.0: propriedade SimularQuedaAposGravar (etapa 9). Adição compatível: quem está na 1.0.0 segue funcionando. -->
-    <Version>1.1.0</Version>
+    <!-- 2.0.0 (fase 8): saem as propriedades de simulação e Planos.Sortear. Remoção quebra quem usava: versão maior. -->
+    <Version>2.0.0</Version>
     <Description>Linguagem publicada da squad de Propostas: o evento PropostaRecebida e como a mensagem é montada.</Description>
   </PropertyGroup>
 

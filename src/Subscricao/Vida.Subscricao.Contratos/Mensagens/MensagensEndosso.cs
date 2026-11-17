@@ -32,7 +32,7 @@ public static class MensagensEndosso
             SessionId = endosso.ApoliceId.ToString(),
             // Id composto, previsível a partir do negócio: reenviar a mesma versão gera o mesmo MessageId,
             // e a detecção de duplicatas da fila descarta a cópia. Um Guid novo a cada envio anularia isso.
-            // A versão vem do producer (EnvioDeEndossos.NovoEndosso). Esta é a primeira camada de dedup, só dentro
+            // A versão vem de quem registra o pedido (RegistroDeEndossos, no banco). Esta é a primeira camada de dedup, só dentro
             // da janela da fila; a segunda é o consumer, que relê a versão do corpo (ProcessadorDeEndossos/DecisaoDeEndosso).
             MessageId = $"{endosso.ApoliceId}/v{endosso.Versao}",
             ContentType = "application/json",

@@ -12,7 +12,7 @@ namespace Vida.Operacao.Ferramentas;
 /// <param name="client">ServiceBusClient singleton do app.</param>
 /// <param name="admin">Administration client, para ler as regras.</param>
 /// <param name="descoberta">Lista de assinaturas que existem no broker.</param>
-/// <param name="logger">Logger; o painel mostra estas linhas na coluna da Operação.</param>
+/// <param name="logger">Logger das ferramentas de operação.</param>
 public sealed class InspecaoDeEntidades(
     ServiceBusClient client, ServiceBusAdministrationClient admin, DescobertaDeEntidades descoberta,
     ILogger<InspecaoDeEntidades> logger)

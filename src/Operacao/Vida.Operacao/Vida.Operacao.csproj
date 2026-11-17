@@ -20,7 +20,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Plataforma\Vida.Plataforma\Vida.Plataforma.csproj" />
-    <ProjectReference Include="..\..\Plataforma\Vida.LogsAoVivo\Vida.LogsAoVivo.csproj" />
     <ProjectReference Include="..\..\Plataforma\Vida.Telemetria\Vida.Telemetria.csproj" />
   </ItemGroup>
 

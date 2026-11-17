@@ -7,13 +7,6 @@ public static class Planos
 {
     public static readonly Plano[] Todos = Enum.GetValues<Plano>();
 
-    /// <summary>Sorteia um plano, para gerar propostas e apólices de teste.</summary>
-    public static Plano Sortear()
-    {
-        var sorteados = Random.Shared.GetItems(Todos, 1);
-        return sorteados[0];
-    }
-
     /// <summary>
     /// Converte o texto que veio de fora (corpo de uma requisição) no plano, sem diferenciar maiúsculas de minúsculas
     /// e ignorando espaços nas pontas. Devolve null se o texto não for um plano.

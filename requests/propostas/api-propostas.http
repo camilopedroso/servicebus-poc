@@ -1,0 +1,86 @@
+# Squad de Propostas (:5180): API REST com transactional outbox (PropostasController.cs).
+# O POST grava proposta + mensagem do outbox numa transação e responde 201 sem falar com o Service Bus.
+# O despachante publica em seguida; a Subscrição decide e o desfecho volta pelas assinaturas status-aprovada/recusada.
+
+@propostas = http://localhost:5180
+
+### Criar proposta → 201 Created + Location
+# @name criada
+POST {{propostas}}/api/propostas
+Content-Type: application/json
+
+{
+  "clienteId": "CLI-1001",
+  "idade": 42,
+  "capitalSegurado": 350000,
+  "plano": "Familiar"
+}
+
+### Consultar a proposta criada acima: Recebida → EnviadaParaAnalise → Aprovada (com ApoliceId)
+GET {{propostas}}/api/propostas/{{criada.response.body.$.propostaId}}
+
+### Idade acima de 80: a API aceita (201) e a Subscrição recusa depois; o GET passa a mostrar Recusada com o motivo
+# @name recusada
+POST {{propostas}}/api/propostas
+Content-Type: application/json
+
+{
+  "clienteId": "CLI-1003",
+  "idade": 85,
+  "capitalSegurado": 100000,
+  "plano": "Individual"
+}
+
+### Consultar a recusada
+GET {{propostas}}/api/propostas/{{recusada.response.body.$.propostaId}}
+
+### Capital acima de 1 milhão: aprovada, a apólice vai para alto-valor (Resseguro) e não para cobrança
+POST {{propostas}}/api/propostas
+Content-Type: application/json
+
+{
+  "clienteId": "CLI-1004",
+  "idade": 50,
+  "capitalSegurado": 1500000,
+  "plano": "Empresarial"
+}
+
+### Idempotency-Key: primeira chamada → 201
+# @name primeira
+POST {{propostas}}/api/propostas
+Content-Type: application/json
+Idempotency-Key: {{$guid}}
+
+{
+  "clienteId": "CLI-1002",
+  "idade": 35,
+  "capitalSegurado": 200000,
+  "plano": "Individual"
+}
+
+### Idempotency-Key repetida (a mesma da chamada acima) → 200 + Idempotent-Replayed: true, mesma proposta, nada gravado
+POST {{propostas}}/api/propostas
+Content-Type: application/json
+Idempotency-Key: {{primeira.request.headers.Idempotency-Key}}
+
+{
+  "clienteId": "CLI-1002",
+  "idade": 35,
+  "capitalSegurado": 200000,
+  "plano": "Individual"
+}
+
+### Validação: todos os campos são obrigatórios → 400 com um erro por campo
+POST {{propostas}}/api/propostas
+Content-Type: application/json
+
+{
+  "idade": 200,
+  "plano": "Ouro"
+}
+
+### Proposta inexistente → 404
+GET {{propostas}}/api/propostas/00000000-0000-0000-0000-000000000000
+
+### Contrato OpenAPI (só em Development)
+GET {{propostas}}/openapi/v1.json

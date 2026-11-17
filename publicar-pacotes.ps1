@@ -1,5 +1,5 @@
 # Publica no feed local (pacotes/) o que as squads compartilham: a plataforma e os contratos.
-# Entre squads o código chega como pacote, com versão; dentro da squad, ProjectReference (ver docs/plano-reestruturacao.md, etapa 10).
+# Entre squads o código chega como pacote, com versão; dentro da squad, ProjectReference (ver docs/como-funciona.md, seção 6).
 # Uso: .\publicar-pacotes.ps1            publica o que ainda não está no feed (idempotente; o iniciar.ps1 chama sempre)
 #      .\publicar-pacotes.ps1 -Forcar    republica a MESMA versão (só para desenvolvimento: ver o comentário de -Forcar)
 # Mudou um contrato ou a plataforma? Suba a <Version> no csproj e rode de novo: quem consome atualiza quando quiser.
@@ -15,7 +15,6 @@ New-Item -ItemType Directory -Force $feed | Out-Null
 # Ordem de dependência: Vida.Subscricao.Contratos depende do pacote Vida.Propostas.Contratos (o Plano), então vem depois.
 $projetos = @(
     'src\Plataforma\Vida.Plataforma\Vida.Plataforma.csproj',
-    'src\Plataforma\Vida.LogsAoVivo\Vida.LogsAoVivo.csproj',
     'src\Plataforma\Vida.Telemetria\Vida.Telemetria.csproj',
     'src\Propostas\Vida.Propostas.Contratos\Vida.Propostas.Contratos.csproj',
     'src\Subscricao\Vida.Subscricao.Contratos\Vida.Subscricao.Contratos.csproj'

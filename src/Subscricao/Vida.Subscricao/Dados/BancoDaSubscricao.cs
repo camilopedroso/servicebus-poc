@@ -6,15 +6,17 @@ namespace Vida.Subscricao.Dados;
 
 /// <summary>
 /// Banco da Subscrição (VidaSubscricao, no mesmo SQL Server local, mas outro banco: cada serviço lê só o seu).
-/// Apólices, recusas, inbox e outbox no mesmo banco: é o que permite gravar tudo numa transação local.
+/// Apólices, recusas, endossos, inbox e outbox no mesmo banco: é o que permite gravar tudo numa transação local.
 /// A transação do Service Bus (fase 2) não serve mais aqui: ela não inclui o SQL Server.
 /// </summary>
-/// <param name="options">Opções do EF Core (connection string vem de src/sqlserver.local.json).</param>
+/// <param name="options">Opções do EF Core (localmente, a connection string vem de src/sqlserver.local.json).</param>
 public sealed class BancoDaSubscricao(DbContextOptions<BancoDaSubscricao> options) : DbContext(options)
 {
     public DbSet<ApoliceRegistrada> Apolices => Set<ApoliceRegistrada>();
 
     public DbSet<RecusaRegistrada> Recusas => Set<RecusaRegistrada>();
+
+    public DbSet<EndossoRegistrado> Endossos => Set<EndossoRegistrado>();
 
     public DbSet<MensagemRecebida> Inbox => Set<MensagemRecebida>();
 
@@ -43,6 +45,19 @@ public sealed class BancoDaSubscricao(DbContextOptions<BancoDaSubscricao> option
             recusa.Property(r => r.Motivo).HasMaxLength(500);
         });
 
+        modelBuilder.Entity<EndossoRegistrado>(endosso =>
+        {
+            endosso.ToTable("Endossos");
+            endosso.HasKey(e => new { e.ApoliceId, e.Versao });
+            endosso.Property(e => e.Tipo).HasMaxLength(EndossoRegistrado.TamanhoMaximoDoTipo);
+            endosso.Property(e => e.ChaveDeIdempotencia).HasMaxLength(EndossoRegistrado.TamanhoMaximoDaChave);
+            // A mesma chave vale por apólice; o filtro deixa várias linhas sem chave.
+            endosso.HasIndex(e => new { e.ApoliceId, e.ChaveDeIdempotencia })
+                .IsUnique()
+                .HasFilter("[ChaveDeIdempotencia] IS NOT NULL");
+            endosso.HasOne<ApoliceRegistrada>().WithMany().HasForeignKey(e => e.ApoliceId);
+        });
+
         modelBuilder.Entity<MensagemRecebida>(mensagem =>
         {
             mensagem.ToTable("Inbox");
@@ -58,6 +73,7 @@ public sealed class BancoDaSubscricao(DbContextOptions<BancoDaSubscricao> option
             mensagem.Property(m => m.MessageId).HasMaxLength(128);
             mensagem.Property(m => m.Subject).HasMaxLength(100);
             mensagem.Property(m => m.CorrelationId).HasMaxLength(128);
+            mensagem.Property(m => m.SessionId).HasMaxLength(128);
             mensagem.Property(m => m.ContentType).HasMaxLength(100);
             mensagem.Property(m => m.UltimoErro).HasMaxLength(1000);
             // O despachante sempre procura "pendentes, em ordem": índice filtrado só com elas fica pequeno.

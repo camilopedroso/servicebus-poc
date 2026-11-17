@@ -9,7 +9,6 @@
     <Project Path="src/Operacao/Vida.Operacao/Vida.Operacao.csproj" />
   </Folder>
   <Folder Name="/src/Plataforma/">
-    <Project Path="src/Plataforma/Vida.LogsAoVivo/Vida.LogsAoVivo.csproj" />
     <Project Path="src/Plataforma/Vida.Plataforma/Vida.Plataforma.csproj" />
     <Project Path="src/Plataforma/Vida.Telemetria/Vida.Telemetria.csproj" />
   </Folder>

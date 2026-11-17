@@ -25,7 +25,7 @@ public sealed class ProcessadorControlavel : IAsyncDisposable
     /// <summary>
     /// Embrulha um processor de fila ou de assinatura.
     /// </summary>
-    /// <param name="nome">Nome usado na rota e no painel (ex.: "propostas", "cobranca").</param>
+    /// <param name="nome">Nome usado na rota (ex.: "propostas", "cobranca").</param>
     /// <param name="processor">Processor já com os handlers de mensagem e de erro.</param>
     /// <param name="logger">Logger de quem criou o processor: os logs de ligar/desligar saem com a categoria dele.</param>
     /// <param name="ligarNaPartida">Se o GerenciadorDeProcessadores liga este processor quando o app sobe.</param>
@@ -51,7 +51,7 @@ public sealed class ProcessadorControlavel : IAsyncDisposable
     /// <summary>
     /// Embrulha um processor de fila com sessions.
     /// </summary>
-    /// <param name="nome">Nome usado na rota e no painel (ex.: "endossos").</param>
+    /// <param name="nome">Nome usado na rota (ex.: "endossos").</param>
     /// <param name="processor">Session processor já com os handlers.</param>
     /// <param name="logger">Logger de quem criou o processor.</param>
     /// <param name="ligarNaPartida">Se o GerenciadorDeProcessadores liga este processor quando o app sobe.</param>
@@ -67,7 +67,7 @@ public sealed class ProcessadorControlavel : IAsyncDisposable
         _logger = logger;
     }
 
-    /// <summary>Nome usado na rota e no painel.</summary>
+    /// <summary>Nome usado na rota.</summary>
     public string Nome { get; }
 
     /// <summary>Fila ou assinatura lida (para assinatura: "topico/Subscriptions/assinatura").</summary>

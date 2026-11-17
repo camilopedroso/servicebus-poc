@@ -6,7 +6,7 @@ namespace Vida.Subscricao.Outbox;
 
 /// <summary>
 /// Uma linha da tabela Subscricao.OutboxMensagens: a mensagem do Service Bus serializada, gravada na MESMA
-/// transação da apólice (ou da recusa) e da inbox. O despachante lê, publica e marca como publicada.
+/// transação do dado de negócio (apólice, recusa ou endosso) e, quando há mensagem recebida, da inbox. O despachante lê, publica e marca como publicada.
 /// Cópia do padrão de Propostas, não código compartilhado: o outbox é um padrão, e cada squad tem o seu.
 /// </summary>
 public sealed class MensagemDeSaida
@@ -22,6 +22,11 @@ public sealed class MensagemDeSaida
     public string? Subject { get; set; }
 
     public string? CorrelationId { get; set; }
+
+    /// <summary>
+    /// Sessão da mensagem, para destinos com sessions (a fila endossos exige: sem SessionId, o envio é recusado).
+    /// </summary>
+    public string? SessionId { get; set; }
 
     public string? ContentType { get; set; }
 
@@ -65,6 +70,7 @@ public sealed class MensagemDeSaida
             MessageId = mensagem.MessageId,
             Subject = mensagem.Subject,
             CorrelationId = mensagem.CorrelationId,
+            SessionId = mensagem.SessionId,
             ContentType = mensagem.ContentType,
             Corpo = corpo,
             Propriedades = propriedades,
@@ -88,6 +94,7 @@ public sealed class MensagemDeSaida
             MessageId = MessageId,
             Subject = Subject,
             CorrelationId = CorrelationId,
+            SessionId = SessionId,
             ContentType = ContentType,
         };
         var propriedades = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(Propriedades) ?? [];

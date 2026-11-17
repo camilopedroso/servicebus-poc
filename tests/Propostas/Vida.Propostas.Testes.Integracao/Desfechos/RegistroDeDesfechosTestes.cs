@@ -94,11 +94,12 @@ public sealed class RegistroDeDesfechosTestes(FabricaDaApi fabrica)
     }
 
     [Fact]
-    public async Task Proposta_que_nao_veio_da_API_e_ignorada()
+    public async Task Proposta_que_nao_esta_no_banco_e_reportada_como_desconhecida()
     {
-        // Endpoints de demonstração enviam direto para a fila: o evento volta, mas a proposta não está no banco.
-        var idDaDemonstracao = Guid.NewGuid();
-        var recusa = Recusa(idDaDemonstracao);
+        // Toda proposta é gravada antes de ser publicada: um desfecho sem proposta é inconsistência (o processador
+        // manda a mensagem para a DLQ). Aqui só a decisão: nada é gravado.
+        var idDesconhecido = Guid.NewGuid();
+        var recusa = Recusa(idDesconhecido);
 
         var resultado = await Aplicar(banco => RegistroDeDesfechos.AplicarRecusaAsync(banco, recusa, TestContext.Current.CancellationToken));
 

@@ -1,18 +1,15 @@
-# Sobe tudo para estudar: SQL Server local (Docker), Propostas, Subscrição, Cobrança, Notificação, Operação e o painel,
-# e abre o navegador.
+# Sobe o ambiente local: SQL Server (Docker), Propostas, Subscrição, Cobrança, Notificação e Operação.
 # O container do SQL Server continua de pé depois do Ctrl+C e do -Parar (é local, não custa); para removê-lo: infra\sql-down.ps1.
-# Uso: .\iniciar.ps1                  compila, sobe os 6 processos e abre http://localhost:5173
+# Uso: .\iniciar.ps1                  compila e sobe os 5 serviços
 #      .\iniciar.ps1 -ComInfra        antes, cria/atualiza a infra no Azure (infra\up.ps1)
 #      .\iniciar.ps1 -ComInfra -ModoDebug   idem, com lock de 5 min (máximo) para parar em breakpoints sem perder a mensagem
-#      .\iniciar.ps1 -SemNavegador    não abre o navegador
 #      .\iniciar.ps1 -ComAspire       também manda a telemetria para o Aspire Dashboard local (Docker), em http://localhost:18888
 #      .\iniciar.ps1 -Parar           encerra processos que ficaram para trás (ex.: janela fechada no X)
-# Ctrl+C encerra tudo. A saída de cada app fica em logs\<app>.log; o painel mostra os mesmos logs ao vivo.
+# Ctrl+C encerra tudo. A saída de cada app fica em logs\<app>.log; traces e logs correlacionados, no Aspire ou no App Insights.
 # No prompt do Claude: ! pwsh -File iniciar.ps1
 param(
     [switch]$ComInfra,
     [switch]$ModoDebug,
-    [switch]$SemNavegador,
     [switch]$ComAspire,
     [switch]$Parar
 )
@@ -26,22 +23,17 @@ $apps = @(
     @{ Nome = 'Notificacao'; Porta = 5183; Pasta = 'src\Notificacao\Vida.Notificacao' },
     @{ Nome = 'Operacao'; Porta = 5184; Pasta = 'src\Operacao\Vida.Operacao' }
 )
-$portaDoPainel = 5173
-$todasAsPortas = @($apps.Porta) + $portaDoPainel
+$todasAsPortas = @($apps.Porta)
 
 function Parar-Tudo {
     # Pelo nome do executável: matar só o "dotnet run" deixaria o app filho vivo segurando a porta.
     Get-Process -Name ($apps | ForEach-Object { "Vida.$($_.Nome)" }) -ErrorAction SilentlyContinue |
         Stop-Process -Force -ErrorAction SilentlyContinue
-    # Sem -State Listen: o Vite aparece como CLOSED aqui (ver Porta-Em-Uso).
-    Get-NetTCPConnection -LocalPort $portaDoPainel -ErrorAction SilentlyContinue |
-        Select-Object -ExpandProperty OwningProcess -Unique |
-        ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }
 }
 
 function Porta-Em-Uso([int]$porta) {
-    # Tenta conectar em vez de listar as portas: neste PC o Get-NetTCPConnection mostra o Vite ([::1]:5173) como
-    # CLOSED mesmo respondendo, e o script esperava os 60 s e derrubava tudo. "localhost" tenta IPv6 e IPv4.
+    # Tenta conectar em vez de listar as portas: o Get-NetTCPConnection às vezes mostra como CLOSED uma porta que
+    # responde. "localhost" tenta IPv6 e IPv4.
     $cliente = [System.Net.Sockets.TcpClient]::new()
     try {
         $conexao = $cliente.ConnectAsync('localhost', $porta)
@@ -77,13 +69,8 @@ if ((az group exists -n rg-servicebus-poc) -ne 'true') {
     throw 'O resource group rg-servicebus-poc não existe. Rode .\iniciar.ps1 -ComInfra.'
 }
 
-# 1b) SQL Server local (fase 4). Sem Docker, só avisa: as fases 1 a 3 não dependem dele.
-try {
-    & "$raiz\infra\sql-up.ps1"
-}
-catch {
-    Write-Host "SQL Server não subiu ($($_.Exception.Message)). A API de propostas (fase 4) vai responder 503." -ForegroundColor Yellow
-}
+# 1b) SQL Server local. Obrigatório: Propostas e Subscrição não sobem sem banco (fail fast).
+& "$raiz\infra\sql-up.ps1"
 
 # 2) Portas livres
 $ocupadas = $todasAsPortas | Where-Object { Porta-Em-Uso $_ }
@@ -98,13 +85,6 @@ if ($ocupadas) {
 Write-Host 'Compilando...'
 dotnet build "$raiz\ServiceBusPoc.slnx" --nologo -v quiet -clp:ErrorsOnly
 if ($LASTEXITCODE -ne 0) { throw 'Build falhou.' }
-
-$painel = "$raiz\web\painel"
-if (-not (Test-Path "$painel\node_modules")) {
-    Write-Host 'Instalando dependências do painel (só na primeira vez)...'
-    npm install --prefix $painel --no-fund --no-audit
-    if ($LASTEXITCODE -ne 0) { throw 'npm install falhou.' }
-}
 
 # 4) Sobe os processos, com a saída de cada um em logs\
 $pastaDeLogs = New-Item -ItemType Directory -Force "$raiz\logs"
@@ -130,12 +110,9 @@ try {
             -WorkingDirectory $pastaDoBinario -NoNewWindow -PassThru `
             -RedirectStandardOutput "$pastaDeLogs\$($app.Nome).log" -RedirectStandardError "$pastaDeLogs\$($app.Nome).erro.log"
     }
-    $processos += Start-Process -FilePath 'node' -ArgumentList 'node_modules/vite/bin/vite.js', '--port', $portaDoPainel, '--strictPort' `
-        -WorkingDirectory $painel -NoNewWindow -PassThru `
-        -RedirectStandardOutput "$pastaDeLogs\Painel.log" -RedirectStandardError "$pastaDeLogs\Painel.erro.log"
 
     # 5) Espera todos responderem
-    Write-Host 'Subindo Propostas (:5180), Subscricao (:5181), Cobranca (:5182), Notificacao (:5183), Operacao (:5184) e painel (:5173)...'
+    Write-Host 'Subindo Propostas (:5180), Subscricao (:5181), Cobranca (:5182), Notificacao (:5183) e Operacao (:5184)...'
     $limite = (Get-Date).AddSeconds(60)
     while (($todasAsPortas | Where-Object { -not (Porta-Em-Uso $_) }) -and (Get-Date) -lt $limite) {
         if ($processos | Where-Object HasExited) { break }
@@ -147,15 +124,13 @@ try {
     }
 
     Write-Host ''
-    Write-Host 'Tudo no ar: http://localhost:5173' -ForegroundColor Green
-    if ($ComAspire) { Write-Host 'Traces ao vivo no Aspire Dashboard: http://localhost:18888' -ForegroundColor Green }
+    Write-Host 'Tudo no ar. Interfaces das APIs: http://localhost:5180/scalar (Propostas), :5181/scalar (Subscrição), :5184/scalar (Operação).' -ForegroundColor Green
+    Write-Host 'Exemplos de chamadas em requests\*.http.'
+    if ($ComAspire) { Write-Host 'Traces, logs e métricas no Aspire Dashboard: http://localhost:18888' -ForegroundColor Green }
     Write-Host 'A primeira chamada ao Service Bus pode levar ~20 s (DefaultAzureCredential procurando o login do az).'
-    Write-Host 'Ctrl+C encerra tudo. Ao terminar de estudar: .\infra\down.ps1 (a infra cobra ~US$ 0,013/h).'
-    if (-not $SemNavegador) {
-        Start-Process "http://localhost:$portaDoPainel"
-    }
+    Write-Host 'Ctrl+C encerra tudo. Ao terminar: .\infra\down.ps1 (a infra cobra ~US$ 0,013/h).'
 
-    # 6) Fica de olho: se um app cair, avisa (o painel mostra a coluna dele como fora do ar)
+    # 6) Fica de olho: se um app cair, avisa
     $avisados = @{}
     while ($true) {
         foreach ($p in $processos | Where-Object HasExited) {

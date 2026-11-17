@@ -1,0 +1,24 @@
+# Rotas da Vida.Plataforma presentes em cada serviço que consome: GET /assinaturas (filtros e pendentes das
+# assinaturas que o serviço lê) e /processadores (pausar o consumo sem derrubar o processo).
+# Cobrança (:5182): cobranca. Notificação (:5183): notificacao, notificacao-recusa.
+
+@cobranca = http://localhost:5182
+@notificacao = http://localhost:5183
+
+### Assinatura da Cobrança: filtro, pendentes e DLQ
+GET {{cobranca}}/assinaturas
+
+### Assinaturas da Notificação
+GET {{notificacao}}/assinaturas
+
+### Processadores da Cobrança
+GET {{cobranca}}/processadores
+
+### Pausar a cobrança: as apólices novas ficam retidas na assinatura (veja "pendentes" subir)
+POST {{cobranca}}/processadores/cobranca/parar
+
+### Religar: o processor consome o que acumulou
+POST {{cobranca}}/processadores/cobranca/iniciar
+
+### Processador desconhecido → 404
+POST {{cobranca}}/processadores/xyz/parar

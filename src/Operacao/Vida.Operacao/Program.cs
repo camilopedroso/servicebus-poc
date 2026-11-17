@@ -1,7 +1,6 @@
 using Azure.Identity;
 using Azure.Messaging.ServiceBus.Administration;
 using Scalar.AspNetCore;
-using Vida.LogsAoVivo.Logs;
 using Vida.Operacao.Ferramentas;
 using Vida.Plataforma.Api;
 using Vida.Plataforma.Conexao;
@@ -15,7 +14,7 @@ using Vida.Telemetria;
 //   GET  /assinaturas                                  assinaturas de todos os tópicos, com contagens e forwardTo
 //   GET  /assinaturas/regras                           filtros e actions de cada assinatura
 //   GET  /assinaturas/{nome}/mensagens?dlq=            peek numa assinatura (ou na DLQ dela)
-//   GET  /namespace                                    namespace em uso (o painel mostra no cabeçalho)
+//   GET  /namespace                                    namespace em uso
 // Em Development, o contrato fica em /openapi/v1.json e a interface em http://localhost:5184/scalar.
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,7 +23,6 @@ builder.Configuration.AddJsonFile(arquivoDoServiceBus, optional: true);
 // O arquivo local é padrão de desenvolvimento: variável de ambiente e linha de comando continuam valendo mais.
 builder.Configuration.AddEnvironmentVariables();
 builder.Configuration.AddCommandLine(args);
-builder.AddLogsAoVivo();
 // OpenTelemetry (traces, métricas, logs) para o Application Insights. Depois da config local, que traz a connection string.
 builder.AddTelemetria("Vida.Operacao");
 builder.Services.AddProblemDetails();

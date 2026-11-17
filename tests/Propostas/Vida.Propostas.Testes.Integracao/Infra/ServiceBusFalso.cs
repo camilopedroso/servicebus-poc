@@ -4,7 +4,7 @@ namespace Vida.Propostas.Testes.Integracao.Infra;
 
 /// <summary>
 /// ServiceBusClient que não conecta em nada: o SDK expõe construtores protegidos e métodos virtuais justamente
-/// para isso. Guarda o que foi "enviado" e pode simular o broker fora do ar.
+/// para isso. Guarda o que foi "enviado" e pode fingir o broker fora do ar.
 /// <para>
 /// Não usa biblioteca de mock (Moq, NSubstitute): é herança simples. O construtor protegido sem parâmetros de
 /// <see cref="ServiceBusClient"/> e de <see cref="ServiceBusSender"/> não abre conexão AMQP nem pede credencial,

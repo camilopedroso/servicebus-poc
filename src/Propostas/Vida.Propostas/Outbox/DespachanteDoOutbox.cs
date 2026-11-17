@@ -18,7 +18,6 @@ namespace Vida.Propostas.Outbox;
 public sealed class DespachanteDoOutbox(
     IServiceScopeFactory escopos,
     ServiceBusClient client,
-    SimulacaoDeIndisponibilidade simulacao,
     ILogger<DespachanteDoOutbox> logger) : BackgroundService
 {
     private const int TamanhoDoLote = 20;
@@ -45,7 +44,7 @@ public sealed class DespachanteDoOutbox(
             }
             catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
             {
-                // Banco fora do ar, por exemplo. Loga uma vez por tipo de erro para não inundar o painel.
+                // Banco fora do ar, por exemplo. Loga uma vez por tipo de erro para não inundar os logs.
                 if (ex.Message != ultimoErro)
                 {
                     logger.LogError("Outbox: não foi possível ler as pendentes ({Erro}). Tentando a cada segundo.", ex.Message);
@@ -101,12 +100,6 @@ public sealed class DespachanteDoOutbox(
             List<MensagemDeSaida> mensagens = [.. grupo];
             try
             {
-                if (simulacao.Ativa)
-                {
-                    throw new ServiceBusException(
-                        "Simulação: Service Bus indisponível.", ServiceBusFailureReason.ServiceCommunicationProblem);
-                }
-
                 ServiceBusSender sender = _senders.GetOrAdd(grupo.Key, client.CreateSender);
                 // Lista na ordem do Id: o broker preserva a ordem dentro da chamada.
                 

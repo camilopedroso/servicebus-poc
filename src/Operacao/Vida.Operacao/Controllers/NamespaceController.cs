@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Vida.Operacao.Controllers;
 
 /// <summary>
-/// GET /namespace: o namespace do Service Bus em uso (o painel mostra no cabeçalho).
+/// GET /namespace: o namespace do Service Bus em uso (confere para onde o serviço aponta).
 /// </summary>
 /// <param name="client">O ServiceBusClient singleton, que sabe a que namespace está ligado.</param>
 [ApiController]

@@ -48,7 +48,7 @@ public sealed class AssinaturasController(DescobertaDeEntidades descoberta, Insp
         }
         if (comEsteNome.Length > 1)
         {
-            // O nome de uma assinatura só é único dentro do tópico; aqui o painel manda só o nome.
+            // O nome de uma assinatura só é único dentro do tópico; aqui a rota recebe só o nome.
             var topicos = string.Join(", ", comEsteNome.Select(a => a.Topico));
             return Problem(
                 statusCode: StatusCodes.Status409Conflict,

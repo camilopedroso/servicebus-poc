@@ -3,7 +3,6 @@ using Azure.Messaging.ServiceBus;
 using Vida.Plataforma.Processamento;
 using Vida.Plataforma.Mensagens;
 using Vida.Propostas.Contratos.Eventos;
-using Vida.Propostas.Contratos.Mensagens;
 using Vida.Subscricao.Contratos.Eventos;
 using Vida.Subscricao.Contratos.Mensagens;
 using Vida.Subscricao.Dominio;
@@ -27,7 +26,7 @@ public sealed class ProcessadorDePropostas(
     ILogger<ProcessadorDePropostas> logger)
     : IAsyncDisposable
 {
-    /// <summary>Nome do processador na rota /processadores/{nome} e no painel.</summary>
+    /// <summary>Nome do processador na rota /processadores/{nome}.</summary>
     public const string NomeDoProcessador = "propostas";
 
     /// <summary>
@@ -39,8 +38,7 @@ public sealed class ProcessadorDePropostas(
 
     private const int IdadeMaximaAceita = 80;
 
-    // Retry com backoff: a falha simulada some nesta tentativa; acima do máximo, DLQ.
-    private const int TentativaEmQueADependenciaVolta = 3;
+    // Retry com backoff para falha transitória ao gravar: 2, 4, 8, 16 s; na 5ª tentativa, DLQ.
     private const int MaximoDeTentativas = 5;
     private static readonly System.Globalization.CultureInfo PtBr = new("pt-BR");
 
@@ -54,9 +52,8 @@ public sealed class ProcessadorDePropostas(
     /// <summary>
     /// Cria o processor da fila subscricao-entrada com os handlers desta classe. Chamado uma vez, no registro (Program.cs).
     /// </summary>
-    /// <param name="ligarNaPartida">False sem banco: as propostas esperam na fila em vez de falhar 5 vezes e ir para a DLQ.</param>
     /// <returns>O processor, pronto para o GerenciadorDeProcessadores ligar.</returns>
-    public ProcessadorControlavel CriarProcessador(bool ligarNaPartida)
+    public ProcessadorControlavel CriarProcessador()
     {
         var opcoes = new ServiceBusProcessorOptions
         {
@@ -75,7 +72,7 @@ public sealed class ProcessadorDePropostas(
         processor.ProcessMessageAsync += ProcessarMensagem;
         processor.ProcessErrorAsync += TratarErro;
 
-        return new ProcessadorControlavel(NomeDoProcessador, processor, logger, ligarNaPartida);
+        return new ProcessadorControlavel(NomeDoProcessador, processor, logger);
     }
 
     private async Task ProcessarMensagem(ProcessMessageEventArgs args)
@@ -114,58 +111,17 @@ public sealed class ProcessadorDePropostas(
             return;
         }
 
-        var simularFalha = mensagem.ApplicationProperties.TryGetValue(PropriedadesDaProposta.SimularFalha, out var falha) && falha is true;
-        var comBackoff = mensagem.ApplicationProperties.TryGetValue(PropriedadesDaProposta.RetryComBackoff, out var backoff) && backoff is true;
-        var tentativa = mensagem.ApplicationProperties.TryGetValue(PropriedadesDaProposta.Tentativa, out var t) && t is int n ? n : 1;
-        var simularQueda = mensagem.ApplicationProperties.TryGetValue(PropriedadesDaProposta.SimularQuedaAposGravar, out var queda) && queda is true;
-
-        // 2a) Falha transitória com retry agendado (fase 3). A dependência simulada volta na 3ª tentativa:
-        //     com backoff, ela teve tempo de se recuperar; com Abandon (2b), as 5 entregas acabam em segundos.
-        if (simularFalha && comBackoff && tentativa < TentativaEmQueADependenciaVolta)
-        {
-            await AgendarNovaTentativa(args, proposta, tentativa);
-            return;
-        }
-        if (simularFalha && comBackoff)
-        {
-            logger.LogInformation(
-                "[{Instancia}] Dependência de volta: proposta {PropostaId} processada na tentativa {Tentativa}.",
-                _instancia,
-                proposta.PropostaId,
-                tentativa);
-        }
-
-        // 2b) Falha transitória (ex.: serviço de score fora do ar): Abandon libera o lock e a mensagem
-        //    volta para a fila na hora. Após maxDeliveryCount (5) entregas, o broker manda para a DLQ sozinho.
-        if (simularFalha && !comBackoff)
-        {
-            logger.LogWarning(
-                "[{Instancia}] Falha transitória simulada na proposta {PropostaId} (entrega {Entrega}). Abandonando; após maxDeliveryCount entregas, o broker manda para a DLQ.",
-                _instancia,
-                proposta.PropostaId,
-                mensagem.DeliveryCount);
-
-            await args.AbandonMessageAsync(mensagem);
-
-            return;
-        }
-
         // Span de negócio, dentro do span do processor (ServiceBusProcessor.ProcessMessage). As tags viram
         // "custom dimensions" no App Insights: dá para buscar o trace de uma proposta pelo id.
         using var atividade = FonteDeAtividades.Fonte.StartActivity("AnalisarProposta");
         atividade?.SetTag("vida.proposta.id", proposta.PropostaId);
         atividade?.SetTag("vida.proposta.plano", proposta.Plano.ToString());
 
-        // 3) Regra de negócio violada: a proposta FOI analisada, e o resultado é "recusada". Não é falha,
+        // 2) Regra de negócio violada: a proposta FOI analisada, e o resultado é "recusada". Não é falha,
         //    então não vai para a DLQ (lá ninguém avisaria o cliente, e reprocessar daria a mesma recusa).
         //    Grava a recusa e o evento PropostaRecusada no banco, como no caminho feliz, e conclui a mensagem.
         if (proposta.Idade > IdadeMaximaAceita)
         {
-            atividade?.SetTag("vida.proposta.resultado", "recusada");
-            MetricasDeNegocio.PropostasDecididas.Add(
-                1,
-                new KeyValuePair<string, object?>("resultado", "recusada"));
-
             var recusa = new PropostaRecusada(
                 PropostaId: proposta.PropostaId,
                 ClienteId: proposta.ClienteId,
@@ -175,11 +131,17 @@ public sealed class ProcessadorDePropostas(
                 Motivo: $"Idade {proposta.Idade} acima do limite de {IdadeMaximaAceita} anos.",
                 RecusadaEm: DateTimeOffset.UtcNow);
 
-            var recusaNova = await RegistrarAsync(registro => registro.RegistrarRecusaAsync(mensagem.MessageId, recusa, args.CancellationToken));
-            if (await ConcluirAsync(args, proposta, recusaNova, simularQueda))
+            var recusaNova = await TentarRegistrarAsync(
+                args, proposta, registro => registro.RegistrarRecusaAsync(mensagem.MessageId, recusa, args.CancellationToken));
+            if (recusaNova is null || await ConcluirAsync(args, proposta, recusaNova.Value))
             {
                 return;
             }
+
+            atividade?.SetTag("vida.proposta.resultado", "recusada");
+            MetricasDeNegocio.PropostasDecididas.Add(
+                1,
+                new KeyValuePair<string, object?>("resultado", "recusada"));
 
             logger.LogWarning(
                 "[{Instancia}] Proposta {PropostaId} recusada: idade {Idade} acima de {Maxima}. Recusa gravada com o evento no outbox ('{Topico}').",
@@ -192,9 +154,7 @@ public sealed class ProcessadorDePropostas(
             return;
         }
 
-        // 4) Caminho feliz: simula a análise de risco, emite a apólice e publica o evento.
-        await Task.Delay(TimeSpan.FromMilliseconds(500), args.CancellationToken);
-
+        // 3) Caminho feliz: calcula o prêmio, emite a apólice e grava o evento no outbox.
         var premioMensal = CalculadoraDePremio.CalcularMensal(proposta.CapitalSegurado, proposta.Idade);
         var requerRevisao = PoliticaDeRevisao.RequerRevisao(proposta.CapitalSegurado);
         var apolice = new ApoliceEmitida(
@@ -210,8 +170,9 @@ public sealed class ProcessadorDePropostas(
         // Até a etapa 8: Complete na fila + Send no tópico na mesma transação do broker. Com banco próprio isso não
         // basta: um INSERT no SQL Server não entra na transação do Service Bus. Agora: grava tudo numa transação do
         // SQL (inbox + apólice + outbox) e só então conclui. Se cair entre os dois, a reentrega cai na inbox.
-        var apoliceNova = await RegistrarAsync(registro => registro.RegistrarAprovacaoAsync(mensagem.MessageId, apolice, args.CancellationToken));
-        if (await ConcluirAsync(args, proposta, apoliceNova, simularQueda))
+        var apoliceNova = await TentarRegistrarAsync(
+            args, proposta, registro => registro.RegistrarAprovacaoAsync(mensagem.MessageId, apolice, args.CancellationToken));
+        if (apoliceNova is null || await ConcluirAsync(args, proposta, apoliceNova.Value))
         {
             return;
         }
@@ -235,6 +196,25 @@ public sealed class ProcessadorDePropostas(
     }
 
     /// <summary>
+    /// Grava a análise. Falha transitória (banco fora, timeout, deadlock) vira retentativa agendada com espera
+    /// crescente; qualquer outra exceção sobe, o SDK abandona a mensagem e o maxDeliveryCount leva à DLQ.
+    /// </summary>
+    /// <returns>True se gravou, false se já estava gravada (reentrega), null se a mensagem foi reagendada.</returns>
+    private async Task<bool?> TentarRegistrarAsync(
+        ProcessMessageEventArgs args, PropostaSeguroVida proposta, Func<RegistroDaAnalise, Task<bool>> registrar)
+    {
+        try
+        {
+            return await RegistrarAsync(registrar);
+        }
+        catch (Exception ex) when (FalhasTransitorias.EhTransitoria(ex))
+        {
+            await AgendarNovaTentativa(args, proposta, ex);
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Grava a análise num escopo próprio (um DbContext por mensagem; o processor roda mensagens em paralelo).
     /// </summary>
     private async Task<bool> RegistrarAsync(Func<RegistroDaAnalise, Task<bool>> registrar)
@@ -246,36 +226,26 @@ public sealed class ProcessadorDePropostas(
 
     /// <summary>
     /// Conclui a mensagem depois de gravar. Devolve true quando o chamador não deve seguir (nada a registrar no log
-    /// do caminho normal): reentrega já processada, ou a queda simulada.
+    /// do caminho normal): reentrega já processada.
     /// </summary>
     /// <param name="args">Mensagem em processamento.</param>
     /// <param name="proposta">Proposta lida do corpo.</param>
     /// <param name="gravouAgora">False se a inbox já tinha este MessageId (reentrega).</param>
-    /// <param name="simularQueda">Propriedade simularQuedaAposGravar da mensagem.</param>
-    private async Task<bool> ConcluirAsync(
-        ProcessMessageEventArgs args, PropostaSeguroVida proposta, bool gravouAgora, bool simularQueda)
+    private async Task<bool> ConcluirAsync(ProcessMessageEventArgs args, PropostaSeguroVida proposta, bool gravouAgora)
     {
         var mensagem = args.Message;
-        if (!gravouAgora)
-        {
-            // At-least-once: a mesma mensagem voltou depois de já gravada. Conclui sem gravar nem publicar de novo.
-            await args.CompleteMessageAsync(mensagem, args.CancellationToken);
-            logger.LogWarning(
-                "[{Instancia}] Proposta {PropostaId} já processada (MessageId na inbox, entrega {Entrega}): concluída sem gravar nem publicar de novo.",
-                _instancia, proposta.PropostaId, mensagem.DeliveryCount);
-            return true;
-        }
-        if (simularQueda && mensagem.DeliveryCount == 1)
-        {
-            // Simula o processo caindo depois do commit e antes do Complete: o lock é devolvido e o broker reentrega.
-            await args.AbandonMessageAsync(mensagem, cancellationToken: args.CancellationToken);
-            logger.LogWarning(
-                "[{Instancia}] Proposta {PropostaId} gravada, mas o processo \"caiu\" antes de concluir (simulação). O broker vai reentregar.",
-                _instancia, proposta.PropostaId);
-            return true;
-        }
         await args.CompleteMessageAsync(mensagem, args.CancellationToken);
-        return false;
+        if (gravouAgora)
+        {
+            return false;
+        }
+
+        // At-least-once: a mesma mensagem voltou depois de já gravada (ex.: o processo caiu entre o commit e o
+        // Complete, ou o lock expirou). Conclui sem gravar nem publicar de novo.
+        logger.LogWarning(
+            "[{Instancia}] Proposta {PropostaId} já processada (MessageId na inbox, entrega {Entrega}): concluída sem gravar nem publicar de novo.",
+            _instancia, proposta.PropostaId, mensagem.DeliveryCount);
+        return true;
     }
 
     /// <summary>
@@ -283,18 +253,20 @@ public sealed class ProcessadorDePropostas(
     /// na mesma transação (ou as duas coisas acontecem, ou nenhuma). Service Bus não tem backoff nativo
     /// no Abandon; o agendamento (ScheduledEnqueueTime) é a forma de esperar sem segurar o lock.
     /// </summary>
-    private async Task AgendarNovaTentativa(ProcessMessageEventArgs args, PropostaSeguroVida proposta, int tentativa)
+    private async Task AgendarNovaTentativa(ProcessMessageEventArgs args, PropostaSeguroVida proposta, Exception falha)
     {
         var mensagem = args.Message;
+        var tentativa = LerTentativa(mensagem);
         if (tentativa >= MaximoDeTentativas)
         {
             await args.DeadLetterMessageAsync(
                 mensagem,
                 MotivosDeDeadLetter.TentativasEsgotadas,
-                $"{tentativa} tentativas com backoff.",
+                $"{tentativa} tentativas com backoff. Última falha: {falha.Message}",
                 args.CancellationToken);
 
             logger.LogError(
+                falha,
                 "[{Instancia}] Proposta {PropostaId}: {Tentativa} tentativas esgotadas. DLQ.",
                 _instancia,
                 proposta.PropostaId,
@@ -311,7 +283,7 @@ public sealed class ProcessadorDePropostas(
         {
             ScheduledEnqueueTime = DateTimeOffset.UtcNow + espera,
         };
-        copia.ApplicationProperties[PropriedadesDaProposta.Tentativa] = tentativa + 1;
+        copia.ApplicationProperties[PropriedadesDaRetentativa.Tentativa] = tentativa + 1;
 
         // Transação numa entidade só (Complete e Send na mesma fila): não precisa de EnableCrossEntityTransactions.
         using (var transacao = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
@@ -324,11 +296,18 @@ public sealed class ProcessadorDePropostas(
         }
 
         logger.LogWarning(
-            "[{Instancia}] Falha transitória na proposta {PropostaId} (tentativa {Tentativa}). Nova tentativa agendada para daqui a {Espera} s.",
+            "[{Instancia}] Falha transitória na proposta {PropostaId} (tentativa {Tentativa}): {Erro}. Nova tentativa agendada para daqui a {Espera} s.",
             _instancia,
             proposta.PropostaId,
             tentativa,
+            falha.Message,
             espera.TotalSeconds);
+    }
+
+    private static int LerTentativa(ServiceBusReceivedMessage mensagem)
+    {
+        var temTentativa = mensagem.ApplicationProperties.TryGetValue(PropriedadesDaRetentativa.Tentativa, out var valor);
+        return temTentativa && valor is int tentativa ? tentativa : 1;
     }
 
     private Task TratarErro(ProcessErrorEventArgs args)

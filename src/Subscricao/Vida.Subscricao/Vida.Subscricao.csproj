@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>dotnet-Vida.Subscricao-98dc07a3-99c1-4a49-9176-c83a3352f306</UserSecretsId>
-    <!-- Comentários /// no contrato OpenAPI das demonstrações; o 1591 (membro público sem comentário) fica desligado. -->
+    <!-- Comentários /// no contrato OpenAPI (/openapi/v1.json); o 1591 (membro público sem comentário) fica desligado. -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);1591</NoWarn>
     <!-- Copia o src/sqlserver.local.json (infra/sql-up.ps1) para a saída: ver src/Directory.Build.props -->
@@ -26,12 +26,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Vida.Plataforma" Version="1.0.0" />
-    <!-- 1.1.0: lê SimularQuedaAposGravar. O Vida.Subscricao.Contratos pede >= 1.0.0, e a referência direta vence. -->
-    <PackageReference Include="Vida.Propostas.Contratos" Version="1.1.0" />
+    <PackageReference Include="Vida.Plataforma" Version="1.0.1" />
+    <!-- 2.0.0: sem as propriedades de simulação. O Vida.Subscricao.Contratos pede >= 1.0.0, e a referência direta vence. -->
+    <PackageReference Include="Vida.Propostas.Contratos" Version="2.0.0" />
     <ProjectReference Include="..\..\Subscricao\Vida.Subscricao.Contratos\Vida.Subscricao.Contratos.csproj" />
-    <PackageReference Include="Vida.LogsAoVivo" Version="1.0.0" />
-    <PackageReference Include="Vida.Telemetria" Version="1.0.0" />
+    <PackageReference Include="Vida.Telemetria" Version="1.1.0" />
   </ItemGroup>
 
   <ItemGroup>

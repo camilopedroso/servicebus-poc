@@ -13,7 +13,7 @@ namespace Vida.Propostas.Desfechos;
 /// </summary>
 /// <param name="client">ServiceBusClient singleton do app (sem transação entre entidades, então serve para tudo).</param>
 /// <param name="escopos">Um escopo (e um DbContext) por mensagem.</param>
-/// <param name="logger">Logger; aparece com o selo "desfecho" na coluna de Propostas.</param>
+/// <param name="logger">Logger do processador de desfechos.</param>
 public sealed class ProcessadorDeDesfechos(
     ServiceBusClient client,
     IServiceScopeFactory escopos,
@@ -24,6 +24,12 @@ public sealed class ProcessadorDeDesfechos(
 
     /// <summary>Assinatura da squad de Propostas no tópico proposta-recusada.</summary>
     public const string AssinaturaRecusada = "status-recusada";
+
+    /// <summary>
+    /// Motivo de dead-letter de um desfecho cuja proposta não está no banco. Só este serviço o usa, por isso fica
+    /// aqui e não no catálogo da plataforma (MotivosDeDeadLetter).
+    /// </summary>
+    public const string MotivoPropostaDesconhecida = "PropostaDesconhecida";
 
     private readonly List<ServiceBusProcessor> _processadores = [];
 
@@ -86,9 +92,7 @@ public sealed class ProcessadorDeDesfechos(
         await using var escopo = escopos.CreateAsyncScope();
         var banco = escopo.ServiceProvider.GetRequiredService<BancoDePropostas>();
         var resultado = await RegistroDeDesfechos.AplicarAprovacaoAsync(banco, apolice, args.CancellationToken);
-        await args.CompleteMessageAsync(mensagem, args.CancellationToken);
-
-        Registrar(resultado, apolice.PropostaId, $"aprovada, apólice {apolice.ApoliceId}");
+        await ConcluirAsync(args, resultado, apolice.PropostaId, $"aprovada, apólice {apolice.ApoliceId}");
     }
 
     private async Task ProcessarRecusaAsync(ProcessMessageEventArgs args)
@@ -104,13 +108,29 @@ public sealed class ProcessadorDeDesfechos(
         await using var escopo = escopos.CreateAsyncScope();
         var banco = escopo.ServiceProvider.GetRequiredService<BancoDePropostas>();
         var resultado = await RegistroDeDesfechos.AplicarRecusaAsync(banco, recusa, args.CancellationToken);
-        await args.CompleteMessageAsync(mensagem, args.CancellationToken);
-
-        Registrar(resultado, recusa.PropostaId, $"recusada ({recusa.Motivo})");
+        await ConcluirAsync(args, resultado, recusa.PropostaId, $"recusada ({recusa.Motivo})");
     }
 
-    private void Registrar(ResultadoDoDesfecho resultado, Guid propostaId, string desfecho)
+    /// <summary>
+    /// Conclui a mensagem conforme o resultado. Proposta desconhecida vai para a DLQ: reprocessar não resolve, e
+    /// concluir esconderia a inconsistência.
+    /// </summary>
+    private async Task ConcluirAsync(ProcessMessageEventArgs args, ResultadoDoDesfecho resultado, Guid propostaId, string desfecho)
     {
+        var mensagem = args.Message;
+        if (resultado == ResultadoDoDesfecho.PropostaDesconhecida)
+        {
+            await args.DeadLetterMessageAsync(
+                mensagem,
+                MotivoPropostaDesconhecida,
+                $"Proposta {propostaId} não existe no banco de propostas.",
+                args.CancellationToken);
+        }
+        else
+        {
+            await args.CompleteMessageAsync(mensagem, args.CancellationToken);
+        }
+
         switch (resultado)
         {
             case ResultadoDoDesfecho.Aplicado:
@@ -120,8 +140,9 @@ public sealed class ProcessadorDeDesfechos(
                 logger.LogInformation("Desfecho: proposta {PropostaId} já tinha desfecho. Evento repetido, nada muda.", propostaId);
                 break;
             case ResultadoDoDesfecho.PropostaDesconhecida:
-                // Toda proposta dos endpoints de demonstração cai aqui: Debug, para não poluir a coluna de Propostas.
-                logger.LogDebug("Desfecho: proposta {PropostaId} não veio da API. Ignorada.", propostaId);
+                logger.LogWarning(
+                    "Desfecho: proposta {PropostaId} não existe no banco. Mensagem enviada para a DLQ ({Motivo}).",
+                    propostaId, MotivoPropostaDesconhecida);
                 break;
         }
     }

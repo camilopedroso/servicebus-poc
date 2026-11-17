@@ -11,7 +11,7 @@ public sealed class GerenciadorDeProcessadores(IEnumerable<ProcessadorControlave
 {
     private readonly ProcessadorControlavel[] _processadores = [.. processadores];
 
-    // Serializa iniciar/parar: dois cliques seguidos no painel não disputam o mesmo processor.
+    // Serializa iniciar/parar: duas chamadas seguidas não disputam o mesmo processor.
     private readonly SemaphoreSlim _trava = new(1, 1);
 
     /// <summary>Processadores na ordem de registro.</summary>

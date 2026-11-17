@@ -1,7 +1,7 @@
 namespace Vida.Plataforma.Processamento;
 
 /// <summary>
-/// Estado de uma assinatura como o painel mostra no seletor de assinaturas.
+/// Estado de uma assinatura como GET /assinaturas devolve.
 /// </summary>
 /// <param name="Nome">Nome da assinatura.</param>
 /// <param name="Filtros">Filtro (e action, se houver) de cada regra, lidos do broker.</param>

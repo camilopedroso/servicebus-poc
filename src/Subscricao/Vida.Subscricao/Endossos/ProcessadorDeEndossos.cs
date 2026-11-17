@@ -10,15 +10,16 @@ namespace Vida.Subscricao.Endossos;
 
 /// <summary>
 /// Fase 3: aplica os endossos de cada apólice em ordem, usando sessions, session state e deferral.
+/// Fase 8: quem envia é a API (POST /api/apolices/{id}/endossos, via outbox), e aplicar grava na apólice.
 /// Sessions garantem a ordem de CHEGADA por apólice e um consumer por apólice de cada vez.
 /// Se o producer mandar fora de ordem (v3 antes da v2), a ordem de chegada não basta:
 /// a v3 é adiada (defer) e retomada pelo SequenceNumber quando a v2 for aplicada.
 /// Quem liga e desliga o processor é o GerenciadorDeProcessadores (POST /processadores/endossos/parar).
 /// </summary>
 public sealed class ProcessadorDeEndossos(
-    ServiceBusClient client, ILogger<ProcessadorDeEndossos> logger)
+    ServiceBusClient client, IServiceScopeFactory escopos, ILogger<ProcessadorDeEndossos> logger)
 {
-    /// <summary>Nome do processador na rota /processadores/{nome} e no painel.</summary>
+    /// <summary>Nome do processador na rota /processadores/{nome}.</summary>
     public const string NomeDoProcessador = "endossos";
 
     private readonly string _instancia = $"{Environment.MachineName}-{Environment.ProcessId}";
@@ -73,7 +74,7 @@ public sealed class ProcessadorDeEndossos(
         }
 
         var estado = await LerEstado(args);
-        // endosso.Versao vem do corpo, definida pelo producer (EnvioDeEndossos.NovoEndosso); a mesma versão já foi usada no
+        // endosso.Versao vem do corpo, gerada pela API no banco (RegistroDeEndossos); a mesma versão já foi usada no
         // MessageId para a dedup do broker. Aqui é a segunda camada: compara com a última versão aplicada, guardada no
         // session state, e pega o que a janela do broker não pega (reentrega após lock perdido, reenvio tardio).
         var acao = DecisaoDeEndosso.Decidir(endosso.Versao, estado.UltimaVersao);
@@ -131,14 +132,24 @@ public sealed class ProcessadorDeEndossos(
     }
 
     /// <summary>
-    /// Aplica um endosso e registra no session state. O estado é salvo antes do Complete: se cair entre os dois,
-    /// a mensagem é reentregue e cai no caso "já aplicado". Session state não entra em transação com o Complete.
+    /// Aplica um endosso na apólice (banco) e registra no session state. A ordem é banco, estado, Complete: se cair
+    /// entre dois passos, a mensagem é reentregue, o banco não avança de novo (só sai de v - 1 para v) e o estado
+    /// cai no caso "já aplicado". Nem o banco nem o session state entram em transação com o Complete.
     /// </summary>
     private async Task Aplicar(
         ProcessSessionMessageEventArgs args, ServiceBusReceivedMessage mensagem, EndossoSolicitado endosso, EstadoDaSessao estado)
     {
-        // Simula a alteração na apólice.
-        await Task.Delay(TimeSpan.FromMilliseconds(300), args.CancellationToken);
+        await using (var escopo = escopos.CreateAsyncScope())
+        {
+            var registro = escopo.ServiceProvider.GetRequiredService<RegistroDeEndossos>();
+            var aplicouAgora = await registro.AplicarAsync(endosso.ApoliceId, endosso.Versao, args.CancellationToken);
+            if (!aplicouAgora)
+            {
+                logger.LogWarning(
+                    "[{Instancia}] Apólice {ApoliceId}: o banco não estava na v{Anterior} (endosso v{Versao} já aplicado ou apólice inexistente).",
+                    _instancia, endosso.ApoliceId, endosso.Versao - 1, endosso.Versao);
+            }
+        }
 
         estado.UltimaVersao = endosso.Versao;
         estado.Adiadas.Remove(endosso.Versao);

@@ -5,7 +5,7 @@ namespace Vida.Propostas.Contratos.Mensagens;
 
 /// <summary>
 /// Contém métodos auxiliares para criar mensagens do tipo PropostaSeguroVida.
-/// Usado pelo envio direto e pelo outbox (fase 4): os dois caminhos geram a mesma mensagem.
+/// Usado pelo outbox da API de propostas: a mensagem é montada aqui e guardada como linha do outbox.
 /// </summary>
 public static class MensagensProposta
 {
@@ -22,12 +22,8 @@ public static class MensagensProposta
     /// Monta a mensagem da proposta para o tópico "proposta-recebida".
     /// </summary>
     /// <param name="proposta">Proposta de seguro de vida.</param>
-    /// <param name="simularFalha">Se true, adiciona a propriedade SimularFalha na mensagem.</param>
-    /// <param name="retryComBackoff">Se true, adiciona a propriedade RetryComBackoff na mensagem.</param>
-    /// <param name="simularQuedaAposGravar">Se true, adiciona a propriedade SimularQuedaAposGravar (desde a 1.1.0).</param>
     /// <returns>Mensagem do Service Bus pronta para envio.</returns>
-    public static ServiceBusMessage Criar(
-        PropostaSeguroVida proposta, bool simularFalha = false, bool retryComBackoff = false, bool simularQuedaAposGravar = false)
+    public static ServiceBusMessage Criar(PropostaSeguroVida proposta)
     {
         var corpo = BinaryData.FromObjectAsJson(proposta);
         var mensagem = new ServiceBusMessage(corpo)
@@ -40,18 +36,6 @@ public static class MensagensProposta
             CorrelationId = proposta.ClienteId,
         };
         mensagem.ApplicationProperties[PropriedadesDaProposta.Plano] = proposta.Plano.ToString();
-        if (simularFalha)
-        {
-            mensagem.ApplicationProperties[PropriedadesDaProposta.SimularFalha] = true;
-        }
-        if (retryComBackoff)
-        {
-            mensagem.ApplicationProperties[PropriedadesDaProposta.RetryComBackoff] = true;
-        }
-        if (simularQuedaAposGravar)
-        {
-            mensagem.ApplicationProperties[PropriedadesDaProposta.SimularQuedaAposGravar] = true;
-        }
         return mensagem;
     }
 }

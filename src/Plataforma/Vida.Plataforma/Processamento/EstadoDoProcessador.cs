@@ -1,7 +1,7 @@
 namespace Vida.Plataforma.Processamento;
 
 /// <summary>
-/// Estado de um processador como o painel mostra no liga/desliga.
+/// Estado de um processador como GET /processadores devolve.
 /// </summary>
 /// <param name="Nome">Nome do processador (o mesmo da rota).</param>
 /// <param name="Entidade">Fila ou assinatura que ele lê.</param>

@@ -12,8 +12,8 @@ public enum ResultadoDoDesfecho
     JaDecidida,
 
     /// <summary>
-    /// A proposta não está no banco: veio dos endpoints de demonstração, que enviam direto para a fila
-    /// ou publicam no tópico sem passar pela API. Não é erro.
+    /// A proposta não está no banco. Toda proposta é gravada antes de o outbox publicar, então isto é inconsistência
+    /// (evento de outro ambiente, publicador indevido): a mensagem vai para a DLQ para alguém investigar.
     /// </summary>
     PropostaDesconhecida,
 }

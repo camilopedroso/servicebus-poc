@@ -3,8 +3,7 @@ using Vida.Propostas.Contratos.Dominio;
 namespace Vida.Propostas.Contratos;
 
 /// <summary>
-/// Corpo de POST /api/propostas. Diferente do POST /demo/propostas da demonstração, nada é sorteado:
-/// é a API "de verdade", e os campos de negócio são obrigatórios.
+/// Corpo de POST /api/propostas. Os campos de negócio são obrigatórios: nada é preenchido pelo servidor.
 /// </summary>
 /// <param name="ClienteId">Identificador do cliente.</param>
 /// <param name="Idade">Idade do proponente.</param>

@@ -1,0 +1,64 @@
+# Squad de Subscrição (:5181): consulta de apólice e pedido de endosso (ApolicesController.cs).
+# O POST gera a próxima versão da apólice no banco e grava o endosso com o comando no outbox (202). O despachante
+# envia para a fila endossos (sessions: SessionId = apólice; MessageId = "{apolice}/v{versao}", com dedup), e o
+# ProcessadorDeEndossos aplica em ordem. Para ter uma apólice, crie uma proposta (requests/propostas/api-propostas.http)
+# e copie o apoliceId do GET da proposta.
+
+@subscricao = http://localhost:5181
+@apolice = 00000000-0000-0000-0000-000000000000
+
+### Apólice com a versão aplicada e os endossos pedidos
+GET {{subscricao}}/api/apolices/{{apolice}}
+
+### Pedir um endosso → 202 Accepted, Location aponta para a apólice
+POST {{subscricao}}/api/apolices/{{apolice}}/endossos
+Content-Type: application/json
+
+{
+  "tipo": "Troca de beneficiário"
+}
+
+### Outro endosso: recebe a versão seguinte
+POST {{subscricao}}/api/apolices/{{apolice}}/endossos
+Content-Type: application/json
+
+{
+  "tipo": "Aumento de capital"
+}
+
+### Idempotency-Key: primeira chamada → 202
+# @name primeiro
+POST {{subscricao}}/api/apolices/{{apolice}}/endossos
+Content-Type: application/json
+Idempotency-Key: {{$guid}}
+
+{
+  "tipo": "Inclusão de cobertura"
+}
+
+### Mesma chave → 200 + Idempotent-Replayed: true, mesma versão, nada gravado
+POST {{subscricao}}/api/apolices/{{apolice}}/endossos
+Content-Type: application/json
+Idempotency-Key: {{primeiro.request.headers.Idempotency-Key}}
+
+{
+  "tipo": "Inclusão de cobertura"
+}
+
+### Validação: tipo obrigatório → 400
+POST {{subscricao}}/api/apolices/{{apolice}}/endossos
+Content-Type: application/json
+
+{}
+
+### Processadores da Subscrição ("propostas" e "endossos"): estado e liga/desliga
+GET {{subscricao}}/processadores
+
+### Parar os endossos: os pedidos ficam na fila; religue para ver as sessões drenarem em ordem
+POST {{subscricao}}/processadores/endossos/parar
+
+### Religar
+POST {{subscricao}}/processadores/endossos/iniciar
+
+### Contrato OpenAPI (só em Development)
+GET {{subscricao}}/openapi/v1.json

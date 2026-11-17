@@ -1,11 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
-    <PackageReference Include="Vida.Plataforma" Version="1.0.0" />
+    <PackageReference Include="Vida.Plataforma" Version="1.0.1" />
     <ProjectReference Include="..\..\Propostas\Vida.Propostas.Contratos\Vida.Propostas.Contratos.csproj" />
-    <PackageReference Include="Vida.Subscricao.Contratos" Version="1.0.0" />
-    <PackageReference Include="Vida.LogsAoVivo" Version="1.0.0" />
-    <PackageReference Include="Vida.Telemetria" Version="1.0.0" />
+    <PackageReference Include="Vida.Subscricao.Contratos" Version="1.0.1" />
+    <PackageReference Include="Vida.Telemetria" Version="1.1.0" />
   </ItemGroup>
 
   <ItemGroup>

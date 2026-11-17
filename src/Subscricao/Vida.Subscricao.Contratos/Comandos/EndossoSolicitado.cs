@@ -6,7 +6,8 @@ namespace Vida.Subscricao.Contratos.Comandos;
 /// </summary>
 /// <param name="ApoliceId">Apólice alterada. Vira o SessionId da mensagem.</param>
 /// <param name="Versao">
-/// Ordem do endosso dentro da apólice, começando em 1. Definida pelo producer (EnvioDeEndossos), compõe o
+/// Ordem do endosso dentro da apólice, começando em 1. Gerada por quem registra o pedido (na Subscrição, a API de
+/// endossos, no banco), compõe o
 /// MessageId (detecção de duplicatas do broker) e é comparada pelo consumer com a última versão aplicada.
 /// </param>
 /// <param name="Tipo">Tipo de alteração (ex.: "Troca de beneficiário").</param>

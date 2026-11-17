@@ -56,12 +56,47 @@ namespace Vida.Subscricao.Dados.Migrations
                     b.Property<bool>("RequerRevisao")
                         .HasColumnType("bit");
 
+                    b.Property<int>("VersaoDosEndossos")
+                        .HasColumnType("int");
+
                     b.HasKey("ApoliceId");
 
                     b.HasIndex("PropostaId")
                         .IsUnique();
 
                     b.ToTable("Apolices", "Subscricao");
+                });
+
+            modelBuilder.Entity("Vida.Subscricao.Dados.EndossoRegistrado", b =>
+                {
+                    b.Property<Guid>("ApoliceId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Versao")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("AplicadoEm")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ChaveDeIdempotencia")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset>("SolicitadoEm")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("ApoliceId", "Versao");
+
+                    b.HasIndex("ApoliceId", "ChaveDeIdempotencia")
+                        .IsUnique()
+                        .HasFilter("[ChaveDeIdempotencia] IS NOT NULL");
+
+                    b.ToTable("Endossos", "Subscricao");
                 });
 
             modelBuilder.Entity("Vida.Subscricao.Dados.RecusaRegistrada", b =>
@@ -145,6 +180,10 @@ namespace Vida.Subscricao.Dados.Migrations
                     b.Property<DateTimeOffset?>("PublicadaEm")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("SessionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
                     b.Property<string>("Subject")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -163,6 +202,15 @@ namespace Vida.Subscricao.Dados.Migrations
                         .HasFilter("[PublicadaEm] IS NULL");
 
                     b.ToTable("OutboxMensagens", "Subscricao");
+                });
+
+            modelBuilder.Entity("Vida.Subscricao.Dados.EndossoRegistrado", b =>
+                {
+                    b.HasOne("Vida.Subscricao.Dados.ApoliceRegistrada", null)
+                        .WithMany()
+                        .HasForeignKey("ApoliceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

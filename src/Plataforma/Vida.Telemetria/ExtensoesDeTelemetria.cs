@@ -1,7 +1,5 @@
 using Azure.Identity;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
-using OpenTelemetry.Instrumentation.AspNetCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -13,7 +11,7 @@ using OpenTelemetry.Trace;
 namespace Vida.Telemetria;
 
 /// <summary>
-/// Liga o OpenTelemetry (Microsoft OpenTelemetry Distro) nos três apps: traces, métricas e logs.
+/// Liga o OpenTelemetry (Microsoft OpenTelemetry Distro) em todos os serviços: traces, métricas e logs.
 /// Destinos, detectados pela configuração:
 /// - Application Insights, se houver ApplicationInsights:ConnectionString (gravada por infra/up.ps1);
 /// - qualquer backend OTLP, se houver OTEL_EXPORTER_OTLP_ENDPOINT (ex.: Aspire Dashboard local, iniciar.ps1 -ComAspire).
@@ -61,13 +59,6 @@ public static class ExtensoesDeTelemetria
                 opcoes.AzureMonitor.SamplingRatio = 1.0F;
             }
         });
-
-        // Rotas que o painel chama o tempo todo (SSE de logs, polling das assinaturas) não viram trace: só ruído e custo.
-        // São duas peças: o filtro descarta o span da requisição; a supressão impede os spans filhos
-        // (ex.: chamadas do administration client), que o filtro sozinho deixava passar, órfãos.
-        builder.Services.Configure<AspNetCoreTraceInstrumentationOptions>(opcoes =>
-            opcoes.Filter = contexto => !RotasDoPainel.Contem(contexto.Request));
-        builder.Services.AddSingleton<IStartupFilter, SupressaoNasRotasDoPainel>();
 
         // Os logs (ILogger) vão junto, já com TraceId/SpanId: no App Insights, a linha de log aparece dentro do trace.
         builder.Logging.AddFilter<OpenTelemetry.Logs.OpenTelemetryLoggerProvider>("Azure", LogLevel.Warning);

@@ -9,11 +9,11 @@ namespace Vida.Plataforma.Api;
 
 /// <summary>
 /// Converte as falhas conhecidas do Service Bus e da autenticação em ProblemDetails com uma explicação útil.
-/// O painel mostra o "detail" logo abaixo do botão do cenário. Registro: builder.Services.AddExceptionHandler&lt;...&gt;();
+/// Registro: builder.Services.AddExceptionHandler&lt;...&gt;();
 /// um app pode registrar outros (ex.: erros de banco), e o primeiro que tratar a exceção responde.
 /// </summary>
 /// <param name="problemDetails">Serviço que escreve a resposta ProblemDetails.</param>
-/// <param name="logger">Logger; o erro também aparece na coluna do app no painel.</param>
+/// <param name="logger">Logger; registra o erro do app.</param>
 public sealed class TratadorDeErrosDoServiceBus(IProblemDetailsService problemDetails, ILogger<TratadorDeErrosDoServiceBus> logger)
     : IExceptionHandler
 {

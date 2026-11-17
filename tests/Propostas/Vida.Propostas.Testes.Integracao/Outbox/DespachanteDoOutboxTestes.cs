@@ -31,14 +31,13 @@ public sealed class DespachanteDoOutboxTestes(FabricaDaApi fabrica)
     private readonly ServiceBusFalso _serviceBus = new();
 
     // Mesmo construtor que o host usaria: escopos do container de DI da fábrica (cada lote abre o seu
-    // BancoDePropostas), o broker falso no lugar do ServiceBusClient, e a simulação de indisponibilidade
-    // desligada (quem desliga o broker nestes testes é o ServiceBusFalso.ForaDoAr).
+    // BancoDePropostas) e o broker falso no lugar do ServiceBusClient (quem derruba o broker nestes testes é o
+    // ServiceBusFalso.ForaDoAr).
     private DespachanteDoOutbox NovoDespachante()
     {
         var escopos = fabrica.Services.GetRequiredService<IServiceScopeFactory>();
-        var simulacao = new SimulacaoDeIndisponibilidade();
         var logger = NullLogger<DespachanteDoOutbox>.Instance;
-        return new DespachanteDoOutbox(escopos, _serviceBus, simulacao, logger);
+        return new DespachanteDoOutbox(escopos, _serviceBus, logger);
     }
 
     // Arrange pela própria API, não por INSERT direto: a linha do outbox nasce como em produção, com a mensagem
@@ -126,7 +125,7 @@ public sealed class DespachanteDoOutboxTestes(FabricaDaApi fabrica)
     public async Task Desfecho_que_chega_antes_da_marcacao_nao_e_sobrescrito()
     {
         // A recusa é rápida: o evento pode voltar entre o envio do despachante e o UPDATE que marca a proposta.
-        // Simula isso gravando o desfecho antes de rodar o lote.
+        // O teste reproduz isso gravando o desfecho antes de rodar o lote.
         var id = await CriarProposta();
         await using (var escopo = fabrica.Services.CreateAsyncScope())
         {

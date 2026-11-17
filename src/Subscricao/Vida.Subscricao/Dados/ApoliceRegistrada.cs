@@ -26,6 +26,12 @@ public sealed class ApoliceRegistrada
     public DateTimeOffset EmitidaEm { get; set; }
 
     /// <summary>
+    /// Última versão de endosso aplicada (0 = nenhum). O ProcessadorDeEndossos só avança de v - 1 para v, o que
+    /// torna a aplicação idempotente: uma reentrega da mesma versão não altera nada.
+    /// </summary>
+    public int VersaoDosEndossos { get; set; }
+
+    /// <summary>
     /// Linha a partir do evento: o que a Subscrição grava é exatamente o que ela publica.
     /// </summary>
     /// <param name="apolice">Evento da apólice emitida.</param>

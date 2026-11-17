@@ -48,7 +48,7 @@ public sealed class DescobertaDeEntidades(ServiceBusAdministrationClient admin)
                 var execucao = await admin.GetSubscriptionRuntimePropertiesAsync(
                     topico.Name, assinatura.SubscriptionName, cancellationToken);
                 var contagens = execucao.Value;
-                // O broker devolve o forwardTo como URL completa (sb://<namespace>/<fila>); para o painel basta o nome.
+                // O broker devolve o forwardTo como URL completa (sb://<namespace>/<fila>); para a resposta basta o nome.
                 var encaminhaPara = NomeDoDestino(assinatura.ForwardTo);
                 var descoberta = new AssinaturaDescoberta(
                     topico.Name, assinatura.SubscriptionName, encaminhaPara,

@@ -1,12 +1,10 @@
 using Vida.Cobranca.Processamento;
-using Vida.LogsAoVivo.Logs;
 using Vida.Plataforma.Conexao;
 using Vida.Plataforma.Processamento;
 using Vida.Telemetria;
 
 // Squad de Cobrança: assina apolice-emitida (assinatura "cobranca") e gera o boleto do 1º prêmio.
-// Host web para o painel (web/painel), em http://localhost:5182:
-//   GET  /logs                                 logs ao vivo (Vida.LogsAoVivo)
+// Host web em http://localhost:5182, com as rotas de operação da plataforma:
 //   GET  /assinaturas                          filtro e contagens da assinatura (Vida.Plataforma)
 //   GET  /processadores                        liga/desliga (Vida.Plataforma)
 //   POST /processadores/cobranca/iniciar|parar
@@ -17,7 +15,6 @@ builder.Configuration.AddJsonFile(arquivoDoServiceBus, optional: true);
 // O arquivo local é padrão de desenvolvimento: variável de ambiente e linha de comando continuam valendo mais.
 builder.Configuration.AddEnvironmentVariables();
 builder.Configuration.AddCommandLine(args);
-builder.AddLogsAoVivo();
 // OpenTelemetry (traces, métricas, logs) para o Application Insights. Depois da config local, que traz a connection string.
 builder.AddTelemetria("Vida.Cobranca");
 builder.AddProcessadoresControlaveis();

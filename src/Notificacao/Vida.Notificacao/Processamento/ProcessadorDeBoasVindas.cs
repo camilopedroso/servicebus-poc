@@ -12,7 +12,7 @@ namespace Vida.Notificacao.Processamento;
 /// recebe também as apólices em revisão, que a Cobrança não recebe.
 /// </summary>
 /// <param name="client">ServiceBusClient singleton do app.</param>
-/// <param name="logger">Logger; o painel mostra estas linhas na coluna da Notificação.</param>
+/// <param name="logger">Logger do processador.</param>
 public sealed class ProcessadorDeBoasVindas(ServiceBusClient client, ILogger<ProcessadorDeBoasVindas> logger)
 {
     /// <summary>Assinatura da squad no tópico apolice-emitida. É também o nome do processador na rota /processadores.</summary>

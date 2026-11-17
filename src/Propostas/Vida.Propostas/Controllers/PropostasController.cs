@@ -18,7 +18,7 @@ namespace Vida.Propostas.Controllers;
 /// do SQL Server e responde 201 sem falar com o Service Bus: quem publica é o DespachanteDoOutbox.
 /// </summary>
 /// <param name="banco">DbContext da requisição (scoped).</param>
-/// <param name="logger">Logger; aparece com o selo "API" na coluna de Propostas.</param>
+/// <param name="logger">Logger da API de propostas.</param>
 [ApiController]
 [Route("api/propostas")]
 [Tags("Propostas")]

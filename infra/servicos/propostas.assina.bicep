@@ -30,8 +30,8 @@ resource propostaRecusada 'Microsoft.ServiceBus/namespaces/topics@2024-01-01' ex
   name: topicoPropostaRecusada
 }
 
-// Sem filtro: eventos de propostas que não vieram da API (demonstração) são descartados pelo serviço,
-// que não as encontra no banco. Uma assinatura por consumidor: cada um recebe a sua cópia.
+// Sem filtro: Propostas quer todo desfecho. Um evento de proposta que não está no banco dela é inconsistência e
+// vai para a DLQ da assinatura (ProcessadorDeDesfechos). Uma assinatura por consumidor: cada um recebe a sua cópia.
 resource statusAprovada 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
   parent: apoliceEmitida
   name: 'status-aprovada'

@@ -1,0 +1,39 @@
+# Squad de Plataforma, Vida.Operacao (:5184): ferramentas de operação do namespace. Peek não consome: só olha.
+# Não conhece nenhuma squad: filas, tópicos e assinaturas são descobertos no broker a cada chamada.
+
+@operacao = http://localhost:5184
+@fila = subscricao-entrada
+@assinatura = alto-valor
+
+### Namespace do Service Bus em uso
+GET {{operacao}}/namespace
+
+### Filas com contagens (ativas, DLQ, agendadas)
+GET {{operacao}}/filas
+
+### Peek na fila
+GET {{operacao}}/filas/{{fila}}/mensagens
+
+### Peek na DLQ (com DeadLetterReason e DeadLetterErrorDescription)
+GET {{operacao}}/filas/{{fila}}/mensagens?dlq=true
+
+### Reprocessar a DLQ: devolve para a mesma fila (motivos permanentes, como PayloadInvalido, ficam na DLQ)
+POST {{operacao}}/filas/{{fila}}/dlq/reprocessar
+
+### Reprocessar tirando a contagem do backoff: a Subscrição recomeça da tentativa 1
+POST {{operacao}}/filas/{{fila}}/dlq/reprocessar?removerPropriedade=tentativa
+
+### Assinaturas de todos os tópicos, com contagens e forwardTo
+GET {{operacao}}/assinaturas
+
+### Regras (filtros e actions) de cada assinatura, lidas do broker. Confira depois de qualquer mudança no Bicep
+GET {{operacao}}/assinaturas/regras
+
+### Peek numa assinatura (alto-valor acumula: o Resseguro não tem serviço)
+GET {{operacao}}/assinaturas/{{assinatura}}/mensagens
+
+### Peek na DLQ de uma assinatura
+GET {{operacao}}/assinaturas/cobranca/mensagens?dlq=true
+
+### Assinatura com forwardTo (subscricao): o broker não aceita receiver nela → 400 explicando
+GET {{operacao}}/assinaturas/subscricao/mensagens

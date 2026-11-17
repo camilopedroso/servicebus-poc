@@ -9,10 +9,9 @@
 
   <!-- Da própria squad: ProjectReference. Das outras squads: pacote com versão (feed local, publicar-pacotes.ps1). -->
   <ItemGroup>
-    <PackageReference Include="Vida.Plataforma" Version="1.0.0" />
-    <PackageReference Include="Vida.Subscricao.Contratos" Version="1.0.0" />
-    <PackageReference Include="Vida.LogsAoVivo" Version="1.0.0" />
-    <PackageReference Include="Vida.Telemetria" Version="1.0.0" />
+    <PackageReference Include="Vida.Plataforma" Version="1.0.1" />
+    <PackageReference Include="Vida.Subscricao.Contratos" Version="1.0.1" />
+    <PackageReference Include="Vida.Telemetria" Version="1.1.0" />
   </ItemGroup>
 
 </Project>

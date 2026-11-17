@@ -14,7 +14,8 @@ public class MensagemDeSaidaTestes
     [Fact]
     public void Ida_e_volta_preserva_ids_corpo_e_tipos_das_propriedades()
     {
-        var original = MensagensProposta.Criar(Proposta, simularFalha: true);
+        var original = MensagensProposta.Criar(Proposta);
+        original.ApplicationProperties["ativo"] = true;
         original.ApplicationProperties["numero"] = 42L;
 
         var linha = MensagemDeSaida.De(MensagensProposta.Topico, original);
@@ -27,7 +28,7 @@ public class MensagemDeSaidaTestes
         var corpoRemontado = remontada.Body.ToString();
         Assert.Equal(corpoOriginal, corpoRemontado);
         // JSON não guarda tipo .NET: sem a conversão, bool e número voltariam como string e os filtros SQL não casariam.
-        Assert.Equal(true, remontada.ApplicationProperties[PropriedadesDaProposta.SimularFalha]);
+        Assert.Equal(true, remontada.ApplicationProperties["ativo"]);
         Assert.Equal(42L, remontada.ApplicationProperties["numero"]);
         Assert.Equal("Familiar", remontada.ApplicationProperties[PropriedadesDaProposta.Plano]);
     }

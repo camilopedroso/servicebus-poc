@@ -1,7 +1,6 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="Vida.Plataforma/Vida.Plataforma.csproj" />
-    <Project Path="Vida.LogsAoVivo/Vida.LogsAoVivo.csproj" />
     <Project Path="Vida.Telemetria/Vida.Telemetria.csproj" />
     <Project Path="../Operacao/Vida.Operacao/Vida.Operacao.csproj" />
   </Folder>

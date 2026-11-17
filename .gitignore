@@ -485,7 +485,7 @@ $RECYCLE.BIN/
 
 # Endpoint gerado por infra/up.ps1
 src/servicebus.local.json
-web/painel/dist/
+
 # Connection string do SQL Server local, gerada por infra/sql-up.ps1 (tem a senha)
 src/sqlserver.local.json
 

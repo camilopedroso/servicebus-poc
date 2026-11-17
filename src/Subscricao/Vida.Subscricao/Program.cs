@@ -1,49 +1,48 @@
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
-using Vida.LogsAoVivo.Logs;
 using Vida.Plataforma.Api;
 using Vida.Plataforma.Conexao;
 using Vida.Plataforma.Processamento;
 using Vida.Subscricao.Analise;
-using Vida.Subscricao.Cenarios;
 using Vida.Subscricao.Dados;
 using Vida.Subscricao.Endossos;
+using Vida.Subscricao.Erros;
 using Vida.Subscricao.Outbox;
 using Vida.Telemetria;
 
 // Squad de Subscrição, em http://localhost:5181: analisa as propostas que chegam na caixa de entrada
 // (fila subscricao-entrada, alimentada pelo tópico proposta-recebida), emite a apólice ou recusa, e aplica endossos.
-// Publica apolice-emitida e proposta-recusada; é a única publicadora desses tópicos. Desde a etapa 9 tem banco
-// próprio (VidaSubscricao): a análise grava inbox + apólice/recusa + outbox numa transação, e o despachante publica.
-//   GET  /logs                                 logs ao vivo (Vida.LogsAoVivo)
+// Publica apolice-emitida e proposta-recusada; é a única publicadora desses tópicos. Tem banco próprio
+// (VidaSubscricao): a análise grava inbox + apólice/recusa + outbox numa transação, e o despachante publica.
+// Em Development, o contrato fica em /openapi/v1.json e a interface para explorar e testar, em http://localhost:5181/scalar.
+//
+//   GET  /api/apolices/{id}                    apólice, versão dos endossos aplicada e endossos pedidos
+//   POST /api/apolices/{id}/endossos           grava o endosso (próxima versão) + comando no outbox → 202 (Idempotency-Key opcional)
 //   GET  /processadores                        liga/desliga (Vida.Plataforma): "propostas" e "endossos"
 //   POST /processadores/{nome}/iniciar|parar
-// Demonstração (Controllers/Demonstracao, contrato em /openapi/demo.json; interface em /scalar, em Development):
-//   POST /demo/apolices                     fase 2: publica uma ApoliceEmitida inventada direto no tópico
-//   POST /demo/endossos/em-ordem            fase 3: {apolices, versoes}: v1..vN intercaladas entre apólices (sessões em paralelo)
-//   POST /demo/endossos/fora-de-ordem       fase 3: 5 versões de uma apólice embaralhadas → deferral
-//   POST /demo/endossos/duplicado           fase 3: v1, v1 de novo (mesmo MessageId) e v2 → o broker descarta a cópia
+//
+// Sem a connection string 'Subscricao' o serviço não sobe (fail fast): análise, endossos e outbox dependem do banco.
 var builder = WebApplication.CreateBuilder(args);
 
 var arquivoDoServiceBus = Path.Combine(AppContext.BaseDirectory, ServiceBusClientFactory.ArquivoConfiguracaoLocal);
 builder.Configuration.AddJsonFile(arquivoDoServiceBus, optional: true);
-// Etapa 9: connection string do SQL Server local (ConnectionStrings:Subscricao), gerada por infra/sql-up.ps1.
+// Connection string do SQL Server local (ConnectionStrings:Subscricao), gerada por infra/sql-up.ps1.
 var arquivoDoSqlServer = Path.Combine(AppContext.BaseDirectory, "sqlserver.local.json");
 builder.Configuration.AddJsonFile(arquivoDoSqlServer, optional: true);
 // O arquivo local é padrão de desenvolvimento: variável de ambiente e linha de comando continuam valendo mais.
 builder.Configuration.AddEnvironmentVariables();
 builder.Configuration.AddCommandLine(args);
-builder.AddLogsAoVivo();
 // Fase 5: OpenTelemetry (traces, métricas, logs) para o Application Insights. Depois da config local, que traz a connection string.
 builder.AddTelemetria("Vida.Subscricao");
 // GET /processadores e POST /processadores/{nome}/iniciar|parar: desligar o consumo sem derrubar o processo.
 builder.AddProcessadoresControlaveis();
 builder.Services.AddProblemDetails();
+// Vários tratadores: o primeiro que reconhecer a exceção responde (Service Bus e auth, depois banco).
 builder.Services.AddExceptionHandler<TratadorDeErrosDoServiceBus>();
+builder.Services.AddExceptionHandler<TratadorDeErrosDoBanco>();
 builder.Services.AddControllers();
-// Só as demonstrações têm contrato aqui: a Subscrição não tem API de negócio, ela conversa por eventos.
-builder.Services.AddOpenApi("demo", opcoes =>
-    opcoes.ShouldInclude = descricao => descricao.GroupName == "demo");
+// Documento v1 (/openapi/v1.json), com os endpoints de Controllers/.
+builder.Services.AddOpenApi();
 
 // Um ServiceBusClient por aplicação (singleton): ele mantém a conexão AMQP e é thread-safe.
 // Até a etapa 8 eram dois: um com EnableCrossEntityTransactions (Complete na fila + Send no tópico) e outro sem.
@@ -56,24 +55,25 @@ builder.Services.AddSingleton(sp =>
     return ServiceBusClientFactory.Criar(fqdn);
 });
 
-// Banco da Subscrição. Sem a connection string, a análise não liga: as propostas esperam na fila (em vez de falhar
-// 5 vezes e ir para a DLQ), e os endossos e as demonstrações continuam funcionando.
+// Fail fast: sem banco não há o que fazer. Melhor não subir do que consumir mensagens que não dá para gravar.
 var conexaoSql = builder.Configuration.GetConnectionString("Subscricao");
-builder.Services.AddDbContext<BancoDaSubscricao>(opcoes =>
-    opcoes.UseSqlServer(conexaoSql ?? throw new InvalidOperationException(
-        "Connection string 'Subscricao' não encontrada. Rode infra\\sql-up.ps1 e recompile.")));
+if (string.IsNullOrWhiteSpace(conexaoSql))
+{
+    throw new InvalidOperationException(
+        "Connection string 'Subscricao' não encontrada. Localmente: rode infra/sql-up.ps1 e recompile (o arquivo é copiado no build).");
+}
+builder.Services.AddDbContext<BancoDaSubscricao>(opcoes => opcoes.UseSqlServer(conexaoSql));
 // Ordem importa: hosted services começam na ordem de registro, então o banco é migrado antes do despachante.
 builder.Services.AddHostedService<MigracaoDoBanco>();
 builder.Services.AddScoped<RegistroDaAnalise>();
-if (conexaoSql is not null)
-{
-    builder.Services.AddHostedService<DespachanteDoOutbox>();
-}
+builder.Services.AddScoped<RegistroDeEndossos>();
+builder.Services.AddHostedService<DespachanteDoOutbox>();
+
 builder.Services.AddSingleton<ProcessadorDePropostas>();
 builder.Services.AddProcessadorControlavel(sp =>
 {
     var propostas = sp.GetRequiredService<ProcessadorDePropostas>();
-    return propostas.CriarProcessador(ligarNaPartida: conexaoSql is not null);
+    return propostas.CriarProcessador();
 });
 
 builder.Services.AddSingleton<ProcessadorDeEndossos>();
@@ -82,19 +82,14 @@ builder.Services.AddProcessadorControlavel(sp =>
     var endossos = sp.GetRequiredService<ProcessadorDeEndossos>();
     return endossos.CriarProcessador();
 });
-builder.Services.AddSingleton<PublicacaoDeApolices>();
-builder.Services.AddSingleton<EnvioDeEndossos>();
 
 var app = builder.Build();
 app.UseExceptionHandler();
+// Contrato e interface só em Development: em produção a API seria publicada pelo API Management.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
-    app.MapScalarApiReference(opcoes => opcoes.AddDocument("demo", "Vida.Subscricao (demonstração)", isDefault: true));
+    app.MapScalarApiReference(opcoes => opcoes.AddDocument("v1", "Vida.Subscricao", isDefault: true));
 }
 app.MapControllers();
-if (conexaoSql is null)
-{
-    app.Logger.LogWarning("Sem banco (ConnectionStrings:Subscricao): o processador de propostas fica desligado; rode infra\\sql-up.ps1.");
-}
 app.Run();

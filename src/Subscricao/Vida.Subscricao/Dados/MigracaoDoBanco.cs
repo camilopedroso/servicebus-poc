@@ -5,15 +5,18 @@ namespace Vida.Subscricao.Dados;
 
 /// <summary>
 /// Aplica as migrations do EF Core na partida (cria o banco VidaSubscricao na primeira vez).
-/// Bom para a POC; em produção a migration roda no pipeline (script ou bundle), não no app.
-/// Não derruba o app se o SQL Server estiver fora: os endossos e as demonstrações continuam funcionando.
+/// Em produção a migration costuma rodar no pipeline (script ou bundle), não no app; aqui fica na partida para
+/// simplificar o ambiente local. Se o banco não responder depois das tentativas, o host para (fail fast):
+/// um serviço sem banco não tem o que fazer, e o orquestrador (App Service, Container Apps) reinicia.
 /// </summary>
 public sealed class MigracaoDoBanco(IServiceScopeFactory escopos, ILogger<MigracaoDoBanco> logger) : IHostedService
 {
+    private const int Tentativas = 10;
+
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        // O container pode estar acabando de subir: algumas tentativas antes de desistir.
-        for (var tentativa = 1; tentativa <= 10; tentativa++)
+        // O banco pode estar acabando de subir: algumas tentativas antes de desistir.
+        for (var tentativa = 1; ; tentativa++)
         {
             try
             {
@@ -27,15 +30,10 @@ public sealed class MigracaoDoBanco(IServiceScopeFactory escopos, ILogger<Migrac
                 logger.LogInformation("Banco VidaSubscricao pronto (migrations aplicadas).");
                 return;
             }
-            catch (Exception ex) when (ex is not OperationCanceledException && tentativa < 10)
+            catch (Exception ex) when (ex is not OperationCanceledException && tentativa < Tentativas)
             {
+                logger.LogWarning("Banco VidaSubscricao indisponível (tentativa {Tentativa} de {Total}): {Erro}", tentativa, Tentativas, ex.Message);
                 await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                logger.LogError(
-                    "SQL Server indisponível ({Erro}). A análise de propostas não vai funcionar; rode infra\\sql-up.ps1.",
-                    ex.Message);
             }
         }
     }

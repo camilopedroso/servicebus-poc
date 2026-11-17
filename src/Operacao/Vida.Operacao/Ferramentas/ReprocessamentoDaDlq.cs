@@ -9,7 +9,7 @@ namespace Vida.Operacao.Ferramentas;
 /// no tópico, a cópia chegaria de novo a todas as assinaturas, não só ao serviço dono da fila.
 /// </summary>
 /// <param name="client">ServiceBusClient singleton do app.</param>
-/// <param name="logger">Logger; o painel mostra estas linhas na coluna da Operação.</param>
+/// <param name="logger">Logger das ferramentas de operação.</param>
 public sealed class ReprocessamentoDaDlq(ServiceBusClient client, ILogger<ReprocessamentoDaDlq> logger)
 {
     /// <summary>
@@ -20,8 +20,9 @@ public sealed class ReprocessamentoDaDlq(ServiceBusClient client, ILogger<Reproc
     /// </summary>
     /// <param name="fila">Nome da fila (como está no broker).</param>
     /// <param name="removerPropriedade">
-    /// Application property a tirar de cada cópia antes de reenviar, ou null. Simula "corrigir a causa antes de
-    /// reprocessar": o cenário do painel tira o simularFalha. A ferramenta não sabe o que a propriedade significa.
+    /// Application property a tirar de cada cópia antes de reenviar, ou null. Serve para "corrigir a causa antes de
+    /// reprocessar" quando ela está numa propriedade (ex.: "tentativa", para a Subscrição recomeçar a contagem do
+    /// backoff). A ferramenta não sabe o que a propriedade significa.
     /// </param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <returns>Quantas mensagens foram movidas e quantas ficaram na DLQ.</returns>
@@ -126,7 +127,7 @@ public sealed class ReprocessamentoDaDlq(ServiceBusClient client, ILogger<Reproc
     {
         try
         {
-            // Sem o token da requisição: mesmo se o painel desconectar, o lock é devolvido.
+            // Sem o token da requisição: mesmo se o cliente desconectar, o lock é devolvido.
             await receiver.AbandonMessageAsync(mensagem, cancellationToken: CancellationToken.None);
         }
         catch (ServiceBusException ex) when (ex.Reason == ServiceBusFailureReason.MessageLockLost)

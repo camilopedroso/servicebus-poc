@@ -9,8 +9,8 @@ using Vida.Telemetria;
 namespace Vida.Subscricao.Outbox;
 
 /// <summary>
-/// Publica no Service Bus o que a análise gravou na tabela Subscricao.OutboxMensagens (polling a cada segundo).
-/// Cópia do despachante de Propostas, sem a simulação de indisponibilidade e sem atualizar proposta nenhuma.
+/// Publica no Service Bus o que a análise e a API de endossos gravaram na tabela Subscricao.OutboxMensagens
+/// (polling a cada segundo). Cópia do despachante de Propostas, sem atualizar proposta nenhuma.
 /// Garantia: at-least-once. Se publicar e cair antes de marcar a linha, publica de novo na volta,
 /// com o mesmo MessageId: o consumer (ou a detecção de duplicatas da fila) precisa lidar com isso.
 /// </summary>
@@ -43,7 +43,7 @@ public sealed class DespachanteDoOutbox(
             }
             catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
             {
-                // Banco fora do ar, por exemplo. Loga uma vez por tipo de erro para não inundar o painel.
+                // Banco fora do ar, por exemplo. Loga uma vez por tipo de erro para não inundar os logs.
                 if (ex.Message != ultimoErro)
                 {
                     logger.LogError("Outbox: não foi possível ler as pendentes ({Erro}). Tentando a cada segundo.", ex.Message);
@@ -93,13 +93,15 @@ public sealed class DespachanteDoOutbox(
         using var atividade = FonteDeAtividades.Fonte.StartActivity("PublicarOutbox");
         atividade?.SetTag("vida.outbox.mensagens", pendentes.Count);
 
-        var gruposPorDestino = pendentes.GroupBy(m => m.Destino);
-        foreach (var grupo in gruposPorDestino)
+        // Um envio por destino e sessão: numa entidade com sessions (a fila endossos), todas as mensagens de um mesmo
+        // SendMessagesAsync precisam ter o mesmo SessionId. Nos tópicos o SessionId é null, e o grupo é o destino.
+        var gruposPorDestinoESessao = pendentes.GroupBy(m => (m.Destino, m.SessionId));
+        foreach (var grupo in gruposPorDestinoESessao)
         {
             var mensagens = grupo.ToList();
             try
             {
-                var sender = _senders.GetOrAdd(grupo.Key, client.CreateSender);
+                var sender = _senders.GetOrAdd(grupo.Key.Destino, client.CreateSender);
                 // Lista na ordem do Id: o broker preserva a ordem dentro da chamada.
                 var remontadas = mensagens.Select(m => m.ParaServiceBus());
                 await sender.SendMessagesAsync(remontadas, cancellationToken);

@@ -12,7 +12,7 @@ namespace Vida.Notificacao.Processamento;
 /// proposta-recusada), não uma falha: se fosse para a DLQ, ninguém avisaria o cliente.
 /// </summary>
 /// <param name="client">ServiceBusClient singleton do app.</param>
-/// <param name="logger">Logger; o painel mostra estas linhas na coluna da Notificação.</param>
+/// <param name="logger">Logger do processador.</param>
 public sealed class ProcessadorDeAvisoDeRecusa(ServiceBusClient client, ILogger<ProcessadorDeAvisoDeRecusa> logger)
 {
     /// <summary>Assinatura da squad no tópico proposta-recusada. É também o nome do processador na rota /processadores.</summary>
